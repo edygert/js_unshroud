@@ -967,5 +967,213 @@ describe('Analysis Engine Tests', () => {
 
       expect(correlations).toHaveLength(0);
     });
+
+    test('should restart sequence when time gap resets and new valid sequence starts', async () => {
+      const correlationData = [
+        {
+          id: 'storage-1',
+          timestamp: 1640995200000,
+          sessionId: 'session-1',
+          type: 'storage',
+          storageType: 'localStorage',
+          operation: 'set',
+          key: 'data1'
+        } as StorageEvent,
+        {
+          id: 'network-1',
+          timestamp: 1640995201000,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/data1'
+        } as NetworkEvent,
+        // Long gap - exceeds 5 second maxTimeGap, then another sequence
+        {
+          id: 'storage-2',
+          timestamp: 1640995210000, // 9 seconds after network-1
+          sessionId: 'session-1',
+          type: 'storage',
+          storageType: 'localStorage',
+          operation: 'set',
+          key: 'data2'
+        } as StorageEvent,
+        {
+          id: 'network-2',
+          timestamp: 1640995211000,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'POST',
+          url: 'https://api.example.com/data2'
+        } as NetworkEvent
+      ];
+
+      writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
+
+      correlationEngine = new CorrelationEngine(new QueryEngine());
+      const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
+
+      // Should find two separate correlations (time gap caused chain restart)
+      expect(correlations).toHaveLength(2);
+      expect(correlations[0]?.events[0]?.id).toBe('storage-1');
+      expect(correlations[1]?.events[0]?.id).toBe('storage-2');
+    });
+
+    test('should handle out-of-order event types in sequences', async () => {
+      const correlationData = [
+        {
+          id: 'network-1',
+          timestamp: 1640995200000,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/data'
+        } as NetworkEvent,
+        {
+          id: 'storage-1',
+          timestamp: 1640995200100,
+          sessionId: 'session-1',
+          type: 'storage',
+          storageType: 'localStorage',
+          operation: 'set',
+          key: 'data'
+        } as StorageEvent,
+        {
+          id: 'network-2',
+          timestamp: 1640995200200,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'POST',
+          url: 'https://api.example.com/save'
+        } as NetworkEvent
+      ];
+
+      writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
+
+      correlationEngine = new CorrelationEngine(new QueryEngine());
+      const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
+
+      // Should find one correlation starting from storage-1 to network-2
+      expect(correlations).toHaveLength(1);
+      expect(correlations[0]?.events[0]?.id).toBe('storage-1');
+      expect(correlations[0]?.events[1]?.id).toBe('network-2');
+    });
+
+    test('should handle groups with time gaps exceeding threshold', async () => {
+      const correlationData = [
+        {
+          id: 'network-1',
+          timestamp: 1640995200000,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'POST',
+          url: 'https://api.example.com/start',
+          correlationId: 'req-1'
+        } as NetworkEvent,
+        {
+          id: 'network-2',
+          timestamp: 1640995200100,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/status',
+          correlationId: 'req-1'
+        } as NetworkEvent,
+        // Large time gap exceeding 10 second maxTimeGap
+        {
+          id: 'network-3',
+          timestamp: 1640995220000, // 20 seconds later
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/final',
+          correlationId: 'req-1'
+        } as NetworkEvent
+      ];
+
+      writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
+
+      correlationEngine = new CorrelationEngine(new QueryEngine());
+      const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-request-response');
+
+      // Should find one group with first two events (third is separated by time gap)
+      expect(correlations).toHaveLength(1);
+      expect(correlations[0]?.events).toHaveLength(2);
+      expect(correlations[0]?.events[0]?.id).toBe('network-1');
+      expect(correlations[0]?.events[1]?.id).toBe('network-2');
+    });
+
+    test('should process final group when stream ends', async () => {
+      const correlationData = [
+        {
+          id: 'network-1',
+          timestamp: 1640995200000,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'POST',
+          url: 'https://api.example.com/start',
+          correlationId: 'req-1'
+        } as NetworkEvent,
+        {
+          id: 'network-2',
+          timestamp: 1640995200100,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/status',
+          correlationId: 'req-1'
+        } as NetworkEvent,
+        {
+          id: 'network-3',
+          timestamp: 1640995200200,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/final',
+          correlationId: 'req-1'
+        } as NetworkEvent
+      ];
+
+      writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
+
+      correlationEngine = new CorrelationEngine(new QueryEngine());
+      const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-request-response');
+
+      // Should find one group with all three events processed at stream end
+      expect(correlations).toHaveLength(1);
+      expect(correlations[0]?.events).toHaveLength(3);
+    });
+
+    test('should handle events without correlation field fallback to sessionId', async () => {
+      const correlationData = [
+        {
+          id: 'storage-1',
+          timestamp: 1640995200000,
+          sessionId: 'session-1',
+          type: 'storage',
+          storageType: 'localStorage',
+          operation: 'set',
+          key: 'data'
+          // No correlationId, should use sessionId
+        } as StorageEvent,
+        {
+          id: 'network-1',
+          timestamp: 1640995200500,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/data'
+          // No correlationId, should use sessionId
+        } as NetworkEvent
+      ];
+
+      writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
+
+      correlationEngine = new CorrelationEngine(new QueryEngine());
+      const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
+
+      // Should find correlation based on sessionId as fallback
+      expect(correlations).toHaveLength(1);
+      expect(correlations[0]?.correlationId).toBe('session-1');
+    });
   });
 });

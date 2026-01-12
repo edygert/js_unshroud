@@ -3,6 +3,7 @@ export interface BaseEvent {
   timestamp: number;
   sessionId: string;
   frameId?: string;
+  correlationId?: string;
   type: string;
 }
 

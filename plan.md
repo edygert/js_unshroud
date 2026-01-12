@@ -46,7 +46,7 @@ js_unshroud/
 
 ## Implementation Phases
 
-### Phase 1: MVP (Week 1-2)
+### Phase 1: MVP (Week 1-2) ✅ COMPLETE
 - Set up TypeScript + Bun project structure
 - Implement basic browser launch with Playwright
 - Create minimal instrumentation (network + console only)
@@ -54,7 +54,7 @@ js_unshroud/
 - Unit tests for core modules (target 80% minimum)
 - CLI runner: `js_unshroud run --url http://example.com --out session.jsonl`
 
-### Phase 2: Core CDP Integration (Week 3-4)
+### Phase 2: Core CDP Integration (Week 3-4) ✅ COMPLETE
 - Implement CDPSessionManager with domain enabling (Network, Runtime, Console, Page)
 - Add unified EventLogger with normalized schema
 - Session tracking with IDs, timestamps, frame correlation
@@ -72,7 +72,7 @@ js_unshroud/
 - Comprehensive unit tests for all new components (80%+ coverage maintained)
 - Extended configuration system with granular control
 
-### Phase 4: Correlation & Analysis (Week 7-8)
+### Phase 4: Correlation & Analysis (Week 7-8) ✅ COMPLETE
 - Multi-page session support (navigation, iframes)
 - Event correlation IDs for request-response matching
 - Analysis CLI tools for filtering and correlation queries

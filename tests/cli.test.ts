@@ -434,6 +434,97 @@ describe('Main Function', () => {
   });
 });
 
+describe('CDPSessionManager Tests', () => {
+  let tempOutputFile: string;
+
+  beforeEach(() => {
+    tempOutputFile = `/tmp/cdp-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+  });
+
+  afterEach(() => {
+    try {
+      if (tempOutputFile) {
+        unlinkSync(tempOutputFile);
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  test('should handle setup methods when CDP session is null', () => {
+    const sessionConfig: SessionConfig = createSessionConfig({
+      url: 'https://test.com',
+      out: tempOutputFile,
+      config: undefined
+    });
+
+    const eventLogger = new EventLogger(sessionConfig);
+
+    // Create a CDPSessionManager but access its private methods through reflection
+    const cdpManager = new CDPSessionManager(null as any, eventLogger, sessionConfig.id);
+
+    // The constructor should complete without errors even with null page
+    // The guard clauses in setup methods should prevent errors when cdpSession is null
+    expect(cdpManager).toBeDefined();
+  });
+
+  test('should handle CDP session initialization failure gracefully', async () => {
+    const sessionConfig: SessionConfig = createSessionConfig({
+      url: 'https://test.com',
+      out: tempOutputFile,
+      config: undefined
+    });
+
+    const eventLogger = new EventLogger(sessionConfig);
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+      const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
+      
+      // Close the page before initialization to trigger failure
+      await page.close();
+      
+      // This should fail because page is closed
+      await expect(cdpManager.initialize(page)).rejects.toThrow();
+    } finally {
+      await browser.close();
+      await eventLogger.close();
+    }
+  }, 10000);
+
+  test('should successfully flush pending events', async () => {
+    const sessionConfig: SessionConfig = createSessionConfig({
+      url: `file://${resolve('test_monitoring.html')}`,
+      out: tempOutputFile,
+      config: undefined
+    });
+
+    const eventLogger = new EventLogger(sessionConfig);
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+      const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
+      await cdpManager.initialize(page);
+
+      // Navigate to generate some events
+      await page.goto(sessionConfig.url, { waitUntil: 'domcontentloaded', timeout: 10000 });
+      
+      // Wait a bit for events to be queued
+      await page.waitForTimeout(500);
+
+      // Flush should complete without errors
+      await cdpManager.flushPendingEvents();
+      await cdpManager.disconnect();
+    } finally {
+      await performCleanup(browser, eventLogger);
+    }
+  }, 15000);
+});
+
 describe('End-to-End Integration Tests', () => {
   let tempOutputFile: string;
 

@@ -10,6 +10,8 @@ export class CDPSessionManager {
   private sessionId: string;
   private frameIds: Map<string, string> = new Map();
   private pendingLogEvents: Promise<void>[] = [];
+  private networkCorrelationMap: Map<string, string> = new Map(); // requestId -> correlationId
+  private networkRequestMap: Map<string, { method: string; url: string }> = new Map(); // requestId -> request details
 
   constructor(page: Page, eventLogger: EventLogger, sessionId: string) {
     this.eventLogger = eventLogger;
@@ -38,10 +40,19 @@ export class CDPSessionManager {
 
     // Network.requestWillBeSent
     this.cdpSession.on('Network.requestWillBeSent', (params: Protocol.Network.RequestWillBeSentEvent) => {
+      // Generate correlation ID for this request and store request details
+      const correlationId = `req_${params.requestId}`;
+      this.networkCorrelationMap.set(params.requestId, correlationId);
+      this.networkRequestMap.set(params.requestId, {
+        method: params.request.method,
+        url: params.request.url
+      });
+
       const promise = this.eventLogger.logEvent(createEvent<NetworkEvent>(
         this.sessionId,
         params.frameId,
         {
+          correlationId,
           type: 'network',
           method: params.request.method,
           url: params.request.url,
@@ -54,12 +65,16 @@ export class CDPSessionManager {
 
     // Network.responseReceived
     this.cdpSession.on('Network.responseReceived', (params: Protocol.Network.ResponseReceivedEvent) => {
+      const correlationId = this.networkCorrelationMap.get(params.requestId);
+      const requestInfo = this.networkRequestMap.get(params.requestId);
+
       const promise = this.eventLogger.logEvent(createEvent<NetworkEvent>(
         this.sessionId,
         params.frameId,
         {
+          correlationId,
           type: 'network',
-          method: 'GET', // We need to correlate with request
+          method: requestInfo?.method ?? 'GET',
           url: params.response.url,
           status: params.response.status,
           statusText: params.response.statusText,
@@ -69,19 +84,34 @@ export class CDPSessionManager {
       this.queueLogEvent(promise);
     });
 
+    // Network.loadingFinished - cleanup successful requests
+    this.cdpSession.on('Network.loadingFinished', (params: Protocol.Network.LoadingFinishedEvent) => {
+      // Clean up correlation maps for completed requests
+      this.networkCorrelationMap.delete(params.requestId);
+      this.networkRequestMap.delete(params.requestId);
+    });
+
     // Network.loadingFailed
     this.cdpSession.on('Network.loadingFailed', (params: Protocol.Network.LoadingFailedEvent) => {
+      const correlationId = this.networkCorrelationMap.get(params.requestId);
+      const requestInfo = this.networkRequestMap.get(params.requestId);
+
       const promise = this.eventLogger.logEvent(createEvent<NetworkEvent>(
         this.sessionId,
         undefined,
         {
+          correlationId,
           type: 'network',
-          method: 'GET', // Default method for failed requests
-          url: params.requestId, // Request ID for correlation
+          method: requestInfo?.method ?? 'GET',
+          url: requestInfo?.url ?? params.requestId,
           error: params.errorText
         }
       ));
       this.queueLogEvent(promise);
+
+      // Clean up correlation maps
+      this.networkCorrelationMap.delete(params.requestId);
+      this.networkRequestMap.delete(params.requestId);
     });
   }
 

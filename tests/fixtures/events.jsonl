@@ -1,0 +1,15 @@
+{"id": "event-1", "timestamp": 1640995200000, "sessionId": "session-1", "type": "console", "level": "log", "message": "Application started", "args": []}
+{"id": "event-2", "timestamp": 1640995200100, "sessionId": "session-1", "type": "network", "method": "GET", "url": "https://api.example.com/users", "correlationId": "corr-1"}
+{"id": "event-3", "timestamp": 1640995200200, "sessionId": "session-1", "type": "storage", "storageType": "localStorage", "operation": "set", "key": "userSettings", "value": "theme=dark"}
+{"id": "event-4", "timestamp": 1640995200300, "sessionId": "session-1", "type": "network", "method": "POST", "url": "https://api.example.com/login", "status": 200, "correlationId": "corr-1"}
+{"id": "event-5", "timestamp": 1640995200400, "sessionId": "session-1", "type": "console", "level": "error", "message": "Network error occurred", "args": ["Error details"]}
+{"id": "event-6", "timestamp": 1640995200500, "sessionId": "session-1", "correlationId": "corr-2", "type": "timer", "timerType": "setTimeout", "operation": "start"}
+{"id": "event-7", "timestamp": 1640995200600, "sessionId": "session-1", "correlationId": "corr-2", "type": "network", "method": "GET", "url": "https://api.example.com/data"}
+{"id": "event-8", "timestamp": 1640995200700, "sessionId": "session-1", "type": "dom", "eventType": "click", "target": "button#submit"}
+{"id": "event-9", "timestamp": 1640995200800, "sessionId": "session-1", "type": "error", "message": "JavaScript runtime error"}
+{"id": "event-10", "timestamp": 1640995200900, "sessionId": "session-2", "correlationId": "corr-3", "type": "network", "method": "PUT", "url": "https://api.example.com/update", "status": 200}
+{"id": "event-11", "timestamp": 1640995201000, "sessionId": "session-2", "correlationId": "corr-3", "type": "network", "method": "DELETE", "url": "https://api.example.com/item/123", "status": 204}
+{"id": "event-12", "timestamp": 1640995206000, "sessionId": "session-1", "correlationId": "corr-2", "type": "timer", "timerType": "setTimeout", "operation": "end"}
+{"id": "event-13", "timestamp": 1640995250000, "sessionId": "session-1", "type": "console", "level": "warn", "message": "Warning message", "args": ["warning details"]}
+{"id": "malformed", "this": "is not valid json"}
+{"id": "event-14", "timestamp": 1640995300000, "sessionId": "session-1", "type": "storage", "storageType": "sessionStorage", "operation": "get", "key": "sessionToken"}}
