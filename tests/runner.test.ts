@@ -1,15 +1,15 @@
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect } from 'vitest';
 import { EventLogger } from '../src/orchestrator/EventLogger.ts';
 import { createEvent, validateEvent, serializeEvent } from '../src/schema/events.ts';
-import type { ConsoleEvent, NetworkEvent, StorageEvent, SessionConfig } from '../src/schema/types.ts';
+import type { ConsoleEvent, NetworkEvent, StorageEvent, SessionConfig, MonitoringEvent } from '../src/schema/types.ts';
 
 describe('EventLogger', () => {
   test('should initialize and log session start', () => {
     const config: SessionConfig = {
-      id: 'test-session',
+      id: 'test-session-init',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test.jsonl'
+      outputPath: '/tmp/test_init.jsonl'
     };
 
     const logger = new EventLogger(config);
@@ -18,16 +18,16 @@ describe('EventLogger', () => {
 
   test('should validate and log events', () => {
     const config: SessionConfig = {
-      id: 'test-session',
+      id: 'test-session-validate',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test.jsonl'
+      outputPath: '/tmp/test_validate.jsonl'
     };
 
     const logger = new EventLogger(config);
 
     const consoleEvent = createEvent<ConsoleEvent>(
-      'test-session',
+      'test-session-validate',
       undefined,
       {
         type: 'console',
@@ -41,7 +41,7 @@ describe('EventLogger', () => {
     expect(logger.getEventCount()).toBe(1);
 
     const networkEvent = createEvent<NetworkEvent>(
-      'test-session',
+      'test-session-validate',
       undefined,
       {
         type: 'network',
@@ -56,27 +56,27 @@ describe('EventLogger', () => {
 
   test('should log multiple events efficiently', () => {
     const config: SessionConfig = {
-      id: 'test-session',
+      id: 'test-session-multi',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test.jsonl'
+      outputPath: '/tmp/test_multi.jsonl'
     };
 
     const logger = new EventLogger(config);
 
     const events = [
-      createEvent<ConsoleEvent>('test-session', undefined, {
+      createEvent<ConsoleEvent>('test-session-multi', undefined, {
         type: 'console',
         level: 'info',
         message: 'Info message',
         args: []
       }),
-      createEvent<NetworkEvent>('test-session', undefined, {
+      createEvent<NetworkEvent>('test-session-multi', undefined, {
         type: 'network',
         method: 'POST',
         url: 'http://api.example.com/data'
       }),
-      createEvent<StorageEvent>('test-session', undefined, {
+      createEvent<StorageEvent>('test-session-multi', undefined, {
         type: 'storage',
         storageType: 'localStorage',
         operation: 'set',
@@ -91,10 +91,10 @@ describe('EventLogger', () => {
 
   test('should reject invalid events', () => {
     const config: SessionConfig = {
-      id: 'test-session',
+      id: 'test-session-reject',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test.jsonl'
+      outputPath: '/tmp/test_reject.jsonl'
     };
 
     const logger = new EventLogger(config);
@@ -105,8 +105,7 @@ describe('EventLogger', () => {
       message: 'missing id, timestamp, sessionId'
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    logger.logEvent(invalidEvent as any);
+    logger.logEvent(invalidEvent as unknown as MonitoringEvent);
     expect(logger.getEventCount()).toBe(0); // Should not count invalid events
   });
 
@@ -115,7 +114,7 @@ describe('EventLogger', () => {
       id: 'test-session-close',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/close_test.jsonl'
+      outputPath: '/tmp/test_close.jsonl'
     };
 
     const logger = new EventLogger(config);
@@ -170,16 +169,16 @@ describe('Schema validation', () => {
     };
 
     const serialized = serializeEvent(event);
-    const parsed = JSON.parse(serialized);
+    const parsed = JSON.parse(serialized) as Record<string, unknown>;
 
-    expect(parsed.id).toBe('test-id'); // eslint-disable-line @typescript-eslint/no-unsafe-member-access
-    expect(parsed.type).toBe('console'); // eslint-disable-line @typescript-eslint/no-unsafe-member-access
-    expect(parsed.level).toBe('log'); // eslint-disable-line @typescript-eslint/no-unsafe-member-access
+    expect(parsed.id).toBe('test-id');
+    expect(parsed.type).toBe('console');
+    expect(parsed.level).toBe('log');
   });
 
   test('should handle circular references in serialization', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const circularObj: any = { prop: 'value' };
+    // Create circular reference for testing serialization error handling
+    const circularObj: Record<string, unknown> = { prop: 'value' };
     circularObj.self = circularObj;
 
     const event: ConsoleEvent = {

@@ -135,9 +135,11 @@ export class CDPSessionManager {
     });
   }
 
-  async disconnect(): Promise<void> {
+  disconnect(): void {
+    // CDP cleanup is now handled automatically by browser.close()
+    // Manual disconnect operations are unreliable and often hang
     if (this.cdpSession) {
-      await this.cdpSession.detach();
+      this.cdpSession = null;
     }
   }
 }

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JS Unshroud Monitoring Test Suite</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
+        .test-title { color: #333; font-weight: bold; margin-bottom: 10px; }
+        .status { padding: 5px 10px; border-radius: 4px; margin: 5px 0; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .log-entry { background: #f8f9fa; padding: 8px; margin: 5px 0; border-left: 3px solid #007bff; font-family: monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>JS Unshroud Monitoring Test Suite</h1>
+    <p>This page tests all current monitoring features. Check the console log output for captured events.</p>
+
+    <div class="test-section">
+        <div class="test-title">1. Console Logging Tests</div>
+        <p>These console statements should be captured by the monitoring system.</p>
+
+        <div id="console-test"></div>
+    </div>
+
+    <script>
+        // Test console logging - should be captured
+        console.log("Test 1: Basic console.log captured");
+        console.info("Test 2: console.info captured");
+        console.warn("Test 3: console.warn captured");
+        console.error("Test 4: console.error captured");
+        console.debug("Test 5: console.debug captured");
+
+        // Test with complex objects
+        console.log("Test 6: Object logging", { name: "test", value: 123, arr: [1, 2, 3] });
+
+        // Test with Error objects
+        try {
+            throw new Error("Test exception");
+        } catch (e) {
+            console.error("Test 7: Error object logging", e);
+        }
+
+        console.log("Console logging tests completed");
+    </script>
+
+    <div class="test-section">
+        <div class="test-title">2. Network Request Tests</div>
+        <p>These network requests should be monitored.</p>
+
+        <div id="network-test"></div>
+    </div>
+
+    <script>
+        // Test XMLHttpRequest
+        console.log("=== XMLHttpRequest Tests ===");
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'https://httpbin.org/status/200');
+        xhr.onreadystatechange = function() {
+            if (this.readyState === 4) {
+                console.log("XMLHttpRequest completed with status:", this.status);
+            }
+        };
+        xhr.send();
+
+        // Test Fetch API
+        console.log("=== Fetch API Tests ===");
+        fetch('https://httpbin.org/json')
+            .then(response => response.json())
+            .then(data => console.log("Fetch response received:", data.url))
+            .catch(error => console.log("Fetch error (expected):", error.message));
+
+        // Test WebSocket creation (will fail but should be logged)
+        console.log("=== WebSocket Tests ===");
+        try {
+            const ws = new WebSocket('ws://invalid.test.url:9999/test');
+            ws.onopen = () => console.log("WebSocket opened");
+            ws.onmessage = (event) => console.log("WebSocket message:", event.data);
+            ws.onerror = () => console.log("WebSocket error (expected)");
+            ws.onclose = () => console.log("WebSocket closed");
+        } catch (e) {
+            console.log("WebSocket constructor error:", e.message);
+        }
+
+        console.log("Network request tests completed");
+    </script>
+
+    <div class="test-section">
+        <div class="test-title">3. Storage Operation Tests</div>
+        <p>These localStorage/sessionStorage operations should be monitored.</p>
+
+        <div id="storage-test"></div>
+    </div>
+
+    <script>
+        // Test localStorage operations
+        console.log("=== Storage Tests ===");
+
+        // Set operations
+        localStorage.setItem('test_key_1', 'test_value_1');
+        localStorage.setItem('test_key_2', JSON.stringify({ name: 'test', items: [1, 2, 3] }));
+
+        // Get operations (should not be logged as they don't modify)
+        const value1 = localStorage.getItem('test_key_1');
+        const value2 = localStorage.getItem('test_key_2');
+        console.log("Retrieved values:", value1, value2);
+
+        // Remove operations
+        localStorage.removeItem('test_key_1');
+
+        // Clear operations
+        localStorage.setItem('temp_clear_test', 'will_be_cleared');
+        localStorage.clear();
+
+        // Test sessionStorage
+        sessionStorage.setItem('session_test', 'session_value');
+        sessionStorage.getItem('session_test');
+        sessionStorage.removeItem('session_test');
+
+        console.log("Storage operation tests completed");
+    </script>
+
+    <div class="test-section">
+        <div class="test-title">4. Advanced Test Scenarios</div>
+        <p>Complex scenarios to ensure robust monitoring.</p>
+    </div>
+
+    <script>
+        console.log("=== Advanced Tests ===");
+
+        // Test nested objects with circular references
+        const circular = { name: 'circular test' };
+        circular.self = circular;
+
+        // Test large objects
+        const largeObj = {};
+        for (let i = 0; i < 100; i++) {
+            largeObj[`key${i}`] = `value${i}`;
+        }
+
+        console.log("Large object test:", largeObj);
+
+        // Test with DOM elements
+        const div = document.createElement('div');
+        div.innerHTML = '<span>test content</span>';
+        console.log("DOM element test:", div);
+
+        // Test with functions
+        const testFunc = function() {
+            console.log("Function called");
+            return "function result";
+        };
+        console.log("Function test:", testFunc.toString());
+
+        // Test timing operations
+        setTimeout(() => {
+            console.log("setTimeout callback executed after 1 second");
+        }, 1000);
+
+        console.log("Advanced test scenarios completed");
+
+        // Final completion message
+        setTimeout(() => {
+            console.log("=== ALL MONITORING TESTS COMPLETED ===");
+            console.log("If you can see all console messages in the logs, monitoring is working correctly!");
+        }, 1500);
+    </script>
+
+</body>
+</html>

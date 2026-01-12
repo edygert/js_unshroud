@@ -15,24 +15,54 @@
 
   const originalConsole = { ...console };
 
-  // Override console methods to capture messages
-  const consoleMethods = ['log', 'warn', 'error', 'info', 'debug'];
-  consoleMethods.forEach(method => {
-    const original = console[method];
-    console[method] = function(...args) {
-      window.__js_unshroud_log(JSON.stringify({
-        type: 'console',
-        level: method,
-        message: args.join(' '),
-        args: args,
-        timestamp: Date.now(),
-        url: window.location.href
-      }));
+  // Store console methods for later interception (avoid overriding during page load)
+  window.__js_unshroud_console_methods = ['log', 'warn', 'error', 'info', 'debug'];
 
-      // Call original method to preserve functionality
-      return original.apply(console, args);
-    };
-  });
+  // Intercept console methods after page load to avoid crashes
+  if (document.readyState === 'loading') {
+    // Wait for DOM to be ready before intercepting console
+    document.addEventListener('DOMContentLoaded', function() {
+      // Small additional delay to avoid timing issues
+      setTimeout(function() {
+        window.__js_unshroud_console_methods.forEach(function(method) {
+          const original = console[method];
+          console[method] = function(...args) {
+            // Log to instrumentation system
+            window.__js_unshroud_log(JSON.stringify({
+              type: 'console',
+              level: method,
+              message: Array.prototype.join.call(args, ' '),
+              args: args,
+              timestamp: Date.now(),
+              url: window.location.href
+            }));
+
+            // Call original method to preserve functionality
+            return original.apply(console, args);
+          };
+        });
+        console.log('[JS Unshroud] Console instrumentation activated');
+      }, 100);
+    });
+  } else {
+    // Page already loaded, intercept immediately
+    window.__js_unshroud_console_methods.forEach(function(method) {
+      const original = console[method];
+      console[method] = function(...args) {
+        window.__js_unshroud_log(JSON.stringify({
+          type: 'console',
+          level: method,
+          message: Array.prototype.join.call(args, ' '),
+          args: args,
+          timestamp: Date.now(),
+          url: window.location.href
+        }));
+
+        return original.apply(console, args);
+      };
+    });
+    console.log('[JS Unshroud] Console instrumentation activated');
+  }
 
   // Store references for other instrumentation modules
   window.__js_unshroud_originals = {

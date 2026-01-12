@@ -1,0 +1,10 @@
+{
+  "enableConsole": true,
+  "enableNetwork": false,
+  "enableStorage": false,
+  "enableWebSocket": true,
+  "enableTimer": false,
+  "enableError": true,
+  "enableDOM": false,
+  "sampleRate": 0.5
+}

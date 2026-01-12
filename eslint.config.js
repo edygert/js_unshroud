@@ -106,6 +106,14 @@ export default [
     },
     rules: {
       "@typescript-eslint/no-non-null-assertion": "off", // Tests often need assertions
+      "@typescript-eslint/no-floating-promises": "off", // Test expectations don't need to be awaited
+      "@typescript-eslint/unbound-method": "off", // Mocked methods and framework globals
+      "@typescript-eslint/no-explicit-any": "off", // Mock objects often need any
+      "@typescript-eslint/no-unsafe-assignment": "off", // Mock assignments
+      "@typescript-eslint/no-unsafe-call": "off", // Mock calls
+      "@typescript-eslint/no-unsafe-member-access": "off", // Mock member access
+      "@typescript-eslint/no-unsafe-argument": "off", // Mock arguments
+      "@typescript-eslint/no-unsafe-return": "off", // Mock returns
     },
   },
 

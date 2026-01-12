@@ -75,142 +75,149 @@
   if (window.__js_unshroud_originals.XMLHttpRequest) {
     const OriginalXHR = window.__js_unshroud_originals.XMLHttpRequest;
 
-    window.XMLHttpRequest = function() {
-      const xhr = new OriginalXHR();
-      const stackTrace = getStackTrace();
-      let startTime = Date.now();
+    const originalOpen = OriginalXHR.prototype.open;
+    const originalSend = OriginalXHR.prototype.send;
 
-      // Override open method
-      const originalOpen = xhr.open;
-      xhr.open = function(method, url /* , async, user, password */) {
-        startTime = Date.now();
+    // Override open method on prototype
+    OriginalXHR.prototype.open = function(method, url /* , async, user, password */) {
+      this._js_unshroud_method = method;
+      this._js_unshroud_url = url;
+      this._js_unshroud_startTime = Date.now();
+      this._js_unshroud_stackTrace = getStackTrace();
+
+      logEvent({
+        type: 'network',
+        method: method,
+        url: url,
+        stackTrace: this._js_unshroud_stackTrace,
+        timestamp: this._js_unshroud_startTime,
+        xhr: true
+      });
+
+      return originalOpen.apply(this, arguments);
+    };
+
+    // Override send method on prototype
+    OriginalXHR.prototype.send = function(/* body */) {
+      const xhr = this;
+      const startTime = this._js_unshroud_startTime;
+
+      if (this.onreadystatechange) {
+        const originalHandler = this.onreadystatechange;
+        this.onreadystatechange = function() {
+          if (this.readyState === 4) { // DONE
+            const endTime = Date.now();
+
+            logEvent({
+              type: 'network',
+              method: xhr._js_unshroud_method,
+              url: xhr._js_unshroud_url,
+              status: this.status,
+              statusText: this.statusText,
+              responseHeaders: this.getAllResponseHeaders(),
+              responsePayload: this.responseText,
+              duration: endTime - startTime,
+              timestamp: endTime,
+              xhr: true
+            });
+          }
+          return originalHandler.apply(this, arguments);
+        };
+      }
+
+      // Hook load event for modern code
+      const originalOnLoad = this.onload;
+      this.onload = function() {
+        const endTime = Date.now();
+
         logEvent({
           type: 'network',
-          method: method,
-          url: url,
-          stackTrace: stackTrace,
-          timestamp: startTime,
+          method: xhr._js_unshroud_method,
+          url: xhr._js_unshroud_url,
+          status: this.status,
+          statusText: this.statusText,
+          responseHeaders: this.getAllResponseHeaders(),
+          responsePayload: this.responseText,
+          duration: endTime - startTime,
+          timestamp: endTime,
           xhr: true
         });
 
-        return originalOpen.apply(this, arguments);
-      };
-
-      // Override send method
-      const originalSend = xhr.send;
-      xhr.send = function(/* body */) {
-        if (this.onreadystatechange) {
-          const originalHandler = this.onreadystatechange;
-          this.onreadystatechange = function() {
-            if (this.readyState === 4) { // DONE
-              const endTime = Date.now();
-
-              logEvent({
-                type: 'network',
-                method: this.__js_unshroud_method,
-                url: this.__js_unshroud_url,
-                status: this.status,
-                statusText: this.statusText,
-                responseHeaders: this.getAllResponseHeaders(),
-                responsePayload: this.responseText,
-                duration: endTime - startTime,
-                timestamp: endTime,
-                xhr: true
-              });
-            }
-            return originalHandler.apply(this, arguments);
-          };
+        if (originalOnLoad) {
+          return originalOnLoad.apply(this, arguments);
         }
-
-        return originalSend.apply(this, arguments);
       };
 
-      // Store method and URL for later retrieval
-      Object.defineProperty(xhr, '__js_unshroud_method', {
-        value: arguments[0], // method
-        writable: false
-      });
-      Object.defineProperty(xhr, '__js_unshroud_url', {
-        value: arguments[1], // url
-        writable: false
-      });
-
-      return xhr;
+      return originalSend.apply(this, arguments);
     };
-
-    // Copy prototype
-    window.XMLHttpRequest.prototype = OriginalXHR.prototype;
-
-    // Override constructor
-    Object.setPrototypeOf(window.XMLHttpRequest, OriginalXHR);
   }
 
-  // Instrument WebSocket
+  // Instrument WebSocket - Use safer approach without constructor wrapping
   if (window.__js_unshroud_originals.WebSocket) {
     const OriginalWebSocket = window.__js_unshroud_originals.WebSocket;
 
-    window.WebSocket = function(url, protocols) {
-      const stackTrace = getStackTrace();
-      const ws = new OriginalWebSocket(url, protocols);
+    // Override send method on prototype to detect WebSocket usage
+    const originalSend = OriginalWebSocket.prototype.send;
+    OriginalWebSocket.prototype.send = function(data) {
+      if (!this._js_unshroud_logged) {
+        logEvent({
+          type: 'websocket',
+          event: 'connect_attempt',
+          url: this.url,
+          timestamp: Date.now()
+        });
+        this._js_unshroud_logged = true;
 
-      logEvent({
-        type: 'websocket',
-        event: 'open',
-        url: url,
-        protocols: protocols,
-        stackTrace: stackTrace,
-        timestamp: Date.now()
-      });
+        // Hook events once per instance
+        const ws = this;
 
-      // Hook events
-      if (ws.addEventListener) {
-        const originalAddListener = ws.addEventListener;
-
-        originalAddListener.call(ws, 'message', function(event) {
+        const originalAddListener = this.addEventListener;
+        originalAddListener.call(this, 'message', function(event) {
           logEvent({
             type: 'websocket',
             event: 'message',
-            url: url,
+            url: ws.url,
             data: event.data,
             timestamp: Date.now()
           });
         });
 
-        originalAddListener.call(ws, 'close', function(event) {
+        originalAddListener.call(this, 'close', function(event) {
           logEvent({
             type: 'websocket',
             event: 'close',
-            url: url,
+            url: ws.url,
             code: event.code,
             reason: event.reason,
             timestamp: Date.now()
           });
         });
 
-        originalAddListener.call(ws, 'error', function(event) {
+        originalAddListener.call(this, 'error', function(event) {
           logEvent({
             type: 'websocket',
             event: 'error',
-            url: url,
+            url: ws.url,
             error: event.toString(),
             timestamp: Date.now()
           });
         });
       }
 
-      // Store reference to original WebSocket
-      ws.__js_unshroud_url = url;
-      return ws;
+      return originalSend.call(this, data);
     };
 
-    // Copy prototype and static properties
-    window.WebSocket.prototype = OriginalWebSocket.prototype;
-    Object.setPrototypeOf(window.WebSocket, OriginalWebSocket);
-
-    // Copy static properties
+    // Copy static properties safely
     Object.getOwnPropertyNames(OriginalWebSocket).forEach(prop => {
       if (!Object.prototype.hasOwnProperty.call(window.WebSocket, prop)) {
-        window.WebSocket[prop] = OriginalWebSocket[prop];
+        const descriptor = Object.getOwnPropertyDescriptor(OriginalWebSocket, prop);
+        if (descriptor && !descriptor.get && !descriptor.set) {
+        try {
+          window.WebSocket[prop] = OriginalWebSocket[prop];
+        } catch {
+          // Ignore read-only property errors
+        }
+        }
       }
     });
   }

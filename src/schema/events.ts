@@ -40,9 +40,9 @@ type SerializableValue = string | number | boolean | null | SerializableValue[] 
 export function serializeEvent(event: MonitoringEvent): string {
   try {
     return JSON.stringify(event);
-  } catch (error) {
+  } catch {
     // Handle circular references and other serialization errors
-    console.error('Failed to serialize event:', error);
+    // Note: This is expected for events with circular references like DOM objects
     const sanitizedEvent = { ...event } as Record<string, unknown>;
 
     // Helper function to sanitize values
