@@ -46,9 +46,11 @@ function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
     enableNetwork: true,
     enableStorage: true,
     enableWebSocket: true,
-    enableTimer: false, // Will be implemented in Phase 3
+    enableTimer: false,
     enableError: true,
-    enableDOM: false, // Will be implemented in Phase 3
+    enableDOM: false,
+    enableFingerprinting: false,
+    enableObjectTracking: false,
     sampleRate: 1.0
   };
 
@@ -85,11 +87,19 @@ function loadInstrumentationScripts(config: InstrumentationConfig) {
   const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
   const networkScript = readFileSync('./src/instrumentation/network-hooks.js', 'utf-8');
   const storageScript = readFileSync('./src/instrumentation/storage-hooks.js', 'utf-8');
+  const timerScript = readFileSync('./src/instrumentation/timer-hooks.js', 'utf-8');
+  const domScript = readFileSync('./src/instrumentation/dom-hooks.js', 'utf-8');
+  const fingerprintingScript = readFileSync('./src/instrumentation/fingerprinting-hooks.js', 'utf-8');
+  const objectTrackingScript = readFileSync('./src/instrumentation/object-tracking.js', 'utf-8');
 
   return {
     bootstrap: bootstrapScript,
     network: config.enableNetwork ? networkScript : null,
-    storage: config.enableStorage ? storageScript : null
+    storage: config.enableStorage ? storageScript : null,
+    timer: config.enableTimer ? timerScript : null,
+    dom: config.enableDOM ? domScript : null,
+    fingerprinting: config.enableFingerprinting ? fingerprintingScript : null,
+    objectTracking: config.enableObjectTracking ? objectTrackingScript : null
   };
 }
 
@@ -106,6 +116,22 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig) 
 
   if (scripts.storage) {
     await page.addInitScript({ content: scripts.storage });
+  }
+
+  if (scripts.timer) {
+    await page.addInitScript({ content: scripts.timer });
+  }
+
+  if (scripts.dom) {
+    await page.addInitScript({ content: scripts.dom });
+  }
+
+  if (scripts.fingerprinting) {
+    await page.addInitScript({ content: scripts.fingerprinting });
+  }
+
+  if (scripts.objectTracking) {
+    await page.addInitScript({ content: scripts.objectTracking });
   }
 
   return scripts;

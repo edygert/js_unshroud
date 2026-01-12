@@ -104,5 +104,7 @@ export interface InstrumentationConfig {
   enableTimer: boolean;
   enableError: boolean;
   enableDOM: boolean;
+  enableFingerprinting: boolean;
+  enableObjectTracking: boolean;
   sampleRate: number;
 }

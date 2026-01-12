@@ -1,0 +1,12 @@
+{
+  "enableConsole": true,
+  "enableNetwork": true,
+  "enableStorage": true,
+  "enableWebSocket": true,
+  "enableTimer": true,
+  "enableError": true,
+  "enableDOM": true,
+  "enableFingerprinting": true,
+  "enableObjectTracking": true,
+  "sampleRate": 1.0
+}

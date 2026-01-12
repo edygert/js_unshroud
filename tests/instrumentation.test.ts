@@ -17,6 +17,7 @@ declare global {
       localStorage?: Storage;
       sessionStorage?: Storage;
     };
+    __js_unshroud_trackObject?: (obj: any, label: string, options?: any) => any;
     __test_log_event?: (event: string) => void;
   }
 }
@@ -24,9 +25,13 @@ declare global {
 describe('Instrumentation Scripts', () => {
   let browser: Browser;
   let page: Page;
-  const bootstrapScript = readFileSync(join(process.cwd(), 'src/instrumentation/bootstrap.js'), 'utf-8');
-  const networkHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/network-hooks.js'), 'utf-8');
-  const storageHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/storage-hooks.js'), 'utf-8');
+const bootstrapScript = readFileSync(join(process.cwd(), 'src/instrumentation/bootstrap.js'), 'utf-8');
+const networkHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/network-hooks.js'), 'utf-8');
+const storageHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/storage-hooks.js'), 'utf-8');
+const timerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/timer-hooks.js'), 'utf-8');
+const domHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/dom-hooks.js'), 'utf-8');
+const fingerprintingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/fingerprinting-hooks.js'), 'utf-8');
+const objectTrackingScript = readFileSync(join(process.cwd(), 'src/instrumentation/object-tracking.js'), 'utf-8');
 
   beforeAll(async () => {
     browser = await chromium.launch({ headless: true });
@@ -287,6 +292,371 @@ describe('Instrumentation Scripts', () => {
       expect(storageEvents.length).toBe(2);
       expect(storageEvents[1].oldValue).toBe('oldValue');
       expect(storageEvents[1].value).toBe('newValue');
+      await page.close();
+    });
+  });
+
+  describe('Timer Hooks Script', () => {
+    test('should intercept setTimeout calls', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(timerHooksScript); // Load timer hooks first
+      await page.addInitScript(bootstrapScript); // Bootstrap second
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        setTimeout(() => {}, 1000);
+      });
+
+      await page.waitForTimeout(100);
+
+      const timerEvents = events.filter(e => e.type === 'timer' && e.timerType === 'setTimeout');
+      expect(timerEvents.length).toBeGreaterThan(0);
+      expect(timerEvents[0]).toMatchObject({
+        type: 'timer',
+        timerType: 'setTimeout',
+        operation: 'create'
+      });
+      expect(timerEvents[0].handler).toContain('function');
+      await page.close();
+    });
+
+    test('should intercept setInterval calls', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(timerHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const id = setInterval(() => {}, 1000);
+        clearInterval(id);
+      });
+
+      await page.waitForTimeout(100);
+
+      const timerEvents = events.filter(e => e.type === 'timer' && e.timerType === 'setInterval');
+      expect(timerEvents.length).toBeGreaterThan(0);
+      expect(timerEvents[0]).toMatchObject({
+        type: 'timer',
+        timerType: 'setInterval',
+        operation: 'create',
+        delay: 1000
+      });
+      await page.close();
+    });
+
+    test('should intercept requestAnimationFrame calls', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(timerHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        requestAnimationFrame(() => {});
+      });
+
+      await page.waitForTimeout(100);
+
+      const timerEvents = events.filter(e => e.type === 'timer' && e.timerType === 'requestAnimationFrame');
+      expect(timerEvents.length).toBeGreaterThan(0);
+      expect(timerEvents[0]).toMatchObject({
+        type: 'timer',
+        timerType: 'requestAnimationFrame',
+        operation: 'create'
+      });
+      await page.close();
+    });
+  });
+
+  describe('DOM Hooks Script', () => {
+    test('should intercept addEventListener calls', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(domHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        document.addEventListener('click', () => {});
+      });
+
+      await page.waitForTimeout(100);
+
+      const domEvents = events.filter(e => e.type === 'dom' && e.operation === 'addEventListener');
+      expect(domEvents.length).toBeGreaterThan(0);
+      expect(domEvents[0]).toMatchObject({
+        type: 'dom',
+        eventType: 'click',
+        operation: 'addEventListener'
+      });
+      await page.close();
+    });
+
+    test('should intercept DOM mutation methods', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(domHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+      });
+
+      await page.waitForTimeout(100);
+
+      const mutationEvents = events.filter(e => e.type === 'dom' && e.operation === 'appendChild');
+      expect(mutationEvents.length).toBeGreaterThan(0);
+      expect(mutationEvents[0]).toMatchObject({
+        type: 'dom',
+        operation: 'appendChild',
+        addedNode: 'div'
+      });
+      await page.close();
+    });
+
+    test('should intercept innerHTML changes', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(domHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        document.body.innerHTML = '<p>test</p>';
+      });
+
+      await page.waitForTimeout(100);
+
+      const innerHtmlEvents = events.filter(e => e.type === 'dom' && e.operation === 'innerHTML');
+      expect(innerHtmlEvents.length).toBeGreaterThan(0);
+      expect(innerHtmlEvents[0]).toMatchObject({
+        type: 'dom',
+        operation: 'innerHTML'
+      });
+      expect(innerHtmlEvents[0].valueLength).toBeGreaterThan(0);
+      await page.close();
+    });
+  });
+
+  describe('Fingerprinting Hooks Script', () => {
+    test('should intercept canvas toDataURL calls', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(fingerprintingHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx?.fillRect(0, 0, 10, 10);
+        canvas.toDataURL();
+      });
+
+      await page.waitForTimeout(100);
+
+      const fingerprintingEvents = events.filter(e => e.type === 'fingerprinting' && e.method === 'toDataURL');
+      expect(fingerprintingEvents.length).toBeGreaterThan(0);
+      expect(fingerprintingEvents[0]).toMatchObject({
+        type: 'fingerprinting',
+        method: 'toDataURL',
+        operation: 'canvas_fingerprint'
+      });
+      await page.close();
+    });
+
+    test('should intercept navigator property reads', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(fingerprintingHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+        navigator.userAgent;
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+        navigator.language;
+      });
+
+      await page.waitForTimeout(100);
+
+      const uaEvents = events.filter(e => e.type === 'fingerprinting' && e.method === 'navigator.userAgent');
+      const langEvents = events.filter(e => e.type === 'fingerprinting' && e.method === 'navigator.language');
+
+      expect(uaEvents.length).toBeGreaterThan(0);
+      expect(langEvents.length).toBeGreaterThan(0);
+      expect(uaEvents[0].operation).toBe('navigator_read');
+      await page.close();
+    });
+  });
+
+  describe('Object Tracking Script', () => {
+    test('should provide trackObject API', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(objectTrackingScript);
+      await page.goto('about:blank');
+
+      const apiExists = await page.evaluate(() => {
+        return typeof window.__js_unshroud_trackObject === 'function';
+      });
+
+      expect(apiExists).toBe(true);
+      await page.close();
+    });
+
+    test('should track object property access', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(objectTrackingScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const testObj = { prop1: 'value1', prop2: 42 };
+        const tracked = window.__js_unshroud_trackObject!(testObj, 'testObject');
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _val = tracked.prop1;
+        tracked.prop2 = 100;
+      });
+
+      await page.waitForTimeout(100);
+
+      const trackingEvents = events.filter(e => e.type === 'object_tracking');
+      expect(trackingEvents.length).toBe(2);
+
+      const getEvent = trackingEvents.find(e => e.operation === 'get');
+      const setEvent = trackingEvents.find(e => e.operation === 'set');
+
+      expect(getEvent).toMatchObject({
+        type: 'object_tracking',
+        operation: 'get',
+        label: 'testObject',
+        property: 'prop1'
+      });
+
+      expect(setEvent).toMatchObject({
+        type: 'object_tracking',
+        operation: 'set',
+        label: 'testObject',
+        property: 'prop2'
+      });
       await page.close();
     });
   });
