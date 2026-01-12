@@ -8,7 +8,8 @@ export class CDPSessionManager {
   private cdpSession: CDPSession | null = null;
   private eventLogger: EventLogger;
   private sessionId: string;
-  private frameId?: string;
+  private frameIds: Map<string, string> = new Map();
+  private pendingLogEvents: Promise<void>[] = [];
 
   constructor(page: Page, eventLogger: EventLogger, sessionId: string) {
     this.eventLogger = eventLogger;
@@ -37,9 +38,9 @@ export class CDPSessionManager {
 
     // Network.requestWillBeSent
     this.cdpSession.on('Network.requestWillBeSent', (params: Protocol.Network.RequestWillBeSentEvent) => {
-      void this.eventLogger.logEvent(createEvent<NetworkEvent>(
+      const promise = this.eventLogger.logEvent(createEvent<NetworkEvent>(
         this.sessionId,
-        this.frameId,
+        params.frameId,
         {
           type: 'network',
           method: params.request.method,
@@ -48,13 +49,14 @@ export class CDPSessionManager {
           requestPayload: params.request.postData
         }
       ));
+      this.queueLogEvent(promise);
     });
 
     // Network.responseReceived
     this.cdpSession.on('Network.responseReceived', (params: Protocol.Network.ResponseReceivedEvent) => {
-      void this.eventLogger.logEvent(createEvent<NetworkEvent>(
+      const promise = this.eventLogger.logEvent(createEvent<NetworkEvent>(
         this.sessionId,
-        this.frameId,
+        params.frameId,
         {
           type: 'network',
           method: 'GET', // We need to correlate with request
@@ -64,13 +66,14 @@ export class CDPSessionManager {
           responseHeaders: params.response.headers as Record<string, string>
         }
       ));
+      this.queueLogEvent(promise);
     });
 
     // Network.loadingFailed
     this.cdpSession.on('Network.loadingFailed', (params: Protocol.Network.LoadingFailedEvent) => {
-      void this.eventLogger.logEvent(createEvent<NetworkEvent>(
+      const promise = this.eventLogger.logEvent(createEvent<NetworkEvent>(
         this.sessionId,
-        this.frameId,
+        undefined,
         {
           type: 'network',
           method: 'GET', // Default method for failed requests
@@ -78,6 +81,7 @@ export class CDPSessionManager {
           error: params.errorText
         }
       ));
+      this.queueLogEvent(promise);
     });
   }
 
@@ -86,9 +90,9 @@ export class CDPSessionManager {
 
     // Console.messageAdded
     this.cdpSession.on('Console.messageAdded', (params: Protocol.Console.MessageAddedEvent) => {
-      void this.eventLogger.logEvent(createEvent<ConsoleEvent>(
+      const promise = this.eventLogger.logEvent(createEvent<ConsoleEvent>(
         this.sessionId,
-        this.frameId,
+        undefined,
         {
           type: 'console',
           level: params.message.level as 'log' | 'warn' | 'error' | 'info' | 'debug',
@@ -96,6 +100,7 @@ export class CDPSessionManager {
           args: [] // CDP doesn't provide structured args in the same way
         }
       ));
+      this.queueLogEvent(promise);
     });
   }
 
@@ -104,9 +109,9 @@ export class CDPSessionManager {
 
     // Runtime.exceptionThrown
     this.cdpSession.on('Runtime.exceptionThrown', (params: Protocol.Runtime.ExceptionThrownEvent) => {
-      void this.eventLogger.logEvent(createEvent<ErrorEvent>(
+      const promise = this.eventLogger.logEvent(createEvent<ErrorEvent>(
         this.sessionId,
-        this.frameId,
+        params.exceptionDetails.executionContextId?.toString(),
         {
           type: 'error',
           message: params.exceptionDetails.exception?.description ?? 'Runtime exception',
@@ -118,6 +123,7 @@ export class CDPSessionManager {
           ).join('\n')
         }
       ));
+      this.queueLogEvent(promise);
     });
   }
 
@@ -126,16 +132,35 @@ export class CDPSessionManager {
 
     // Page.frameAttached
     this.cdpSession.on('Page.frameAttached', (params: Protocol.Page.FrameAttachedEvent) => {
-      this.frameId = params.frameId;
+      this.frameIds.set(params.frameId, params.parentFrameId || 'main');
     });
 
     // Page.frameNavigated
     this.cdpSession.on('Page.frameNavigated', (params: Protocol.Page.FrameNavigatedEvent) => {
-      this.frameId = params.frame.id;
+      this.frameIds.set(params.frame.id, params.frame.url ?? params.frame.name ?? 'unknown');
     });
   }
 
-  disconnect(): void {
+  private queueLogEvent(promise: Promise<void>): void {
+    this.pendingLogEvents.push(promise);
+    
+    // Clean up completed promises periodically
+    if (this.pendingLogEvents.length > 100) {
+      this.pendingLogEvents = this.pendingLogEvents.slice(-50);
+    }
+  }
+
+  async flushPendingEvents(): Promise<void> {
+    if (this.pendingLogEvents.length > 0) {
+      await Promise.allSettled(this.pendingLogEvents);
+      this.pendingLogEvents = [];
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    // Flush any pending event logs before disconnecting
+    await this.flushPendingEvents();
+    
     // CDP cleanup is now handled automatically by browser.close()
     // Manual disconnect operations are unreliable and often hang
     if (this.cdpSession) {

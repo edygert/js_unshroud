@@ -6,6 +6,7 @@ export class EventLogger {
   private writeStream: WriteStream;
   private sessionConfig: SessionConfig;
   private eventCount = 0;
+  private closed = false;
 
   constructor(sessionConfig: SessionConfig) {
     this.sessionConfig = sessionConfig;
@@ -24,7 +25,12 @@ export class EventLogger {
     }) + '\n');
   }
 
-  logEvent(event: MonitoringEvent): void {
+  async logEvent(event: MonitoringEvent): Promise<void> {
+    // Ignore events after logger is closed
+    if (this.closed) {
+      return Promise.resolve();
+    }
+
     if (!validateEvent(event)) {
       console.warn('Invalid event received:', event);
       return;
@@ -32,17 +38,25 @@ export class EventLogger {
 
     try {
       const serialized = serializeEvent(event);
-      this.writeStream.write(serialized + '\n');
-      this.eventCount++;
+      return new Promise((resolve, reject) => {
+        this.writeStream.write(serialized + '\n', (error) => {
+          if (error) {
+            console.error('Failed to log event:', error);
+            reject(error);
+          } else {
+            this.eventCount++;
+            resolve();
+          }
+        });
+      });
     } catch (error) {
-      console.error('Failed to log event:', error);
+      console.error('Failed to serialize event:', error);
+      return Promise.resolve();
     }
   }
 
-  logEvents(events: MonitoringEvent[]): void {
-    for (const event of events) {
-      this.logEvent(event);
-    }
+  async logEvents(events: MonitoringEvent[]): Promise<void> {
+    await Promise.all(events.map(event => this.logEvent(event)));
   }
 
   getEventCount(): number {
@@ -50,6 +64,9 @@ export class EventLogger {
   }
 
   async close(): Promise<void> {
+    // Mark as closed to prevent new events from being logged
+    this.closed = true;
+
     return new Promise((resolve, reject) => {
       // Log session end
       this.writeStream.write(JSON.stringify({

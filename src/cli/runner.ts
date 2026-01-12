@@ -211,6 +211,9 @@ async function runMonitoring(args: Args) {
     console.error('Error during monitoring:', error);
     throw error; // Re-throw for main function to handle
   } finally {
+    // Flush pending events before cleanup
+    await cdpManager.flushPendingEvents();
+    await cdpManager.disconnect();
     await performCleanup(browser, eventLogger);
   }
 }

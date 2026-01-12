@@ -4,9 +4,26 @@
 
   if (!window.__js_unshroud_originals) return;
 
+  // Generate a simple event ID
+  const generateEventId = function() {
+    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  };
+
+  // Get session ID from window or generate a temporary one
+  const getSessionId = function() {
+    return window.__js_unshroud_session_id || 'unknown_session';
+  };
+
   const logEvent = function(event) {
     if (window.__js_unshroud_log) {
-      window.__js_unshroud_log(JSON.stringify(event));
+      // Ensure all events have required fields
+      const enrichedEvent = {
+        id: generateEventId(),
+        sessionId: getSessionId(),
+        timestamp: event.timestamp || Date.now(),
+        ...event
+      };
+      window.__js_unshroud_log(JSON.stringify(enrichedEvent));
     }
   };
 
@@ -57,7 +74,7 @@
       logEvent({
         type: 'storage',
         storageType: storageType,
-        operation: 'set',
+        operation: 'setItem',
         key: key,
         value: value,
         oldValue: oldValue,

@@ -13,55 +13,56 @@
     };
   }
 
-  const originalConsole = { ...console };
+  // Store original console reference (direct reference, not copy)
+  const originalConsole = console;
 
   // Store console methods for later interception (avoid overriding during page load)
   window.__js_unshroud_console_methods = ['log', 'warn', 'error', 'info', 'debug'];
+
+  // Generate a simple event ID
+  const generateEventId = function() {
+    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  };
+
+  // Get session ID from window or generate a temporary one
+  const getSessionId = function() {
+    return window.__js_unshroud_session_id || 'unknown_session';
+  };
+
+  // Shared console interception logic
+  const interceptConsole = function() {
+    window.__js_unshroud_console_methods.forEach(function(method) {
+      const original = console[method];
+      console[method] = function(...args) {
+        // Log to instrumentation system
+        window.__js_unshroud_log(JSON.stringify({
+          id: generateEventId(),
+          sessionId: getSessionId(),
+          timestamp: Date.now(),
+          type: 'console',
+          level: method,
+          message: Array.prototype.join.call(args, ' '),
+          args: args,
+          url: window.location.href
+        }));
+
+        // Call original method to preserve functionality
+        return original.apply(console, args);
+      };
+    });
+    console.log('[JS Unshroud] Console instrumentation activated');
+  };
 
   // Intercept console methods after page load to avoid crashes
   if (document.readyState === 'loading') {
     // Wait for DOM to be ready before intercepting console
     document.addEventListener('DOMContentLoaded', function() {
       // Small additional delay to avoid timing issues
-      setTimeout(function() {
-        window.__js_unshroud_console_methods.forEach(function(method) {
-          const original = console[method];
-          console[method] = function(...args) {
-            // Log to instrumentation system
-            window.__js_unshroud_log(JSON.stringify({
-              type: 'console',
-              level: method,
-              message: Array.prototype.join.call(args, ' '),
-              args: args,
-              timestamp: Date.now(),
-              url: window.location.href
-            }));
-
-            // Call original method to preserve functionality
-            return original.apply(console, args);
-          };
-        });
-        console.log('[JS Unshroud] Console instrumentation activated');
-      }, 100);
+      setTimeout(interceptConsole, 100);
     });
   } else {
     // Page already loaded, intercept immediately
-    window.__js_unshroud_console_methods.forEach(function(method) {
-      const original = console[method];
-      console[method] = function(...args) {
-        window.__js_unshroud_log(JSON.stringify({
-          type: 'console',
-          level: method,
-          message: Array.prototype.join.call(args, ' '),
-          args: args,
-          timestamp: Date.now(),
-          url: window.location.href
-        }));
-
-        return original.apply(console, args);
-      };
-    });
-    console.log('[JS Unshroud] Console instrumentation activated');
+    interceptConsole();
   }
 
   // Store references for other instrumentation modules

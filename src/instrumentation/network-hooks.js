@@ -2,11 +2,33 @@
 (function() {
   'use strict';
 
-  if (!window.__js_unshroud_originals) return;
+  // Wait for bootstrap to set up originals, or use current window objects
+  const originals = window.__js_unshroud_originals || {
+    fetch: window.fetch,
+    XMLHttpRequest: window.XMLHttpRequest,
+    WebSocket: window.WebSocket
+  };
+
+  // Generate a simple event ID
+  const generateEventId = function() {
+    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  };
+
+  // Get session ID from window or generate a temporary one
+  const getSessionId = function() {
+    return window.__js_unshroud_session_id || 'unknown_session';
+  };
 
   const logEvent = function(event) {
     if (window.__js_unshroud_log) {
-      window.__js_unshroud_log(JSON.stringify(event));
+      // Ensure all events have required fields
+      const enrichedEvent = {
+        id: generateEventId(),
+        sessionId: getSessionId(),
+        timestamp: event.timestamp || Date.now(),
+        ...event
+      };
+      window.__js_unshroud_log(JSON.stringify(enrichedEvent));
     }
   };
 
@@ -20,8 +42,8 @@
   };
 
   // Instrument fetch API
-  if (window.__js_unshroud_originals.fetch) {
-    const originalFetch = window.__js_unshroud_originals.fetch;
+  if (originals.fetch) {
+    const originalFetch = originals.fetch;
 
     window.fetch = async function(...args) {
       const [resource, init] = args;
@@ -72,8 +94,8 @@
   }
 
   // Instrument XMLHttpRequest
-  if (window.__js_unshroud_originals.XMLHttpRequest) {
-    const OriginalXHR = window.__js_unshroud_originals.XMLHttpRequest;
+  if (originals.XMLHttpRequest) {
+    const OriginalXHR = originals.XMLHttpRequest;
 
     const originalOpen = OriginalXHR.prototype.open;
     const originalSend = OriginalXHR.prototype.send;
@@ -153,8 +175,8 @@
   }
 
   // Instrument WebSocket - Use safer approach without constructor wrapping
-  if (window.__js_unshroud_originals.WebSocket) {
-    const OriginalWebSocket = window.__js_unshroud_originals.WebSocket;
+  if (originals.WebSocket) {
+    const OriginalWebSocket = originals.WebSocket;
 
     // Override send method on prototype to detect WebSocket usage
     const originalSend = OriginalWebSocket.prototype.send;
@@ -212,11 +234,14 @@
       if (!Object.prototype.hasOwnProperty.call(window.WebSocket, prop)) {
         const descriptor = Object.getOwnPropertyDescriptor(OriginalWebSocket, prop);
         if (descriptor && !descriptor.get && !descriptor.set) {
-        try {
-          window.WebSocket[prop] = OriginalWebSocket[prop];
-        } catch {
-          // Ignore read-only property errors
-        }
+          try {
+            window.WebSocket[prop] = OriginalWebSocket[prop];
+          } catch (e) {
+            // Log ignored properties in debug mode
+            if (window.__js_unshroud_debug) {
+              console.debug('[JS Unshroud] Could not copy WebSocket property:', prop, e.message);
+            }
+          }
         }
       }
     });

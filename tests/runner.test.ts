@@ -16,7 +16,7 @@ describe('EventLogger', () => {
     expect(logger.getEventCount()).toBe(0);
   });
 
-  test('should validate and log events', () => {
+  test('should validate and log events', async () => {
     const config: SessionConfig = {
       id: 'test-session-validate',
       url: 'http://example.com',
@@ -37,7 +37,7 @@ describe('EventLogger', () => {
       }
     );
 
-    logger.logEvent(consoleEvent);
+    await logger.logEvent(consoleEvent);
     expect(logger.getEventCount()).toBe(1);
 
     const networkEvent = createEvent<NetworkEvent>(
@@ -50,11 +50,11 @@ describe('EventLogger', () => {
       }
     );
 
-    logger.logEvent(networkEvent);
+    await logger.logEvent(networkEvent);
     expect(logger.getEventCount()).toBe(2);
   });
 
-  test('should log multiple events efficiently', () => {
+  test('should log multiple events efficiently', async () => {
     const config: SessionConfig = {
       id: 'test-session-multi',
       url: 'http://example.com',
@@ -85,7 +85,7 @@ describe('EventLogger', () => {
       })
     ];
 
-    logger.logEvents(events);
+    await logger.logEvents(events);
     expect(logger.getEventCount()).toBe(3);
   });
 
