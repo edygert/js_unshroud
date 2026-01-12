@@ -278,16 +278,26 @@ describe('Instrumentation Injection', () => {
       enableTimer: false,
       enableError: true,
       enableDOM: false,
-      sampleRate: 1.0
+      enableFingerprinting: false,
+      enableObjectTracking: false,
+      enableHeadlessMitigation: false,
+      sampleRate: 1.0,
+      maxEventsPerSecond: 1000,
+      dedupeWindowMs: 100,
+      maxPayloadSize: 1024,
+      maxStackDepth: 20,
+      enableSampling: true,
+      enableRateLimiting: true,
+      enableDeduplication: true
     };
 
     // Mock page with addInitScript spy (only mock the page since we can't inject into a fake page)
     const addInitScript = vi.fn();
     const page = { addInitScript } as any;
 
-    await injectInstrumentation(page, config);
+    await injectInstrumentation(page, config, 'test-session');
 
-    expect(addInitScript).toHaveBeenCalledTimes(3);
+    expect(addInitScript).toHaveBeenCalledTimes(5); // bootstrap + network + storage + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -302,15 +312,25 @@ describe('Instrumentation Injection', () => {
       enableTimer: false,
       enableError: true,
       enableDOM: false,
-      sampleRate: 1.0
+      enableFingerprinting: false,
+      enableObjectTracking: false,
+      enableHeadlessMitigation: false,
+      sampleRate: 1.0,
+      maxEventsPerSecond: 1000,
+      dedupeWindowMs: 100,
+      maxPayloadSize: 1024,
+      maxStackDepth: 20,
+      enableSampling: true,
+      enableRateLimiting: true,
+      enableDeduplication: true
     };
 
     const addInitScript = vi.fn();
     const page = { addInitScript } as any;
 
-    await injectInstrumentation(page, config);
+    await injectInstrumentation(page, config, 'test-session');
 
-    expect(addInitScript).toHaveBeenCalledTimes(2);
+    expect(addInitScript).toHaveBeenCalledTimes(4); // bootstrap + storage + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -352,7 +372,7 @@ describe('Instrumentation Injection', () => {
 
     await injectInstrumentation(page, config);
 
-    expect(addInitScript).toHaveBeenCalledTimes(1);
+    expect(addInitScript).toHaveBeenCalledTimes(3); // bootstrap + performance config + performance monitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );

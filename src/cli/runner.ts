@@ -51,7 +51,15 @@ function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
     enableDOM: false,
     enableFingerprinting: false,
     enableObjectTracking: false,
-    sampleRate: 1.0
+    enableHeadlessMitigation: false,
+    sampleRate: 1.0,
+    maxEventsPerSecond: 1000,
+    dedupeWindowMs: 100,
+    maxPayloadSize: 1024,
+    maxStackDepth: 20,
+    enableSampling: true,
+    enableRateLimiting: true,
+    enableDeduplication: true
   };
 
   if (!configPath) {
@@ -91,6 +99,8 @@ function loadInstrumentationScripts(config: InstrumentationConfig) {
   const domScript = readFileSync('./src/instrumentation/dom-hooks.js', 'utf-8');
   const fingerprintingScript = readFileSync('./src/instrumentation/fingerprinting-hooks.js', 'utf-8');
   const objectTrackingScript = readFileSync('./src/instrumentation/object-tracking.js', 'utf-8');
+  const headlessMitigationScript = readFileSync('./src/instrumentation/headless-mitigation.js', 'utf-8');
+  const performanceMonitorScript = readFileSync('./src/instrumentation/performance-monitor.js', 'utf-8');
 
   return {
     bootstrap: bootstrapScript,
@@ -99,11 +109,13 @@ function loadInstrumentationScripts(config: InstrumentationConfig) {
     timer: config.enableTimer ? timerScript : null,
     dom: config.enableDOM ? domScript : null,
     fingerprinting: config.enableFingerprinting ? fingerprintingScript : null,
-    objectTracking: config.enableObjectTracking ? objectTrackingScript : null
+    objectTracking: config.enableObjectTracking ? objectTrackingScript : null,
+    headlessMitigation: config.enableHeadlessMitigation ? headlessMitigationScript : null,
+    performanceMonitor: performanceMonitorScript // Always loaded for performance controls
   };
 }
 
-async function injectInstrumentation(page: Page, config: InstrumentationConfig) {
+async function injectInstrumentation(page: Page, config: InstrumentationConfig, sessionId: string) {
   const scripts = loadInstrumentationScripts(config);
 
   // Inject bootstrap first
@@ -133,6 +145,30 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig) 
   if (scripts.objectTracking) {
     await page.addInitScript({ content: scripts.objectTracking });
   }
+
+  if (scripts.headlessMitigation) {
+    await page.addInitScript({ content: scripts.headlessMitigation });
+  }
+
+  // Always inject performance monitor (for sampling/rate limiting controls)
+  // Set up performance config on window first
+  await page.addInitScript({
+    content: `
+      window.__js_unshroud_config = ${JSON.stringify({
+        sampleRate: config.sampleRate,
+        maxEventsPerSecond: config.maxEventsPerSecond,
+        dedupeWindowMs: config.dedupeWindowMs,
+        maxPayloadSize: config.maxPayloadSize,
+        maxStackDepth: config.maxStackDepth,
+        enableSampling: config.enableSampling,
+        enableRateLimiting: config.enableRateLimiting,
+        enableDeduplication: config.enableDeduplication
+      })};
+      window.__js_unshroud_session_id = '${sessionId}';
+    `
+  });
+
+  await page.addInitScript({ content: scripts.performanceMonitor });
 
   return scripts;
 }
@@ -208,7 +244,7 @@ async function runMonitoring(args: Args) {
 
   try {
     await cdpManager.initialize(page);
-    await injectInstrumentation(page, config);
+    await injectInstrumentation(page, config, sessionId);
 
     // Navigate to the URL
     console.log(`Navigating to ${args.url}...`);

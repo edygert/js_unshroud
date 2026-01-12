@@ -80,6 +80,59 @@ export interface DomEvent extends BaseEvent {
   details?: unknown;
 }
 
+export interface FingerprintingEvent extends BaseEvent {
+  type: 'fingerprinting';
+  method: string;
+  operation: string;
+  value?: unknown;
+  contextType?: string;
+  options?: unknown;
+  stackTrace?: string;
+}
+
+export interface HeadlessMitigationEvent extends BaseEvent {
+  type: 'headless_mitigation';
+  method: string;
+  operation: string;
+  originalValue?: unknown;
+  newValue?: unknown;
+  originalError?: string;
+  newState?: string;
+  pluginCount?: number;
+  width?: number;
+  height?: number;
+  originalLength?: number;
+  newLength?: number;
+  parameter?: number;
+  query?: string;
+  originalResult?: boolean;
+  stackTrace?: string;
+}
+
+export interface PerformanceStatsEvent extends BaseEvent {
+  type: 'performance_stats';
+  method: string;
+  operation: 'performance_monitoring';
+  uptime: number;
+  totalEventsProcessed: number;
+  eventsAccepted: number;
+  eventsRejected: number;
+  eventsSampled: number;
+  eventsRateLimited: number;
+  eventsDeduplicated: number;
+  acceptanceRate: string;
+  samplingRate: number;
+  maxEventsPerSecond: number;
+}
+
+export interface PerformanceWarningEvent extends BaseEvent {
+  type: 'performance_warning';
+  method: 'setTimeout' | 'setInterval';
+  operation: 'short_timeout_detected' | 'short_interval_detected';
+  delay: number;
+  warning: string;
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -87,7 +140,11 @@ export type MonitoringEvent =
   | WebSocketEvent
   | TimerEvent
   | ErrorEvent
-  | DomEvent;
+  | DomEvent
+  | FingerprintingEvent
+  | HeadlessMitigationEvent
+  | PerformanceStatsEvent
+  | PerformanceWarningEvent;
 
 export interface SessionConfig {
   id: string;
@@ -107,5 +164,13 @@ export interface InstrumentationConfig {
   enableDOM: boolean;
   enableFingerprinting: boolean;
   enableObjectTracking: boolean;
+  enableHeadlessMitigation: boolean;
   sampleRate: number;
+  maxEventsPerSecond: number;
+  dedupeWindowMs: number;
+  maxPayloadSize: number;
+  maxStackDepth: number;
+  enableSampling: boolean;
+  enableRateLimiting: boolean;
+  enableDeduplication: boolean;
 }

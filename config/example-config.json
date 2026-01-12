@@ -8,5 +8,13 @@
   "enableDOM": true,
   "enableFingerprinting": true,
   "enableObjectTracking": true,
-  "sampleRate": 1.0
+  "enableHeadlessMitigation": false,
+  "sampleRate": 0.5,
+  "maxEventsPerSecond": 500,
+  "dedupeWindowMs": 100,
+  "maxPayloadSize": 1024,
+  "maxStackDepth": 20,
+  "enableSampling": true,
+  "enableRateLimiting": true,
+  "enableDeduplication": true
 }
