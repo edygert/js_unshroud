@@ -1,0 +1,33 @@
+{
+  "name": "js_unshroud",
+  "module": "index.ts",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Headless JavaScript monitoring and analysis tool",
+  "author": "Evan H. Dygert",
+  "license": "MIT",
+  "bin": {
+    "js_unshroud": "./dist/runner.js"
+  },
+  "scripts": {
+    "build": "bun build ./src/cli/runner.ts --compile --outfile dist/js_unshroud",
+    "test": "bun test",
+    "lint": "eslint src/ tests/ --ext .ts,.js",
+    "lint:fix": "eslint src/ tests/ --ext .ts,.js --fix",
+    "dev": "bun run src/cli/runner.ts"
+  },
+  "dependencies": {
+    "playwright-core": "^1.57.0",
+    "devtools-protocol": "^0.0.1566079"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.19.2",
+    "@typescript-eslint/parser": "^8.19.2",
+    "eslint": "^9.17.0",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
