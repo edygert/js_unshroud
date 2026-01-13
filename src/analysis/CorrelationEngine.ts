@@ -166,8 +166,8 @@ export class CorrelationEngine {
 
           // Check if chain is complete
           if (currentChain.length === rule.patterns.events.length) {
-            const startEvent = currentChain[0];
-            const endEvent = currentChain[currentChain.length - 1];
+            const startEvent = currentChain[0]!;
+            const endEvent = currentChain[currentChain.length - 1]!;
             chains.push({
               events: [...currentChain],
               description: rule.description,

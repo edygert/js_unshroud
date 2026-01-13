@@ -213,7 +213,17 @@ describe('Instrumentation Script Loading', () => {
       enableTimer: false,
       enableError: true,
       enableDOM: false,
-      sampleRate: 1.0
+      enableFingerprinting: false,
+      enableObjectTracking: false,
+      enableHeadlessMitigation: false,
+      sampleRate: 1.0,
+      maxEventsPerSecond: 1000,
+      dedupeWindowMs: 100,
+      maxPayloadSize: 1024,
+      maxStackDepth: 20,
+      enableSampling: true,
+      enableRateLimiting: true,
+      enableDeduplication: true
     };
 
     const scripts = loadInstrumentationScripts(config);
@@ -235,7 +245,17 @@ describe('Instrumentation Script Loading', () => {
       enableTimer: false,
       enableError: true,
       enableDOM: false,
-      sampleRate: 1.0
+      enableFingerprinting: false,
+      enableObjectTracking: false,
+      enableHeadlessMitigation: false,
+      sampleRate: 1.0,
+      maxEventsPerSecond: 1000,
+      dedupeWindowMs: 100,
+      maxPayloadSize: 1024,
+      maxStackDepth: 20,
+      enableSampling: true,
+      enableRateLimiting: true,
+      enableDeduplication: true
     };
 
     const scripts = loadInstrumentationScripts(config);
@@ -256,7 +276,17 @@ describe('Instrumentation Script Loading', () => {
       enableTimer: false,
       enableError: false,
       enableDOM: false,
-      sampleRate: 1.0
+      enableFingerprinting: false,
+      enableObjectTracking: false,
+      enableHeadlessMitigation: false,
+      sampleRate: 1.0,
+      maxEventsPerSecond: 1000,
+      dedupeWindowMs: 100,
+      maxPayloadSize: 1024,
+      maxStackDepth: 20,
+      enableSampling: true,
+      enableRateLimiting: true,
+      enableDeduplication: true
     };
 
     const scripts = loadInstrumentationScripts(config);
@@ -345,14 +375,24 @@ describe('Instrumentation Injection', () => {
       enableTimer: false,
       enableError: true,
       enableDOM: false,
-      sampleRate: 1.0
+      enableFingerprinting: false,
+      enableObjectTracking: false,
+      enableHeadlessMitigation: false,
+      sampleRate: 1.0,
+      maxEventsPerSecond: 1000,
+      dedupeWindowMs: 100,
+      maxPayloadSize: 1024,
+      maxStackDepth: 20,
+      enableSampling: true,
+      enableRateLimiting: true,
+      enableDeduplication: true
     };
 
     const addInitScript = vi.fn().mockRejectedValueOnce(new Error('Injection failed'));
     const page = { addInitScript } as any;
 
     // Should rethrow the error
-    await expect(injectInstrumentation(page, config)).rejects.toThrow('Injection failed');
+    await expect(injectInstrumentation(page, config, 'test-session')).rejects.toThrow('Injection failed');
   });
 
   test('should handle minimal config with only bootstrap', async () => {
@@ -364,13 +404,23 @@ describe('Instrumentation Injection', () => {
       enableTimer: false,
       enableError: false,
       enableDOM: false,
-      sampleRate: 1.0
+      enableFingerprinting: false,
+      enableObjectTracking: false,
+      enableHeadlessMitigation: false,
+      sampleRate: 1.0,
+      maxEventsPerSecond: 1000,
+      dedupeWindowMs: 100,
+      maxPayloadSize: 1024,
+      maxStackDepth: 20,
+      enableSampling: true,
+      enableRateLimiting: true,
+      enableDeduplication: true
     };
 
     const addInitScript = vi.fn();
     const page = { addInitScript } as any;
 
-    await injectInstrumentation(page, config);
+    await injectInstrumentation(page, config, 'test-session');
 
     expect(addInitScript).toHaveBeenCalledTimes(3); // bootstrap + performance config + performance monitor
     expect(addInitScript).toHaveBeenCalledWith(
@@ -591,7 +641,7 @@ describe('End-to-End Integration Tests', () => {
       await cdpManager.initialize(page);
 
       // Inject instrumentation scripts
-      await injectInstrumentation(page, config);
+      await injectInstrumentation(page, config, sessionConfig.id);
 
       // Navigate to test page
       await page.goto(sessionConfig.url, {
@@ -648,7 +698,7 @@ describe('End-to-End Integration Tests', () => {
     try {
       const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
       await cdpManager.initialize(page);
-      await injectInstrumentation(page, config);
+      await injectInstrumentation(page, config, sessionConfig.id);
 
       // This should fail with navigation error
        
@@ -712,7 +762,7 @@ describe('End-to-End Integration Tests', () => {
 
       const config = loadInstrumentationConfig();
        
-      await expect(injectInstrumentation(page, config)).rejects.toThrow('Script injection failed');
+      await expect(injectInstrumentation(page, config, sessionConfig.id)).rejects.toThrow('Script injection failed');
 
     } finally {
       await performCleanup(browser, eventLogger);

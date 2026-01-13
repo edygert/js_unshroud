@@ -164,6 +164,18 @@ bun test tests/runner.test.ts  # Event logger and schema tests
 
 ## Code Quality
 
+### Type Checking
+
+Run TypeScript type checking:
+
+```bash
+bun run typecheck
+```
+
+This runs the TypeScript compiler in no-emit mode to check for type errors without generating output files.
+
+### Linting
+
 Lint the codebase:
 
 ```bash
@@ -174,6 +186,14 @@ Auto-fix linting issues:
 
 ```bash
 bun run lint:fix
+```
+
+### Combined Check
+
+Run both type checking and linting:
+
+```bash
+bun run check
 ```
 
 ## Packaging and Distribution

@@ -19,8 +19,10 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src/ tests/ --ext .ts,.js",
     "lint:fix": "eslint src/ tests/ --ext .ts,.js --fix",
+    "check": "npm run typecheck && npm run lint",
     "dev": "bun run src/cli/runner.ts"
   },
   "dependencies": {

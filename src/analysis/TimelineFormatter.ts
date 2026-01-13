@@ -85,7 +85,7 @@ export class TimelineFormatter {
 
   private combineEventSummaries(eventsAtTime: MonitoringEvent[]): string {
     if (eventsAtTime.length === 1) {
-      return this.generateEventSummary(eventsAtTime[0]);
+      return this.generateEventSummary(eventsAtTime[0]!);
     }
 
     const summaries = eventsAtTime.map(e => this.generateEventSummary(e));
