@@ -9,10 +9,19 @@ import type { SessionConfig, InstrumentationConfig } from '../schema/types.ts';
 // Declare setTimeout for linting purposes
 declare const setTimeout: (handler: () => void, timeout?: number) => number;
 
+// Timeout constants (in milliseconds)
+const TIMEOUTS = {
+  PAGE_NAVIGATION: 60_000,
+  BROWSER_CLOSE: 8_000,
+  EVENT_LOGGER_CLOSE: 2_000,
+  INSTRUMENTATION_LOAD: 5_000,
+  MONITORING_DURATION: 15_000
+} as const;
+
 interface Args {
   url: string;
   out: string;
-  config?: string;
+  config?: string | undefined;
 }
 
 function parseArgs(): Args {
@@ -20,15 +29,24 @@ function parseArgs(): Args {
   let url: string | undefined, out: string | undefined, config: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--url' && i+1 < args.length) {
-      url = args[i+1];
-      i++;
-    } else if (args[i] === '--out' && i+1 < args.length) {
-      out = args[i+1];
-      i++;
-    } else if (args[i] === '--config' && i+1 < args.length) {
-      config = args[i+1];
-      i++;
+    if (args[i] === '--url') {
+      const nextArg = args[i + 1];
+      if (nextArg) {
+        url = nextArg;
+        i++;
+      }
+    } else if (args[i] === '--out') {
+      const nextArg = args[i + 1];
+      if (nextArg) {
+        out = nextArg;
+        i++;
+      }
+    } else if (args[i] === '--config') {
+      const nextArg = args[i + 1];
+      if (nextArg) {
+        config = nextArg;
+        i++;
+      }
     }
   }
 
@@ -37,7 +55,7 @@ function parseArgs(): Args {
     process.exit(1);
   }
 
-  return { url: url, out: out, config };  
+  return { url, out, config };  
 }
 
 function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
@@ -91,7 +109,17 @@ function createSessionConfig(args: Args): SessionConfig {
   };
 }
 
-function loadInstrumentationScripts(config: InstrumentationConfig) {
+function loadInstrumentationScripts(config: InstrumentationConfig): {
+  bootstrap: string;
+  network: string | null;
+  storage: string | null;
+  timer: string | null;
+  dom: string | null;
+  fingerprinting: string | null;
+  objectTracking: string | null;
+  headlessMitigation: string | null;
+  performanceMonitor: string;
+} {
   const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
   const networkScript = readFileSync('./src/instrumentation/network-hooks.js', 'utf-8');
   const storageScript = readFileSync('./src/instrumentation/storage-hooks.js', 'utf-8');
@@ -115,7 +143,17 @@ function loadInstrumentationScripts(config: InstrumentationConfig) {
   };
 }
 
-async function injectInstrumentation(page: Page, config: InstrumentationConfig, sessionId: string) {
+async function injectInstrumentation(page: Page, config: InstrumentationConfig, sessionId: string): Promise<{
+  bootstrap: string;
+  network: string | null;
+  storage: string | null;
+  timer: string | null;
+  dom: string | null;
+  fingerprinting: string | null;
+  objectTracking: string | null;
+  headlessMitigation: string | null;
+  performanceMonitor: string;
+}> {
   const scripts = loadInstrumentationScripts(config);
 
   // Inject bootstrap first
@@ -173,7 +211,7 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig, 
   return scripts;
 }
 
-async function performCleanup(browser: Browser, eventLogger: EventLogger) {
+async function performCleanup(browser: Browser, eventLogger: EventLogger): Promise<void> {
   console.log('Starting cleanup...');
 
   const cleanupPromises = [
@@ -198,7 +236,7 @@ async function performCleanup(browser: Browser, eventLogger: EventLogger) {
         // Browser cleanup failure - don't warn as cleanup is best-effort
       }),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Browser close timeout')), 8000)
+        setTimeout(() => reject(new Error('Browser close timeout')), TIMEOUTS.BROWSER_CLOSE)
       )
     ]).catch(() => {
       // Browser cleanup timeout - cleanup is best-effort, don't warn
@@ -210,7 +248,7 @@ async function performCleanup(browser: Browser, eventLogger: EventLogger) {
         // Event logger close failure - ignore as cleanup is best-effort
       }),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Event logger close timeout')), 2000)
+        setTimeout(() => reject(new Error('Event logger close timeout')), TIMEOUTS.EVENT_LOGGER_CLOSE)
       )
     ]).catch(() => {
       // Event logger cleanup failure - cleanup is best-effort, don't warn
@@ -225,7 +263,7 @@ async function performCleanup(browser: Browser, eventLogger: EventLogger) {
   }
 }
 
-async function runMonitoring(args: Args) {
+async function runMonitoring(args: Args): Promise<void> {
   const config = loadInstrumentationConfig(args.config);
   console.log(`Monitoring ${args.url}, outputting to ${args.out}`);
   const sessionConfig = createSessionConfig(args);
@@ -250,7 +288,7 @@ async function runMonitoring(args: Args) {
     console.log(`Navigating to ${args.url}...`);
     await page.goto(args.url, {
       waitUntil: 'domcontentloaded',
-      timeout: 60000
+      timeout: TIMEOUTS.PAGE_NAVIGATION
     });
 
     // Wait for instrumentation to load (only if bootstrap was injected)
@@ -258,15 +296,15 @@ async function runMonitoring(args: Args) {
       await page.waitForFunction(() => {
         return (globalThis as { __js_unshroud_loaded?: boolean }).__js_unshroud_loaded === true;
       }, {
-        timeout: 5000
+        timeout: TIMEOUTS.INSTRUMENTATION_LOAD
       });
     } catch {
       console.log('Warning: Instrumentation load timeout (bootstrap may be disabled)');
     }
 
-    console.log('Instrumentation loaded, monitoring for 10 seconds...');
-    // Wait for events to be captured (increased to 15s for comprehensive testing)
-    await page.waitForTimeout(15000);
+    console.log(`Instrumentation loaded, monitoring for ${TIMEOUTS.MONITORING_DURATION / 1000} seconds...`);
+    // Wait for events to be captured
+    await page.waitForTimeout(TIMEOUTS.MONITORING_DURATION);
     console.log('Monitoring completed.');
 
   } catch (error) {

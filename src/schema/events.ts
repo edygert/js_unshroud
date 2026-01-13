@@ -1,6 +1,25 @@
 import type { MonitoringEvent } from './types.ts';
 import { createHash } from 'node:crypto';
 
+// Type-safe event types derived from MonitoringEvent union
+const EVENT_TYPES = [
+  'console',
+  'network',
+  'storage',
+  'websocket',
+  'timer',
+  'error',
+  'dom',
+  'fingerprinting',
+  'headless_mitigation',
+  'performance_stats',
+  'performance_warning'
+] as const satisfies readonly MonitoringEvent['type'][];
+
+function isValidEventType(type: string): type is MonitoringEvent['type'] {
+  return EVENT_TYPES.includes(type as MonitoringEvent['type']);
+}
+
 export function generateEventId(sessionId: string, timestamp: number, type: string): string {
   const hash = createHash('md5');
   hash.update(`${sessionId}${timestamp}${type}${Math.random()}`);
@@ -24,13 +43,12 @@ export function createEvent<T extends MonitoringEvent>(
 export function validateEvent(event: unknown): event is MonitoringEvent {
   if (!event || typeof event !== 'object') return false;
   const obj = event as Record<string, unknown>;
-  if (!obj.id || typeof obj.id !== 'string') return false;
-  if (!obj.timestamp || typeof obj.timestamp !== 'number') return false;
-  if (!obj.sessionId || typeof obj.sessionId !== 'string') return false;
-  if (!obj.type || typeof obj.type !== 'string') return false;
+  if (typeof obj['id'] !== 'string') return false;
+  if (typeof obj['timestamp'] !== 'number') return false;
+  if (typeof obj['sessionId'] !== 'string') return false;
+  if (typeof obj['type'] !== 'string') return false;
 
-  const validTypes = ['console', 'network', 'storage', 'websocket', 'timer', 'error', 'dom'];
-  if (!validTypes.includes(obj.type)) return false;
+  if (!isValidEventType(obj['type'])) return false;
 
   return true;
 }
@@ -56,8 +74,8 @@ export function serializeEvent(event: MonitoringEvent): string {
     };
 
     // Handle problematic properties that might exist on different event types
-    if (sanitizedEvent.args && Array.isArray(sanitizedEvent.args)) {
-      sanitizedEvent.args = sanitizedEvent.args.map(sanitizeValue);
+    if (sanitizedEvent['args'] && Array.isArray(sanitizedEvent['args'])) {
+      sanitizedEvent['args'] = sanitizedEvent['args'].map(sanitizeValue);
     }
 
     // Also handle requestPayload and responsePayload if they exist

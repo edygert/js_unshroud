@@ -31,6 +31,13 @@ export default [
     rules: {
       ...tseslint.configs.recommended.rules,
       ...tseslint.configs["recommended-requiring-type-checking"].rules,
+      // Additional strict rules for code quality
+      "@typescript-eslint/explicit-module-boundary-types": "warn",
+      "@typescript-eslint/consistent-type-imports": "error",
+      "@typescript-eslint/consistent-type-exports": "error",
+      "@typescript-eslint/no-unnecessary-condition": "warn",
+      "@typescript-eslint/prefer-readonly": "warn",
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
       // Project-specific overrides
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/explicit-function-return-type": "off",
@@ -70,6 +77,7 @@ export default [
         cancelAnimationFrame: "readonly",
         addEventListener: "readonly",
         removeEventListener: "readonly",
+        MutationObserver: "readonly",
       },
     },
     rules: {

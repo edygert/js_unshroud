@@ -13,7 +13,8 @@ export interface QueryFilter {
     from?: number;
     to?: number;
   };
-  [key: string]: unknown;
+  storageType?: 'localStorage' | 'sessionStorage';
+  operation?: 'set' | 'get' | 'remove' | 'clear';
 }
 
 export class QueryEngine {

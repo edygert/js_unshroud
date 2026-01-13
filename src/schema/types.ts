@@ -151,7 +151,7 @@ export interface SessionConfig {
   url: string;
   startTime: number;
   outputPath: string;
-  configPath?: string;
+  configPath?: string | undefined;
 }
 
 export interface InstrumentationConfig {

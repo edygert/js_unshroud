@@ -1,5 +1,7 @@
 import type { MonitoringEvent } from '../schema/types.ts';
-import { QueryEngine, type QueryFilter } from './QueryEngine.ts';
+import type { QueryEngine} from './QueryEngine.ts';
+import { type QueryFilter } from './QueryEngine.ts';
+import { CorrelationRuleError } from '../utils/errors.ts';
 
 export interface CorrelationChain {
   events: MonitoringEvent[];
@@ -25,8 +27,8 @@ export interface CorrelationRule {
 }
 
 export class CorrelationEngine {
-  private queryEngine: QueryEngine;
-  private correlationRules: CorrelationRule[];
+  private readonly queryEngine: QueryEngine;
+  private readonly correlationRules: CorrelationRule[];
 
   constructor(queryEngine: QueryEngine) {
     this.queryEngine = queryEngine;
@@ -84,7 +86,11 @@ export class CorrelationEngine {
     if (ruleName) {
       const rule = this.correlationRules.find(r => r.name === ruleName);
       if (!rule) {
-        throw new Error(`Correlation rule '${ruleName}' not found`);
+        throw new CorrelationRuleError(
+          `Correlation rule '${ruleName}' not found`,
+          ruleName,
+          this.correlationRules.map(r => r.name)
+        );
       }
       const ruleChains = await this.applyRule(inputPath, rule);
       chains.push(...ruleChains);
@@ -115,10 +121,12 @@ export class CorrelationEngine {
       const correlationKey = this.getCorrelationKey(event, rule.patterns.correlationField);
       if (!correlationKey) continue;
 
-      if (!eventGroups.has(correlationKey)) {
-        eventGroups.set(correlationKey, []);
+      const group = eventGroups.get(correlationKey);
+      if (group) {
+        group.push(event);
+      } else {
+        eventGroups.set(correlationKey, [event]);
       }
-      eventGroups.get(correlationKey)!.push(event);
     }
 
     // Process each group to find correlations
@@ -132,7 +140,7 @@ export class CorrelationEngine {
             chainType: rule.name
           });
         }
-      } else if (rule.patterns.type === 'group') {
+      } else {
         const groupedChains = this.findGroups(events, rule);
         for (const chain of groupedChains) {
           chains.push({
@@ -166,8 +174,16 @@ export class CorrelationEngine {
 
           // Check if chain is complete
           if (currentChain.length === rule.patterns.events.length) {
-            const startEvent = currentChain[0]!;
-            const endEvent = currentChain[currentChain.length - 1]!;
+            const startEvent = currentChain[0];
+            const endEvent = currentChain[currentChain.length - 1];
+            
+            if (!startEvent || !endEvent) {
+              console.warn('Chain has insufficient events, skipping');
+              currentChain = [];
+              lastTimestamp = 0;
+              continue;
+            }
+            
             chains.push({
               events: [...currentChain],
               description: rule.description,
@@ -255,9 +271,12 @@ export class CorrelationEngine {
     if (!correlationField) return event.sessionId;
 
     if (correlationField === 'sessionId') return event.sessionId;
-    if (correlationField === 'correlationId') return event.correlationId ?? event.sessionId;
+    if (correlationField === 'correlationId') {
+       
+      return event.correlationId ?? event.sessionId;
+    }
     if (correlationField === 'url' && event.type === 'network') {
-      return event.url ?? event.sessionId;
+      return event.url || event.sessionId;
     }
 
     return event.sessionId; // Fallback

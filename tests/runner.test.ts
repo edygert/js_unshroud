@@ -171,15 +171,15 @@ describe('Schema validation', () => {
     const serialized = serializeEvent(event);
     const parsed = JSON.parse(serialized) as Record<string, unknown>;
 
-    expect(parsed.id).toBe('test-id');
-    expect(parsed.type).toBe('console');
-    expect(parsed.level).toBe('log');
+    expect(parsed['id']).toBe('test-id');
+    expect(parsed['type']).toBe('console');
+    expect(parsed['level']).toBe('log');
   });
 
   test('should handle circular references in serialization', () => {
     // Create circular reference for testing serialization error handling
     const circularObj: Record<string, unknown> = { prop: 'value' };
-    circularObj.self = circularObj;
+    circularObj['self'] = circularObj;
 
     const event: ConsoleEvent = {
       id: 'test-id',

@@ -1,10 +1,11 @@
-import { WriteStream, createWriteStream } from 'node:fs';
+import type { WriteStream} from 'node:fs';
+import { createWriteStream } from 'node:fs';
 import type { MonitoringEvent, SessionConfig } from '../schema/types.ts';
 import { serializeEvent, validateEvent } from '../schema/events.ts';
 
 export class EventLogger {
-  private writeStream: WriteStream;
-  private sessionConfig: SessionConfig;
+  private readonly writeStream: WriteStream;
+  private readonly sessionConfig: SessionConfig;
   private eventCount = 0;
   private closed = false;
 

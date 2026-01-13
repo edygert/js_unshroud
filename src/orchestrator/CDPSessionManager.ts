@@ -1,19 +1,19 @@
 import type { CDPSession, Page } from 'playwright-core';
 import type { NetworkEvent, ConsoleEvent, ErrorEvent } from '../schema/types.ts';
 import type { Protocol } from 'devtools-protocol';
-import { EventLogger } from './EventLogger.ts';
+import type { EventLogger } from './EventLogger.ts';
 import { createEvent } from '../schema/events.ts';
 
 export class CDPSessionManager {
   private cdpSession: CDPSession | null = null;
-  private eventLogger: EventLogger;
-  private sessionId: string;
-  private frameIds: Map<string, string> = new Map();
+  private readonly eventLogger: EventLogger;
+  private readonly sessionId: string;
+  private readonly frameIds: Map<string, string> = new Map();
   private pendingLogEvents: Promise<void>[] = [];
-  private networkCorrelationMap: Map<string, string> = new Map(); // requestId -> correlationId
-  private networkRequestMap: Map<string, { method: string; url: string }> = new Map(); // requestId -> request details
+  private readonly networkCorrelationMap: Map<string, string> = new Map(); // requestId -> correlationId
+  private readonly networkRequestMap: Map<string, { method: string; url: string }> = new Map(); // requestId -> request details
 
-  constructor(page: Page, eventLogger: EventLogger, sessionId: string) {
+  constructor(_page: Page, eventLogger: EventLogger, sessionId: string) {
     this.eventLogger = eventLogger;
     this.sessionId = sessionId;
   }
@@ -52,7 +52,7 @@ export class CDPSessionManager {
         this.sessionId,
         params.frameId,
         {
-          correlationId,
+          ...(correlationId ? { correlationId } : {}),
           type: 'network',
           method: params.request.method,
           url: params.request.url,
@@ -72,7 +72,7 @@ export class CDPSessionManager {
         this.sessionId,
         params.frameId,
         {
-          correlationId,
+          ...(correlationId ? { correlationId } : {}),
           type: 'network',
           method: requestInfo?.method ?? 'GET',
           url: params.response.url,
@@ -96,11 +96,12 @@ export class CDPSessionManager {
       const correlationId = this.networkCorrelationMap.get(params.requestId);
       const requestInfo = this.networkRequestMap.get(params.requestId);
 
+       
       const promise = this.eventLogger.logEvent(createEvent<NetworkEvent>(
         this.sessionId,
         undefined,
         {
-          correlationId,
+          ...(correlationId ? { correlationId } : {}),
           type: 'network',
           method: requestInfo?.method ?? 'GET',
           url: requestInfo?.url ?? params.requestId,
@@ -145,12 +146,14 @@ export class CDPSessionManager {
         {
           type: 'error',
           message: params.exceptionDetails.exception?.description ?? 'Runtime exception',
-          filename: params.exceptionDetails.url,
+          ...(params.exceptionDetails.url && { filename: params.exceptionDetails.url }),
           lineno: params.exceptionDetails.lineNumber,
           colno: params.exceptionDetails.columnNumber,
-          stack: params.exceptionDetails.stackTrace?.callFrames.map(frame =>
-            `${frame.functionName} at ${frame.url}:${frame.lineNumber}:${frame.columnNumber}`
-          ).join('\n')
+          ...(params.exceptionDetails.stackTrace?.callFrames && {
+            stack: params.exceptionDetails.stackTrace.callFrames.map(frame =>
+              `${frame.functionName} at ${frame.url}:${frame.lineNumber}:${frame.columnNumber}`
+            ).join('\n')
+          })
         }
       ));
       this.queueLogEvent(promise);
@@ -167,7 +170,7 @@ export class CDPSessionManager {
 
     // Page.frameNavigated
     this.cdpSession.on('Page.frameNavigated', (params: Protocol.Page.FrameNavigatedEvent) => {
-      this.frameIds.set(params.frame.id, params.frame.url ?? params.frame.name ?? 'unknown');
+      this.frameIds.set(params.frame.id, params.frame.url || (params.frame.name ?? 'unknown'));
     });
   }
 

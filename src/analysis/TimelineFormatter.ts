@@ -1,4 +1,4 @@
-import type { MonitoringEvent } from '../schema/types.ts';
+import type { MonitoringEvent, BaseEvent } from '../schema/types.ts';
 
 export interface TimelineEntry {
   timestamp: number;
@@ -14,8 +14,8 @@ export interface TimeRange {
 }
 
 export class TimelineFormatter {
-  private events: MonitoringEvent[];
-  private groupedEvents: Map<number, MonitoringEvent[]> = new Map();
+  private readonly events: MonitoringEvent[];
+  private readonly groupedEvents: Map<number, MonitoringEvent[]> = new Map();
 
   constructor(events: MonitoringEvent[]) {
     this.events = events.sort((a, b) => a.timestamp - b.timestamp);
@@ -60,7 +60,7 @@ export class TimelineFormatter {
 
       case 'console': {
         const consoleEvent = event;
-        return `console.${consoleEvent.level}(${consoleEvent.message?.slice(0, 50) ?? ''})`;
+        return `console.${consoleEvent.level}(${consoleEvent.message ? consoleEvent.message.slice(0, 50) : ''})`;
       }
 
       case 'error': {
@@ -78,14 +78,41 @@ export class TimelineFormatter {
         return `Timer: ${timerEvent.timerType}.${timerEvent.operation}`;
       }
 
+      case 'websocket': {
+        const wsEvent = event;
+        return `WebSocket: ${wsEvent.event} ${wsEvent.url}`;
+      }
+
+      case 'fingerprinting': {
+        const fpEvent = event;
+        return `Fingerprinting: ${fpEvent.method}.${fpEvent.operation}`;
+      }
+
+      case 'headless_mitigation': {
+        const hmEvent = event;
+        return `Headless Mitigation: ${hmEvent.method}.${hmEvent.operation}`;
+      }
+
+      case 'performance_stats': {
+        const psEvent = event;
+        return `Performance Stats: ${psEvent.operation} (uptime: ${psEvent.uptime}ms)`;
+      }
+
+      case 'performance_warning': {
+        const pwEvent = event;
+        return `Performance Warning: ${pwEvent.method} - ${pwEvent.warning}`;
+      }
+
       default:
-        return `${event.type} event`;
+        return `${(event as BaseEvent).type} event`;
     }
   }
 
   private combineEventSummaries(eventsAtTime: MonitoringEvent[]): string {
     if (eventsAtTime.length === 1) {
-      return this.generateEventSummary(eventsAtTime[0]!);
+      const firstEvent = eventsAtTime[0];
+      if (!firstEvent) return ''; // Should never happen but handles the type check
+      return this.generateEventSummary(firstEvent);
     }
 
     const summaries = eventsAtTime.map(e => this.generateEventSummary(e));
@@ -192,8 +219,10 @@ export class TimelineFormatter {
       return acc;
     }, {} as Record<string, number>);
 
-    const start = filteredEvents.length > 0 ? filteredEvents[0]!.timestamp : 0;
-    const end = filteredEvents.length > 0 ? filteredEvents[filteredEvents.length - 1]!.timestamp : 0;
+    const firstEvent = filteredEvents[0];
+    const lastEvent = filteredEvents[filteredEvents.length - 1];
+    const start = firstEvent ? firstEvent.timestamp : 0;
+    const end = lastEvent ? lastEvent.timestamp : 0;
 
     return {
       totalEvents: filteredEvents.length,

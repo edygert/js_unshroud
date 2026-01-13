@@ -6,10 +6,10 @@
 
   // Global event logger function - should be injected by the main monitoring script
   if (typeof window.__js_unshroud_log !== 'function') {
-    // Fallback logger that doesn't do anything
+    // Fallback logger that doesn't do anything (to avoid recursion issues)
     window.__js_unshroud_log = function() {
-      // CDP session will pick this up
-      console.log('[JS_UNSHROUD]', ...arguments);
+      // Silent fallback to prevent recursion when console is intercepted
+      // CDP session can capture console output if needed
     };
   }
 
@@ -51,14 +51,28 @@
       };
     });
     console.log('[JS Unshroud] Console instrumentation activated');
+    // Mark as intercepted to avoid duplicate interception
+    window.__js_unshroud_console_intercepted = true;
   };
 
-  // Intercept console methods after page load to avoid crashes
+  // Intercept console methods immediately when safe, using MutationObserver to avoid timing detection
   if (document.readyState === 'loading') {
-    // Wait for DOM to be ready before intercepting console
+    // Use MutationObserver for immediate execution when body is available
+    // This eliminates the 100ms detection window while ensuring DOM safety
+    const observer = new MutationObserver(function(_mutations) {
+      if (document.body) {
+        observer.disconnect();
+        interceptConsole();
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
+
+    // Fallback: intercept on DOMContentLoaded if MutationObserver doesn't fire (shouldn't happen)
     document.addEventListener('DOMContentLoaded', function() {
-      // Small additional delay to avoid timing issues
-      setTimeout(interceptConsole, 100);
+      observer.disconnect(); // Clean up observer
+      if (!window.__js_unshroud_console_intercepted) {
+        interceptConsole();
+      }
     });
   } else {
     // Page already loaded, intercept immediately

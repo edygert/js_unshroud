@@ -316,7 +316,7 @@ const objectTrackingScript = readFileSync(join(process.cwd(), 'src/instrumentati
       await page.goto('about:blank');
 
       await page.evaluate(() => {
-        setTimeout(() => {}, 1000);
+        setTimeout(function() {}, 1000);
       });
 
       await page.waitForTimeout(100);
@@ -631,8 +631,8 @@ const objectTrackingScript = readFileSync(join(process.cwd(), 'src/instrumentati
       await page.evaluate(() => {
         const testObj = { prop1: 'value1', prop2: 42 };
         const tracked = window.__js_unshroud_trackObject!(testObj, 'testObject');
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const _val = tracked.prop1;
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+        tracked.prop1;
         tracked.prop2 = 100;
       });
 
