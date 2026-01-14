@@ -133,6 +133,21 @@ export interface PerformanceWarningEvent extends BaseEvent {
   warning: string;
 }
 
+export interface ServiceWorkerEvent extends BaseEvent {
+  type: 'service_worker';
+  eventType: 'register' | 'unregister' | 'update' | 'install' | 'activate' | 'message' | 'fetch_intercept' | 'cache_open' | 'cache_add' | 'cache_delete' | 'push_subscribe' | 'push_unsubscribe';
+  scriptUrl?: string;
+  scope?: string;
+  state?: 'installing' | 'installed' | 'activating' | 'activated' | 'redundant';
+  messageData?: unknown;
+  cacheName?: string;
+  cacheKey?: string;
+  subscriptionEndpoint?: string;
+  success?: boolean;
+  error?: string;
+  stackTrace?: string;
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -144,7 +159,8 @@ export type MonitoringEvent =
   | FingerprintingEvent
   | HeadlessMitigationEvent
   | PerformanceStatsEvent
-  | PerformanceWarningEvent;
+  | PerformanceWarningEvent
+  | ServiceWorkerEvent;
 
 export interface SessionConfig {
   id: string;
@@ -165,6 +181,7 @@ export interface InstrumentationConfig {
   enableFingerprinting: boolean;
   enableObjectTracking: boolean;
   enableHeadlessMitigation: boolean;
+  enableServiceWorker: boolean;
   sampleRate: number;
   maxEventsPerSecond: number;
   dedupeWindowMs: number;

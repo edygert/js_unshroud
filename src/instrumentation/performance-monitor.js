@@ -292,6 +292,7 @@
   window.__js_unshroud.getPerformanceStats = () => ({ ...performanceStats });
   window.__js_unshroud.updateConfig = (newConfig) => {
     config = { ...config, ...newConfig };
+    window.__js_unshroud_config = { ...window.__js_unshroud_config, ...newConfig };
   };
 
   console.log('[JS Unshroud] Performance monitor loaded - Sample Rate:', config.sampleRate, 'Max Events/sec:', config.maxEventsPerSecond);

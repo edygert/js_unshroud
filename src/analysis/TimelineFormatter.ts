@@ -103,6 +103,11 @@ export class TimelineFormatter {
         return `Performance Warning: ${pwEvent.method} - ${pwEvent.warning}`;
       }
 
+      case 'service_worker': {
+        const swEvent = event;
+        return `Service Worker: ${swEvent.eventType}${swEvent.scriptUrl ? ` ${swEvent.scriptUrl}` : ''}${swEvent.cacheName ? ` ${swEvent.cacheName}` : ''}`;
+      }
+
       default:
         return `${(event as BaseEvent).type} event`;
     }

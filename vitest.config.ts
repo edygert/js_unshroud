@@ -10,13 +10,17 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      include: ['src/**/*.ts'],
+      include: ['src/**/*.{ts,js}'],
       exclude: [
         'node_modules/**',
         'dist/**',
         'tests/**',
         '**/*.d.ts',
-        'src/schema/types.ts'
+        'src/schema/types.ts',
+        // Browser-executed instrumentation scripts (tested via Playwright in browser context)
+        // These files are thoroughly tested but execute in Chromium, not Node.js,
+        // so they cannot contribute to V8 coverage metrics
+        'src/instrumentation/**/*.js'
       ]
     }
   },

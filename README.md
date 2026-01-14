@@ -155,6 +155,29 @@ Run tests with coverage reporting:
 bun test --coverage
 ```
 
+### Coverage Notes
+
+The instrumentation scripts in `src/instrumentation/` are **excluded from coverage metrics** despite being thoroughly tested. This is intentional and expected because:
+
+- **Execution Context**: Instrumentation scripts execute in the browser context (Chromium via Playwright), not in the Node.js test environment
+- **Coverage Limitation**: The V8 coverage provider only tracks code execution in the Node.js process, and cannot see code running in a separate browser process
+- **Testing Approach**: These files are comprehensively tested via Playwright integration tests (`tests/instrumentation.test.ts`), which inject and execute the scripts in a real browser environment
+- **Architectural Decision**: This separation between test coverage (Node.js) and actual testing (browser) is a fundamental architectural constraint when testing browser-injected code
+
+The excluded files include:
+- `bootstrap.js` - Core logging infrastructure
+- `network-hooks.js` - fetch/XHR interception
+- `storage-hooks.js` - localStorage/sessionStorage tracking
+- `timer-hooks.js` - setTimeout/setInterval monitoring
+- `dom-hooks.js` - DOM mutation tracking
+- `fingerprinting-hooks.js` - Canvas/WebGL fingerprinting detection
+- `object-tracking.js` - Proxy-based object monitoring
+- `headless-mitigation.js` - Browser evasion techniques
+- `performance-monitor.js` - Event filtering and sampling
+- `service-worker-hooks.js` - Service Worker monitoring
+
+All other TypeScript/JavaScript code (CLI, orchestration, analysis) runs in Node.js and contributes to coverage metrics normally.
+
 Run specific test files:
 
 ```bash

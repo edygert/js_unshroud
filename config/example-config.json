@@ -9,6 +9,7 @@
   "enableFingerprinting": true,
   "enableObjectTracking": true,
   "enableHeadlessMitigation": false,
+  "enableServiceWorker": true,
   "sampleRate": 0.5,
   "maxEventsPerSecond": 500,
   "dedupeWindowMs": 100,

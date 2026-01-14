@@ -86,7 +86,9 @@
     XMLHttpRequest: window.XMLHttpRequest,
     WebSocket: window.WebSocket,
     localStorage: window.localStorage,
-    sessionStorage: window.sessionStorage
+    sessionStorage: window.sessionStorage,
+    serviceWorker: navigator.serviceWorker ? navigator.serviceWorker : null,
+    caches: window.caches ? window.caches : null
   };
 
   // Mark as loaded

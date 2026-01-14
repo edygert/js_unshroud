@@ -70,6 +70,7 @@ function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
     enableFingerprinting: false,
     enableObjectTracking: false,
     enableHeadlessMitigation: false,
+    enableServiceWorker: false,
     sampleRate: 1.0,
     maxEventsPerSecond: 1000,
     dedupeWindowMs: 100,
@@ -118,6 +119,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   fingerprinting: string | null;
   objectTracking: string | null;
   headlessMitigation: string | null;
+  serviceWorker: string | null;
   performanceMonitor: string;
 } {
   const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
@@ -128,6 +130,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   const fingerprintingScript = readFileSync('./src/instrumentation/fingerprinting-hooks.js', 'utf-8');
   const objectTrackingScript = readFileSync('./src/instrumentation/object-tracking.js', 'utf-8');
   const headlessMitigationScript = readFileSync('./src/instrumentation/headless-mitigation.js', 'utf-8');
+  const serviceWorkerScript = readFileSync('./src/instrumentation/service-worker-hooks.js', 'utf-8');
   const performanceMonitorScript = readFileSync('./src/instrumentation/performance-monitor.js', 'utf-8');
 
   return {
@@ -139,6 +142,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
     fingerprinting: config.enableFingerprinting ? fingerprintingScript : null,
     objectTracking: config.enableObjectTracking ? objectTrackingScript : null,
     headlessMitigation: config.enableHeadlessMitigation ? headlessMitigationScript : null,
+    serviceWorker: config.enableServiceWorker ? serviceWorkerScript : null,
     performanceMonitor: performanceMonitorScript // Always loaded for performance controls
   };
 }
@@ -152,6 +156,7 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig, 
   fingerprinting: string | null;
   objectTracking: string | null;
   headlessMitigation: string | null;
+  serviceWorker: string | null;
   performanceMonitor: string;
 }> {
   const scripts = loadInstrumentationScripts(config);
@@ -188,6 +193,10 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig, 
     await page.addInitScript({ content: scripts.headlessMitigation });
   }
 
+  if (scripts.serviceWorker) {
+    await page.addInitScript({ content: scripts.serviceWorker });
+  }
+
   // Always inject performance monitor (for sampling/rate limiting controls)
   // Set up performance config on window first
   await page.addInitScript({
@@ -200,7 +209,8 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig, 
         maxStackDepth: config.maxStackDepth,
         enableSampling: config.enableSampling,
         enableRateLimiting: config.enableRateLimiting,
-        enableDeduplication: config.enableDeduplication
+        enableDeduplication: config.enableDeduplication,
+        enableServiceWorker: config.enableServiceWorker
       })};
       window.__js_unshroud_session_id = '${sessionId}';
     `

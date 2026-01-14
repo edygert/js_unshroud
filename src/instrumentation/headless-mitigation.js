@@ -68,6 +68,7 @@
 
   // 2. Hardware concurrency - Headless browsers often have unrealistic values
   try {
+    const originalHardwareConcurrency = navigator.hardwareConcurrency;
     Object.defineProperty(window.navigator, 'hardwareConcurrency', {
       get: function() {
         const overrideValue = 8; // Realistic value for modern systems
@@ -75,7 +76,7 @@
           type: 'headless_mitigation',
           method: 'navigator.hardwareConcurrency',
           operation: 'value_override',
-          originalValue: navigator.hardwareConcurrency,
+          originalValue: originalHardwareConcurrency,
           newValue: overrideValue,
           stackTrace: getStackTrace(),
           timestamp: Date.now()
@@ -89,6 +90,7 @@
 
   // 3. Device memory - Similar headless detection vector
   try {
+    const originalDeviceMemory = navigator.deviceMemory;
     Object.defineProperty(window.navigator, 'deviceMemory', {
       get: function() {
         const overrideValue = 8; // Realistic value for modern systems
@@ -96,7 +98,7 @@
           type: 'headless_mitigation',
           method: 'navigator.deviceMemory',
           operation: 'value_override',
-          originalValue: navigator.deviceMemory,
+          originalValue: originalDeviceMemory,
           newValue: overrideValue,
           stackTrace: getStackTrace(),
           timestamp: Date.now()
@@ -157,9 +159,24 @@
     const originalQuery = window.navigator.permissions?.query;
     if (originalQuery) {
       window.navigator.permissions.query = function(permissionDescriptor) {
-        const promise = originalQuery.call(this, permissionDescriptor);
+        return originalQuery.call(this, permissionDescriptor).then(function(result) {
+          logEvent({
+            type: 'headless_mitigation',
+            method: 'navigator.permissions.query',
+            operation: 'permission_override',
+            name: permissionDescriptor.name,
+            originalState: result.state,
+            newState: 'granted',
+            stackTrace: getStackTrace(),
+            timestamp: Date.now()
+          });
 
-        return promise.catch(function(error) {
+          // Always return 'granted' to mimic normal browser behavior
+          return {
+            state: 'granted',
+            onchange: null
+          };
+        }).catch(function(error) {
           logEvent({
             type: 'headless_mitigation',
             method: 'navigator.permissions.query',
@@ -261,7 +278,7 @@
 
       // Monitor for headless-specific media queries
       if (query.includes('device-width') || query.includes('device-height') ||
-          query.includes('-webkit-min-device-pixel-ratio') || query.includes('forced-colors')) {
+          query.includes('device-pixel-ratio') || query.includes('forced-colors')) {
 
         logEvent({
           type: 'headless_mitigation',
