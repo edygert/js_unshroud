@@ -6,6 +6,9 @@ out
 dist
 *.tgz
 
+*.jsonl
+test_output.log
+
 # code coverage
 coverage
 *.lcov
