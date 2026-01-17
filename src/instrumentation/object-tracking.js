@@ -25,14 +25,6 @@
     }
   };
 
-  // Function to capture stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack || '';
-    }
-  };
 
   // Safe serialization of values
   const serializeValue = function(value, maxDepth = 2, currentDepth = 0) {
@@ -93,7 +85,6 @@
     const handler = {
       get: function(targetObj, property, receiver) {
         const value = Reflect.get(targetObj, property, receiver);
-        const stackTrace = getStackTrace();
 
         if (trackGets && property !== '__js_unshroud_proxy_label') {
           logEvent({
@@ -102,7 +93,6 @@
             label: label,
             property: String(property),
             value: serializeValue(value, maxDepth),
-            stackTrace: stackTrace,
             timestamp: Date.now()
           });
         }
@@ -118,7 +108,6 @@
       set: function(targetObj, property, value, receiver) {
         const oldValue = targetObj[property];
         const result = Reflect.set(targetObj, property, value, receiver);
-        const stackTrace = getStackTrace();
 
         if (trackSets && property !== '__js_unshroud_proxy_label') {
           logEvent({
@@ -128,7 +117,6 @@
             property: String(property),
             oldValue: serializeValue(oldValue, maxDepth),
             newValue: serializeValue(value, maxDepth),
-            stackTrace: stackTrace,
             timestamp: Date.now()
           });
         }
@@ -139,7 +127,6 @@
       deleteProperty: function(targetObj, property) {
         const oldValue = targetObj[property];
         const result = Reflect.deleteProperty(targetObj, property);
-        const stackTrace = getStackTrace();
 
         if (trackDeletes) {
           logEvent({
@@ -148,7 +135,6 @@
             label: label,
             property: String(property),
             oldValue: serializeValue(oldValue, maxDepth),
-            stackTrace: stackTrace,
             timestamp: Date.now()
           });
         }

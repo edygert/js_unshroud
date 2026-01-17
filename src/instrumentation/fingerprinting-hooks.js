@@ -41,21 +41,12 @@
     }
   };
 
-  // Function to capture stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack || '';
-    }
-  };
 
   // Instrument canvas getContext
   if (originals.getContext) {
     const originalGetContext = originals.getContext;
 
     window.HTMLCanvasElement.prototype.getContext = function(contextType, options) {
-      const stackTrace = getStackTrace();
 
       // Log WebGL context creation (common fingerprinting method)
       if (contextType && contextType.includes('webgl')) {
@@ -65,7 +56,6 @@
           contextType: contextType,
           options: options,
           operation: 'webgl_context',
-          stackTrace: stackTrace,
           timestamp: Date.now()
         });
       }
@@ -79,13 +69,11 @@
     const originalToDataURL = originals.toDataURL;
 
     window.HTMLCanvasElement.prototype.toDataURL = function() {
-      const stackTrace = getStackTrace();
 
       logEvent({
         type: 'fingerprinting',
         method: 'toDataURL',
         operation: 'canvas_fingerprint',
-        stackTrace: stackTrace,
         timestamp: Date.now()
       });
 
@@ -98,14 +86,12 @@
     const originalGetImageData = originals.getImageData;
 
     window.CanvasRenderingContext2D.prototype.getImageData = function(sx, sy, sw, sh) {
-      const stackTrace = getStackTrace();
 
       logEvent({
         type: 'fingerprinting',
         method: 'getImageData',
         operation: 'canvas_read',
         sx: sx, sy: sy, sw: sw, sh: sh,
-        stackTrace: stackTrace,
         timestamp: Date.now()
       });
 
@@ -123,7 +109,6 @@
 
       Object.defineProperty(window.navigator.constructor.prototype, prop, {
         get: function() {
-          const stackTrace = getStackTrace();
           const value = originalGetter.call(this);
 
           logEvent({
@@ -131,7 +116,6 @@
             method: 'navigator.' + prop,
             operation: 'navigator_read',
             value: typeof value === 'string' ? value.substring(0, 100) : value, // Limit string length
-            stackTrace: stackTrace,
             timestamp: Date.now()
           });
 
@@ -152,7 +136,6 @@
       // Audio fingerprinting by creating contexts and analyzing output
       const WrappedAudioContext = function(options) {
         const instance = new originalConstructor(options);
-        const stackTrace = getStackTrace();
 
         // Listen for audio destination creation and analysis methods
         if (instance.destination) {
@@ -163,7 +146,6 @@
                 type: 'fingerprinting',
                 method: 'audioDestination.connect',
                 operation: 'audio_fingerprint',
-                stackTrace: getStackTrace(),
                 timestamp: Date.now()
               });
               return originalConnect.apply(this, arguments);
@@ -181,7 +163,6 @@
                 type: 'fingerprinting',
                 method: 'AudioContext.' + method,
                 operation: 'audio_fingerprint',
-                stackTrace: getStackTrace(),
                 timestamp: Date.now()
               });
               return originalMethod.apply(this, arguments);
@@ -194,7 +175,6 @@
           method: AudioCtx.name || 'AudioContext',
           operation: 'audio_context_created',
           options: options,
-          stackTrace: stackTrace,
           timestamp: Date.now()
         });
 

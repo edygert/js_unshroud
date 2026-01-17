@@ -27,15 +27,6 @@
     }
   };
 
-  // Function to capture stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack || '';
-    }
-  };
-
   // Helper to instrument storage object
   function instrumentStorage(storage, storageType) {
     // Only instrument if storage is available
@@ -48,7 +39,6 @@
 
     // Override getItem
     storage.getItem = function(key) {
-      const stackTrace = getStackTrace();
       const result = originalGetItem.apply(this, arguments);
 
       logEvent({
@@ -57,7 +47,6 @@
         operation: 'get',
         key: key,
         value: result,
-        stackTrace: stackTrace,
         timestamp: Date.now()
       });
 
@@ -66,7 +55,6 @@
 
     // Override setItem
     storage.setItem = function(key, value) {
-      const stackTrace = getStackTrace();
       const oldValue = originalGetItem.call(this, key);
 
       const result = originalSetItem.apply(this, arguments);
@@ -78,7 +66,6 @@
         key: key,
         value: value,
         oldValue: oldValue,
-        stackTrace: stackTrace,
         timestamp: Date.now()
       });
 
@@ -87,7 +74,6 @@
 
     // Override removeItem
     storage.removeItem = function(key) {
-      const stackTrace = getStackTrace();
       const oldValue = originalGetItem.call(this, key);
 
       const result = originalRemoveItem.apply(this, arguments);
@@ -98,7 +84,6 @@
         operation: 'remove',
         key: key,
         oldValue: oldValue,
-        stackTrace: stackTrace,
         timestamp: Date.now()
       });
 
@@ -107,13 +92,11 @@
 
     // Override clear
     storage.clear = function() {
-      const stackTrace = getStackTrace();
 
       logEvent({
         type: 'storage',
         storageType: storageType,
         operation: 'clear',
-        stackTrace: stackTrace,
         timestamp: Date.now()
       });
 

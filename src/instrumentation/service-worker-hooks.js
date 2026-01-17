@@ -19,15 +19,6 @@
     return window.__js_unshroud_session_id || 'unknown_session';
   };
 
-  // Get stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack ? e.stack.split('\n').slice(2).join('\n') : undefined;
-    }
-  };
-
   // Log Service Worker event
   const logServiceWorkerEvent = function(eventData) {
     if (typeof window.__js_unshroud_log === 'function') {
@@ -53,7 +44,6 @@
         eventType: 'register',
         scriptUrl: scriptUrl,
         scope: options ? options.scope : undefined,
-        stackTrace: getStackTrace()
       });
 
       return originalRegister.apply(navigator.serviceWorker, [scriptUrl, options]).then(function(registration) {
@@ -87,7 +77,6 @@
           scope: options ? options.scope : undefined,
           success: false,
           error: error.message || String(error),
-          stackTrace: getStackTrace()
         });
         throw error;
       });

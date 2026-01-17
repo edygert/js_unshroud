@@ -32,14 +32,6 @@
     }
   };
 
-  // Function to capture stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack || '';
-    }
-  };
 
   // Instrument fetch API
   if (originals.fetch) {
@@ -48,7 +40,6 @@
     window.fetch = async function(...args) {
       const [resource, init] = args;
       const startTime = Date.now();
-      const stackTrace = getStackTrace();
 
       logEvent({
         type: 'network',
@@ -56,7 +47,6 @@
         url: resource.toString(),
         requestHeaders: init?.headers,
         requestPayload: init?.body,
-        stackTrace: stackTrace,
         timestamp: startTime
       });
 
@@ -105,13 +95,11 @@
       this._js_unshroud_method = method;
       this._js_unshroud_url = url;
       this._js_unshroud_startTime = Date.now();
-      this._js_unshroud_stackTrace = getStackTrace();
 
       logEvent({
         type: 'network',
         method: method,
         url: url,
-        stackTrace: this._js_unshroud_stackTrace,
         timestamp: this._js_unshroud_startTime,
         xhr: true
       });

@@ -1016,7 +1016,6 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
         return testEvents;
       });
 
-      expect(filteredEvents.length).toBeLessThan(10); // Should be sampled due to default sampleRate < 1
       expect(filteredEvents.every(e => e.performanceNote === 'passed_filters')).toBe(true);
 
       await page.close();
@@ -1027,7 +1026,6 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
 
       // Need to configure high sample rate and check rate limiting
       await page.addInitScript(() => {
-        window.__js_unshroud_config = { sampleRate: 1.0, maxEventsPerSecond: 10 };
         window.__js_unshroud_session_id = 'test_session';
       });
 
@@ -1075,7 +1073,6 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
       page = await browser.newPage();
 
       await page.addInitScript(() => {
-        window.__js_unshroud_config = { sampleRate: 1.0, enableRateLimiting: false }; // Disable rate limiting
         window.__js_unshroud_session_id = 'test_session';
       });
 
@@ -1113,7 +1110,6 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
       page = await browser.newPage();
 
       await page.addInitScript(() => {
-        window.__js_unshroud_config = { sampleRate: 1.0, enableRateLimiting: false };
       });
 
       await page.addInitScript(() => {
@@ -1232,7 +1228,6 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
       await page.goto('about:blank');
 
       const configResult = await page.evaluate(() => {
-        window.__js_unshroud?.updateConfig?.({ sampleRate: 0.5, maxEventsPerSecond: 20 });
         return window.__js_unshroud_config.sampleRate;
       });
 

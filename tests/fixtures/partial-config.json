@@ -1,5 +1,4 @@
 {
   "enableDOM": true,
-  "enableNetwork": false,
-  "sampleRate": 0.7
+  "enableNetwork": false
 }

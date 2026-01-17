@@ -37,15 +37,6 @@
     }
   };
 
-  // Function to capture stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack || '';
-    }
-  };
-
   // Get element selector for logging (safely)
   const getElementSelector = function(element) {
     try {
@@ -90,7 +81,6 @@
     const originalAddEventListener = originals.addEventListener;
 
     window.EventTarget.prototype.addEventListener = function(type, listener, options) {
-      const stackTrace = getStackTrace();
       const listenerStr = getListenerString(listener);
       const targetSelector = getElementSelector(this);
 
@@ -101,7 +91,6 @@
         operation: 'addEventListener',
         listener: listenerStr,
         options: options,
-        stackTrace: stackTrace,
         timestamp: Date.now()
       });
 
@@ -177,7 +166,6 @@
       const originalMethod = method;
 
       window.Node.prototype[name] = function() {
-        const stackTrace = getStackTrace();
         const targetSelector = getElementSelector(this);
         let addedSelector = '';
         let removedSelector = '';
@@ -199,7 +187,6 @@
           targetSelector: targetSelector,
           addedNode: addedSelector,
           removedNode: removedSelector,
-          stackTrace: stackTrace,
           timestamp: Date.now()
         });
 
@@ -215,7 +202,6 @@
     Object.defineProperty(window.Element.prototype, 'innerHTML', {
       get: originals.innerHTML.get,
       set: function(value) {
-        const stackTrace = getStackTrace();
         const targetSelector = getElementSelector(this);
 
         logEvent({
@@ -223,7 +209,6 @@
           operation: 'innerHTML',
           targetSelector: targetSelector,
           valueLength: value ? value.length : 0,
-          stackTrace: stackTrace,
           timestamp: Date.now()
         });
 

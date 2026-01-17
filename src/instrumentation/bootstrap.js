@@ -87,6 +87,21 @@
     WebSocket: window.WebSocket,
     localStorage: window.localStorage,
     sessionStorage: window.sessionStorage,
+    setTimeout: window.setTimeout,
+    setInterval: window.setInterval,
+    requestAnimationFrame: window.requestAnimationFrame,
+    clearTimeout: window.clearTimeout,
+    clearInterval: window.clearInterval,
+    cancelAnimationFrame: window.cancelAnimationFrame,
+    // DOM manipulation originals
+    EventTarget: window.EventTarget,
+    addEventListener: window.EventTarget?.prototype?.addEventListener,
+    removeEventListener: window.EventTarget?.prototype?.removeEventListener,
+    appendChild: window.Node?.prototype?.appendChild,
+    insertBefore: window.Node?.prototype?.insertBefore,
+    removeChild: window.Node?.prototype?.removeChild,
+    replaceChild: window.Node?.prototype?.replaceChild,
+    innerHTML: Object.getOwnPropertyDescriptor(window.Element?.prototype, 'innerHTML'),
     serviceWorker: navigator.serviceWorker ? navigator.serviceWorker : null,
     caches: window.caches ? window.caches : null
   };

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Storage Test</title>
+</head>
+<body>
+    <h1>Storage Test</h1>
+    <script>
+        console.log('=== STARTING STORAGE TEST ===');
+
+        // Test localStorage
+        localStorage.setItem('test-key', 'test-value');
+        console.log('localStorage.getItem:', localStorage.getItem('test-key'));
+        localStorage.removeItem('test-key');
+
+        // Test sessionStorage
+        sessionStorage.setItem('session-key', 'session-value');
+        console.log('sessionStorage.getItem:', sessionStorage.getItem('session-key'));
+        sessionStorage.clear();
+
+        console.log('=== STORAGE TEST COMPLETE ===');
+    </script>
+</body>
+</html>

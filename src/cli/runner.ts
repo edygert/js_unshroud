@@ -4,7 +4,8 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { readFileSync } from 'fs';
 import { EventLogger } from '../orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../orchestrator/CDPSessionManager.ts';
-import type { SessionConfig, InstrumentationConfig } from '../schema/types.ts';
+import type { SessionConfig, InstrumentationConfig, MonitoringEvent } from '../schema/types.ts';
+import { validateEvent } from '../schema/events.ts';
 
 // Declare setTimeout for linting purposes
 declare const setTimeout: (handler: () => void, timeout?: number) => number;
@@ -71,12 +72,10 @@ function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
     enableObjectTracking: false,
     enableHeadlessMitigation: false,
     enableServiceWorker: false,
-    sampleRate: 1.0,
-    maxEventsPerSecond: 1000,
-    dedupeWindowMs: 100,
+    maxEventsPerSecond: 100000,  // High threshold for malware analysis - protects against flooding attacks
+    dedupeWindowMs: 100,          // Short window to reduce noise from tight loops
     maxPayloadSize: 1024,
     maxStackDepth: 20,
-    enableSampling: true,
     enableRateLimiting: true,
     enableDeduplication: true
   };
@@ -147,7 +146,12 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   };
 }
 
-async function injectInstrumentation(page: Page, config: InstrumentationConfig, sessionId: string): Promise<{
+async function injectInstrumentation(
+  page: Page,
+  config: InstrumentationConfig,
+  sessionId: string,
+  eventLogger: EventLogger
+): Promise<{
   bootstrap: string;
   network: string | null;
   storage: string | null;
@@ -161,8 +165,58 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig, 
 }> {
   const scripts = loadInstrumentationScripts(config);
 
+  // CRITICAL: Set up browser-to-Node.js logging bridge BEFORE bootstrap loads
+  // This fixes the bug where instrumentation hooks were silent no-ops
+  await page.exposeFunction('__playwright_log_event', async (eventJson: string) => {
+    try {
+      const event = JSON.parse(eventJson);
+      if (validateEvent(event)) {
+        await eventLogger.logEvent(event as MonitoringEvent);
+      } else {
+        console.warn('[JS Unshroud] Invalid event received from instrumentation:', eventJson.substring(0, 200));
+      }
+    } catch (error) {
+      console.error('[JS Unshroud] Failed to parse instrumentation event:', error);
+    }
+  });
+
+  // Install bridge connector BEFORE bootstrap loads
+  // This overrides the silent no-op in bootstrap.js with a working implementation
+  await page.addInitScript({
+    content: `
+      window.__js_unshroud_log = function(data) {
+        if (window.__playwright_log_event) {
+          window.__playwright_log_event(data).catch(function(err) {
+            // Error handler - can't use console.log here due to recursion
+          });
+        }
+      };
+    `
+  });
+
   // Inject bootstrap first
   await page.addInitScript({ content: scripts.bootstrap });
+
+  // Set up config BEFORE performance monitor and other hooks
+  await page.addInitScript({
+    content: `
+      window.__js_unshroud_config = ${JSON.stringify({
+        maxEventsPerSecond: config.maxEventsPerSecond,
+        dedupeWindowMs: config.dedupeWindowMs,
+        maxPayloadSize: config.maxPayloadSize,
+        maxStackDepth: config.maxStackDepth,
+        enableRateLimiting: config.enableRateLimiting,
+        enableDeduplication: config.enableDeduplication,
+        enableServiceWorker: config.enableServiceWorker
+      })};
+      window.__js_unshroud_session_id = '${sessionId}';
+    `
+  });
+
+  // CRITICAL: Inject performance monitor BEFORE timer hooks
+  // Performance monitor wraps setTimeout/setInterval for performance warnings
+  // Timer hooks will then wrap those to add instrumentation
+  await page.addInitScript({ content: scripts.performanceMonitor });
 
   // Inject other scripts if enabled
   if (scripts.network) {
@@ -196,27 +250,6 @@ async function injectInstrumentation(page: Page, config: InstrumentationConfig, 
   if (scripts.serviceWorker) {
     await page.addInitScript({ content: scripts.serviceWorker });
   }
-
-  // Always inject performance monitor (for sampling/rate limiting controls)
-  // Set up performance config on window first
-  await page.addInitScript({
-    content: `
-      window.__js_unshroud_config = ${JSON.stringify({
-        sampleRate: config.sampleRate,
-        maxEventsPerSecond: config.maxEventsPerSecond,
-        dedupeWindowMs: config.dedupeWindowMs,
-        maxPayloadSize: config.maxPayloadSize,
-        maxStackDepth: config.maxStackDepth,
-        enableSampling: config.enableSampling,
-        enableRateLimiting: config.enableRateLimiting,
-        enableDeduplication: config.enableDeduplication,
-        enableServiceWorker: config.enableServiceWorker
-      })};
-      window.__js_unshroud_session_id = '${sessionId}';
-    `
-  });
-
-  await page.addInitScript({ content: scripts.performanceMonitor });
 
   return scripts;
 }
@@ -370,7 +403,7 @@ async function runMonitoring(args: Args): Promise<void> {
       });
     }
 
-    await injectInstrumentation(page, config, sessionId);
+    await injectInstrumentation(page, config, sessionId, eventLogger);
 
     // Navigate to the URL
     console.log(`Navigating to ${args.url}...`);

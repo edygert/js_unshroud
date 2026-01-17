@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Timer Test</title>
+</head>
+<body>
+    <h1>Simple Timer Test</h1>
+    <script>
+        console.log('=== STARTING TIMER TEST ===');
+
+        // Test 1: Simple setTimeout
+        setTimeout(function() {
+            console.log('setTimeout callback executed');
+        }, 100);
+
+        // Test 2: setInterval
+        let count = 0;
+        const interval = setInterval(function() {
+            count++;
+            console.log('setInterval callback executed:', count);
+            if (count >= 2) {
+                clearInterval(interval);
+            }
+        }, 200);
+
+        console.log('=== TIMER TEST COMPLETE ===');
+    </script>
+</body>
+</html>

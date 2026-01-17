@@ -121,7 +121,6 @@ describe('Instrumentation Config Loading', () => {
     expect(config.enableTimer).toBe(false);
     expect(config.enableError).toBe(true);
     expect(config.enableDOM).toBe(false);
-    expect(config.sampleRate).toBe(1.0);
   });
 
   test('should load and merge config from file', () => {
@@ -131,7 +130,6 @@ describe('Instrumentation Config Loading', () => {
     expect(config.enableNetwork).toBe(false); // Overridden
     expect(config.enableStorage).toBe(false); // Overridden
     expect(config.enableWebSocket).toBe(true); // Default
-    expect(config.sampleRate).toBe(0.5); // Overridden
   });
 
   test('should handle invalid JSON in config file', () => {
@@ -155,7 +153,6 @@ describe('Instrumentation Config Loading', () => {
     expect(config.enableConsole).toBe(true); // Default
     expect(config.enableNetwork).toBe(false); // Overridden
     expect(config.enableDOM).toBe(true); // Overridden
-    expect(config.sampleRate).toBe(0.7); // Overridden
     expect(config.enableWebSocket).toBe(true); // Default
   });
 });
@@ -217,12 +214,10 @@ describe('Instrumentation Script Loading', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      sampleRate: 1.0,
       maxEventsPerSecond: 1000,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableSampling: true,
       enableRateLimiting: true,
       enableDeduplication: true
     };
@@ -250,12 +245,10 @@ describe('Instrumentation Script Loading', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      sampleRate: 1.0,
       maxEventsPerSecond: 1000,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableSampling: true,
       enableRateLimiting: true,
       enableDeduplication: true
     };
@@ -282,12 +275,10 @@ describe('Instrumentation Script Loading', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      sampleRate: 1.0,
       maxEventsPerSecond: 1000,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableSampling: true,
       enableRateLimiting: true,
       enableDeduplication: true
     };
@@ -315,23 +306,25 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      sampleRate: 1.0,
       maxEventsPerSecond: 1000,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableSampling: true,
       enableRateLimiting: true,
       enableDeduplication: true
     };
 
-    // Mock page with addInitScript spy (only mock the page since we can't inject into a fake page)
+    // Mock page with addInitScript and exposeFunction spies
     const addInitScript = vi.fn();
-    const page = { addInitScript } as any;
+    const exposeFunction = vi.fn();
+    const page = { addInitScript, exposeFunction } as any;
 
-    await injectInstrumentation(page, config, 'test-session');
+    // Mock eventLogger
+    const mockEventLogger = { logEvent: vi.fn() } as any;
 
-    expect(addInitScript).toHaveBeenCalledTimes(5); // bootstrap + network + storage + config + performanceMonitor
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger);
+
+    expect(addInitScript).toHaveBeenCalledTimes(6); // bridge + bootstrap + network + storage + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -350,22 +343,24 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      sampleRate: 1.0,
       maxEventsPerSecond: 1000,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableSampling: true,
       enableRateLimiting: true,
       enableDeduplication: true
     };
 
     const addInitScript = vi.fn();
-    const page = { addInitScript } as any;
+    const exposeFunction = vi.fn();
+    const page = { addInitScript, exposeFunction } as any;
 
-    await injectInstrumentation(page, config, 'test-session');
+    // Mock eventLogger
+    const mockEventLogger = { logEvent: vi.fn() } as any;
 
-    expect(addInitScript).toHaveBeenCalledTimes(4); // bootstrap + storage + config + performanceMonitor
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger);
+
+    expect(addInitScript).toHaveBeenCalledTimes(5); // bridge + bootstrap + storage + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -384,21 +379,23 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      sampleRate: 1.0,
       maxEventsPerSecond: 1000,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableSampling: true,
       enableRateLimiting: true,
       enableDeduplication: true
     };
 
     const addInitScript = vi.fn().mockRejectedValueOnce(new Error('Injection failed'));
-    const page = { addInitScript } as any;
+    const exposeFunction = vi.fn();
+    const page = { addInitScript, exposeFunction } as any;
+
+    // Mock eventLogger
+    const mockEventLogger = { logEvent: vi.fn() } as any;
 
     // Should rethrow the error
-    await expect(injectInstrumentation(page, config, 'test-session')).rejects.toThrow('Injection failed');
+    await expect(injectInstrumentation(page, config, 'test-session', mockEventLogger)).rejects.toThrow('Injection failed');
   });
 
   test('should handle minimal config with only bootstrap', async () => {
@@ -414,22 +411,24 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      sampleRate: 1.0,
       maxEventsPerSecond: 1000,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableSampling: true,
       enableRateLimiting: true,
       enableDeduplication: true
     };
 
     const addInitScript = vi.fn();
-    const page = { addInitScript } as any;
+    const exposeFunction = vi.fn();
+    const page = { addInitScript, exposeFunction } as any;
 
-    await injectInstrumentation(page, config, 'test-session');
+    // Mock eventLogger
+    const mockEventLogger = { logEvent: vi.fn() } as any;
 
-    expect(addInitScript).toHaveBeenCalledTimes(3); // bootstrap + performance config + performance monitor
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger);
+
+    expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -648,7 +647,7 @@ describe('End-to-End Integration Tests', () => {
       await cdpManager.initialize(page);
 
       // Inject instrumentation scripts
-      await injectInstrumentation(page, config, sessionConfig.id);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger);
 
       // Navigate to test page
       await page.goto(sessionConfig.url, {
@@ -705,7 +704,7 @@ describe('End-to-End Integration Tests', () => {
     try {
       const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
       await cdpManager.initialize(page);
-      await injectInstrumentation(page, config, sessionConfig.id);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger);
 
       // This should fail with navigation error
        
@@ -768,8 +767,8 @@ describe('End-to-End Integration Tests', () => {
       page.addInitScript = vi.fn().mockRejectedValue(new Error('Script injection failed'));
 
       const config = loadInstrumentationConfig();
-       
-      await expect(injectInstrumentation(page, config, sessionConfig.id)).rejects.toThrow('Script injection failed');
+
+      await expect(injectInstrumentation(page, config, sessionConfig.id, eventLogger)).rejects.toThrow('Script injection failed');
 
     } finally {
       await performCleanup(browser, eventLogger);

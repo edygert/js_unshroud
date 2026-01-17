@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Dynamic Code Execution Methods Test</title>
+</head>
+<body>
+    <h1>Dynamic Code Execution Test</h1>
+    <div id="output"></div>
+
+    <script>
+        console.log('=== CATEGORY 1: Direct Code Execution ===');
+
+        // Test 1: eval (NOT INSTRUMENTED)
+        console.log('[TEST 1] eval()');
+        eval('console.log("✓ eval executed")');
+
+        // Test 2: window.eval (NOT INSTRUMENTED)
+        console.log('[TEST 2] window.eval (indirect)');
+        window.eval('console.log("✓ window.eval executed")');
+
+        // Test 3: Function constructor (NOT INSTRUMENTED)
+        console.log('[TEST 3] Function constructor');
+        new Function('console.log("✓ Function constructor executed")')();
+
+        // Test 4: setTimeout with string (SHOULD BE INSTRUMENTED BUT BROKEN)
+        console.log('[TEST 4] setTimeout(string)');
+        setTimeout('console.log("✓ setTimeout string executed")', 100);
+
+        console.log('\n=== CATEGORY 2: Script Injection ===');
+
+        // Test 5: innerHTML with script tag (PARTIAL - only logs length)
+        console.log('[TEST 5] innerHTML with <script>');
+        const div1 = document.createElement('div');
+        div1.innerHTML = '<script>console.log("✓ innerHTML script executed")</scr' + 'ipt>';
+        document.body.appendChild(div1);
+
+        // Test 6: innerHTML with event handler (NOT DETECTED)
+        console.log('[TEST 6] innerHTML with onerror');
+        const div2 = document.createElement('div');
+        div2.innerHTML = '<img src="invalid" onerror="console.log(\'✓ onerror handler executed\')">';
+        document.body.appendChild(div2);
+
+        // Test 7: createElement script with textContent (PARTIAL - appendChild tracked but not script content)
+        console.log('[TEST 7] createElement + textContent');
+        const script1 = document.createElement('script');
+        script1.textContent = 'console.log("✓ script.textContent executed")';
+        document.body.appendChild(script1);
+
+        // Test 8: insertAdjacentHTML (NOT INSTRUMENTED)
+        console.log('[TEST 8] insertAdjacentHTML');
+        const div3 = document.createElement('div');
+        document.body.appendChild(div3);
+        div3.insertAdjacentHTML('beforeend', '<script>console.log("✓ insertAdjacentHTML script executed")</scr' + 'ipt>');
+
+        // Test 9: document.write (NOT INSTRUMENTED)
+        console.log('[TEST 9] document.write');
+        // Note: Can't use document.write after page load in most cases, so this is commented
+        // document.write('<script>console.log("✓ document.write executed")</script>');
+
+        console.log('\n=== CATEGORY 3: Event Handlers ===');
+
+        // Test 10: setAttribute with event handler (NOT INSTRUMENTED)
+        console.log('[TEST 10] setAttribute onclick');
+        const button1 = document.createElement('button');
+        button1.setAttribute('onclick', 'console.log("✓ setAttribute onclick executed")');
+        button1.textContent = 'Click me (setAttribute)';
+        document.body.appendChild(button1);
+        button1.click(); // Trigger immediately
+
+        // Test 11: Direct event handler property (NOT INSTRUMENTED)
+        console.log('[TEST 11] element.onclick property');
+        const button2 = document.createElement('button');
+        button2.onclick = function() { console.log('✓ onclick property executed'); };
+        button2.textContent = 'Click me (property)';
+        document.body.appendChild(button2);
+        button2.click(); // Trigger immediately
+
+        // Test 12: Event handler with Function constructor (NOT INSTRUMENTED)
+        console.log('[TEST 12] onclick with Function constructor');
+        const button3 = document.createElement('button');
+        button3.onclick = new Function('console.log("✓ onclick Function constructor executed")');
+        button3.textContent = 'Click me (Function)';
+        document.body.appendChild(button3);
+        button3.click(); // Trigger immediately
+
+        console.log('\n=== CATEGORY 4: URL-Based Execution ===');
+
+        // Test 13: javascript: URL in anchor (NOT INSTRUMENTED)
+        console.log('[TEST 13] javascript: URL in anchor.href');
+        const link = document.createElement('a');
+        link.href = 'javascript:console.log("✓ javascript: URL executed")';
+        link.textContent = 'Click me (javascript:)';
+        document.body.appendChild(link);
+        link.click(); // Trigger immediately
+
+        // Test 14: data: URL in script.src (NOT FULLY ANALYZED)
+        console.log('[TEST 14] data: URL in script.src');
+        const script2 = document.createElement('script');
+        script2.src = 'data:text/javascript,console.log("✓ data: URL script executed")';
+        document.body.appendChild(script2);
+
+        // Test 15: data: URL with base64 (NOT DECODED)
+        console.log('[TEST 15] data: URL with base64');
+        const script3 = document.createElement('script');
+        // Base64 of: console.log("✓ base64 data: URL executed")
+        script3.src = 'data:text/javascript;base64,Y29uc29sZS5sb2coIsKcIGJhc2U2NCBkYXRhOiBVUkwgZXhlY3V0ZWQiKQ==';
+        document.body.appendChild(script3);
+
+        console.log('\n=== CATEGORY 5: Blob URLs ===');
+
+        // Test 16: Blob URL in script (NOT TRACKED)
+        console.log('[TEST 16] Blob URL in script.src');
+        const code = 'console.log("✓ Blob URL script executed")';
+        const blob = new Blob([code], {type: 'text/javascript'});
+        const blobUrl = URL.createObjectURL(blob);
+        const script4 = document.createElement('script');
+        script4.src = blobUrl;
+        document.body.appendChild(script4);
+
+        console.log('\n=== CATEGORY 6: Workers (NOT INSTRUMENTED) ===');
+
+        // Test 17: Web Worker with Blob URL (NOT INSTRUMENTED)
+        console.log('[TEST 17] Web Worker with Blob URL');
+        try {
+            const workerCode = 'self.postMessage("✓ Worker executed")';
+            const workerBlob = new Blob([workerCode], {type: 'text/javascript'});
+            const workerUrl = URL.createObjectURL(workerBlob);
+            const worker = new Worker(workerUrl);
+            worker.onmessage = (e) => console.log(e.data);
+        } catch(e) {
+            console.log('Worker test skipped (not supported or blocked)');
+        }
+
+        console.log('\n=== CATEGORY 7: Advanced Methods ===');
+
+        // Test 18: Reflect.construct with Function (NOT INSTRUMENTED)
+        console.log('[TEST 18] Reflect.construct(Function)');
+        const fn = Reflect.construct(Function, ['console.log("✓ Reflect.construct executed")']);
+        fn();
+
+        // Test 19: Aliased eval (NOT INSTRUMENTED)
+        console.log('[TEST 19] Aliased eval');
+        const e = eval;
+        e('console.log("✓ Aliased eval executed")');
+
+        // Test 20: Computed property eval (NOT INSTRUMENTED)
+        console.log('[TEST 20] Computed property eval');
+        window['eval']('console.log("✓ Computed property eval executed")');
+
+        console.log('\n=== CATEGORY 8: iframe-based ===');
+
+        // Test 21: iframe srcdoc (NOT INSTRUMENTED)
+        console.log('[TEST 21] iframe srcdoc');
+        const iframe1 = document.createElement('iframe');
+        iframe1.srcdoc = '<script>parent.console.log("✓ iframe srcdoc executed")</script>';
+        iframe1.style.display = 'none';
+        document.body.appendChild(iframe1);
+
+        // Test 22: iframe contentWindow.eval (NOT INSTRUMENTED)
+        console.log('[TEST 22] iframe contentWindow.eval');
+        setTimeout(() => {
+            const iframe2 = document.createElement('iframe');
+            iframe2.style.display = 'none';
+            document.body.appendChild(iframe2);
+            setTimeout(() => {
+                try {
+                    iframe2.contentWindow.eval('parent.console.log("✓ iframe.contentWindow.eval executed")');
+                } catch(e) {
+                    console.log('iframe contentWindow.eval blocked (CSP or cross-origin)');
+                }
+            }, 100);
+        }, 500);
+
+        console.log('\n=== TEST COMPLETE ===');
+        console.log('Check JSONL output to see which execution methods were captured');
+    </script>
+</body>
+</html>

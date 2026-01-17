@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JavaScript Obfuscation Techniques Test</title>
+</head>
+<body>
+    <h1>Malware Obfuscation Techniques Test</h1>
+    <div id="output"></div>
+
+    <script>
+        // Test 1: Base64 Encoding/Decoding
+        console.log('[TEST 1] Base64 obfuscation');
+        const encodedPayload1 = 'Y29uc29sZS5sb2coJ0Jhc2U2NCBkZWNvZGVkIHBheWxvYWQgZXhlY3V0ZWQnKQ==';
+        const decodedPayload1 = atob(encodedPayload1);
+        console.log('Decoded:', decodedPayload1);
+        eval(decodedPayload1);
+
+        // Test 2: String.fromCharCode obfuscation
+        console.log('[TEST 2] fromCharCode obfuscation');
+        const charCodeArray = [99,111,110,115,111,108,101,46,108,111,103,40,39,67,104,97,114,67,111,100,101,32,112,97,121,108,111,97,100,32,101,120,101,99,117,116,101,100,39,41];
+        const charCodePayload = String.fromCharCode.apply(null, charCodeArray);
+        console.log('Decoded:', charCodePayload);
+        eval(charCodePayload);
+
+        // Test 3: Function constructor obfuscation
+        console.log('[TEST 3] Function constructor obfuscation');
+        const funcPayload = 'console.log("Function constructor payload executed")';
+        const dynamicFunc = new Function(funcPayload);
+        dynamicFunc();
+
+        // Test 4: setTimeout with string code
+        console.log('[TEST 4] setTimeout string obfuscation');
+        setTimeout('console.log("setTimeout string payload executed")', 100);
+
+        // Test 5: Complex base64 + charCode combo
+        console.log('[TEST 5] Complex multi-layer obfuscation');
+        const layer1 = atob('Y29uc29sZS5sb2coJ011bHRpLWxheWVyIHBheWxvYWQgZXhlY3V0ZWQnKQ==');
+        const layer2 = String.fromCharCode(101, 118, 97, 108); // 'eval'
+        window[layer2](layer1);
+
+        // Test 6: Array indexing obfuscation
+        console.log('[TEST 6] Array indexing obfuscation');
+        const methods = ['log', 'warn', 'error'];
+        const targets = ['console', 'window'];
+        window[targets[0]][methods[0]]('Array indexing payload executed');
+
+        // Test 7: String concatenation obfuscation
+        console.log('[TEST 7] String concatenation obfuscation');
+        const part1 = 'cons';
+        const part2 = 'ole';
+        const part3 = '.lo';
+        const part4 = 'g("';
+        const part5 = 'String ';
+        const part6 = 'concat ';
+        const part7 = 'payload';
+        const part8 = ' executed")';
+        eval(part1 + part2 + part3 + part4 + part5 + part6 + part7 + part8);
+
+        // Test 8: Hex encoding
+        console.log('[TEST 8] Hex encoding obfuscation');
+        const hexPayload = '\x63\x6f\x6e\x73\x6f\x6c\x65\x2e\x6c\x6f\x67\x28\x27\x48\x65\x78\x20\x70\x61\x79\x6c\x6f\x61\x64\x20\x65\x78\x65\x63\x75\x74\x65\x64\x27\x29';
+        eval(hexPayload);
+
+        // Test 9: Unicode escape sequences
+        console.log('[TEST 9] Unicode escape sequences');
+        const unicodePayload = '\u0063\u006f\u006e\u0073\u006f\u006c\u0065\u002e\u006c\u006f\u0067\u0028\u0027\u0055\u006e\u0069\u0063\u006f\u0064\u0065\u0020\u0070\u0061\u0079\u006c\u006f\u0061\u0064\u0020\u0065\u0078\u0065\u0063\u0075\u0074\u0065\u0064\u0027\u0029';
+        eval(unicodePayload);
+
+        // Test 10: Self-decoding with btoa/atob
+        console.log('[TEST 10] Self-encoding loop');
+        const original = 'console.log("Self-encoded payload executed")';
+        const encoded = btoa(original);
+        const decoded = atob(encoded);
+        eval(decoded);
+
+        // Test 11: Indirect eval (window.eval, globalThis.eval)
+        console.log('[TEST 11] Indirect eval');
+        const indirectEval = window.eval;
+        indirectEval('console.log("Indirect eval payload executed")');
+
+        // Test 12: Dynamic property access
+        console.log('[TEST 12] Dynamic property access');
+        const obj = window;
+        const method = 'eval';
+        obj[method]('console.log("Dynamic property access payload executed")');
+
+        // Test 13: document.write with obfuscated script
+        console.log('[TEST 13] document.write obfuscation');
+        document.write('<scr' + 'ipt>console.log("document.write payload executed")</scr' + 'ipt>');
+
+        // Test 14: URL-encoded payload
+        console.log('[TEST 14] URL-encoded payload');
+        const urlEncoded = 'console.log(%22URL%20encoded%20payload%20executed%22)';
+        const urlDecoded = decodeURIComponent(urlEncoded);
+        eval(urlDecoded);
+
+        // Test 15: JSFuck-style obfuscation (simplified example)
+        console.log('[TEST 15] JSFuck-style obfuscation');
+        // Using array coercion: []["filter"]["constructor"]("return 'test'")()
+        const jsfuckPayload = []["filter"]["constructor"]('console.log("JSFuck-style payload executed")')();
+
+        // Test 16: XOR encoding (simple example)
+        console.log('[TEST 16] XOR encoding');
+        function xorDecode(encoded, key) {
+            let decoded = '';
+            for (let i = 0; i < encoded.length; i++) {
+                decoded += String.fromCharCode(encoded.charCodeAt(i) ^ key);
+            }
+            return decoded;
+        }
+        const xorEncoded = '`agka\x7f\x7fV\x7f\x7fakY\x11]\x18N\\V\x12a`abiV\x12i|i`miih\x11T';
+        const xorDecoded = xorDecode(xorEncoded, 13);
+        console.log('XOR Decoded:', xorDecoded);
+        eval(xorDecoded);
+
+        // Test 17: Obfuscated network request
+        console.log('[TEST 17] Obfuscated fetch');
+        const urlParts = ['https', '://', 'jsonplaceholder', '.typicode', '.com', '/posts/1'];
+        const targetUrl = urlParts.join('');
+        fetch(targetUrl)
+            .then(r => r.json())
+            .then(d => console.log('Obfuscated fetch result:', d.title));
+
+        // Test 18: localStorage with encoded data
+        console.log('[TEST 18] localStorage with encoded data');
+        const sensitiveData = btoa('malicious_payload_data');
+        localStorage.setItem('encoded_key', sensitiveData);
+        const retrieved = atob(localStorage.getItem('encoded_key'));
+        console.log('Retrieved encoded data:', retrieved);
+
+        // Test 19: Reflection-based code execution
+        console.log('[TEST 19] Reflection-based execution');
+        const reflectTarget = Reflect.get(window, 'eval');
+        reflectTarget('console.log("Reflection-based payload executed")');
+
+        // Test 20: Template literal obfuscation
+        console.log('[TEST 20] Template literal obfuscation');
+        const template = `${'con' + 'sole'}.${'lo' + 'g'}(${'Template literal payload executed'})`;
+        eval(template);
+
+        console.log('[TEST COMPLETE] All obfuscation tests executed');
+    </script>
+</body>
+</html>

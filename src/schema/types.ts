@@ -182,12 +182,10 @@ export interface InstrumentationConfig {
   enableObjectTracking: boolean;
   enableHeadlessMitigation: boolean;
   enableServiceWorker: boolean;
-  sampleRate: number;
-  maxEventsPerSecond: number;
-  dedupeWindowMs: number;
-  maxPayloadSize: number;
-  maxStackDepth: number;
-  enableSampling: boolean;
-  enableRateLimiting: boolean;
-  enableDeduplication: boolean;
+  maxEventsPerSecond: number;  // Rate limit threshold (default: 100000 for malware analysis)
+  dedupeWindowMs: number;       // Deduplication window in milliseconds
+  maxPayloadSize: number;       // Maximum payload size in bytes
+  maxStackDepth: number;        // Maximum stack trace depth
+  enableRateLimiting: boolean;  // Protect against event flooding attacks
+  enableDeduplication: boolean; // Reduce noise from tight loops
 }

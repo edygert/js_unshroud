@@ -25,14 +25,6 @@
     }
   };
 
-  // Function to capture stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack || '';
-    }
-  };
 
   // === CORE HEADLESS DETECTION MITIGATIONS ===
 
@@ -46,7 +38,6 @@
           operation: 'value_override',
           originalValue: true,
           newValue: false,
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
         return false; // Override to false
@@ -57,7 +48,6 @@
           type: 'headless_mitigation',
           method: 'navigator.webdriver',
           operation: 'set_attempt',
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
       }
@@ -78,7 +68,6 @@
           operation: 'value_override',
           originalValue: originalHardwareConcurrency,
           newValue: overrideValue,
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
         return overrideValue;
@@ -100,7 +89,6 @@
           operation: 'value_override',
           originalValue: originalDeviceMemory,
           newValue: overrideValue,
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
         return overrideValue;
@@ -143,7 +131,6 @@
           method: 'navigator.plugins',
           operation: 'plugins_override',
           pluginCount: fakePlugins.length,
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
 
@@ -167,7 +154,6 @@
             name: permissionDescriptor.name,
             originalState: result.state,
             newState: 'granted',
-            stackTrace: getStackTrace(),
             timestamp: Date.now()
           });
 
@@ -184,7 +170,6 @@
             name: permissionDescriptor.name,
             originalError: error.message,
             newState: 'granted',
-            stackTrace: getStackTrace(),
             timestamp: Date.now()
           });
 
@@ -225,7 +210,6 @@
           operation: 'entropy_injection',
           originalLength: result.length,
           newLength: modifiedResult.length,
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
 
@@ -258,7 +242,6 @@
           operation: 'noise_injection',
           width: result.width,
           height: result.height,
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
       }
@@ -286,7 +269,6 @@
           operation: 'media_query_monitor',
           query: query,
           originalResult: result.matches,
-          stackTrace: getStackTrace(),
           timestamp: Date.now()
         });
       }
@@ -316,7 +298,6 @@
             parameter: parameter,
             originalValue: result,
             newValue: overrideValue,
-            stackTrace: getStackTrace(),
             timestamp: Date.now()
           });
           return overrideValue;
@@ -329,7 +310,6 @@
             parameter: parameter,
             originalValue: result,
             newValue: overrideValue,
-            stackTrace: getStackTrace(),
             timestamp: Date.now()
           });
           return overrideValue;

@@ -35,15 +35,6 @@
     }
   };
 
-  // Function to capture stack trace
-  const getStackTrace = function() {
-    try {
-      throw new Error();
-    } catch (e) {
-      return e.stack || '';
-    }
-  };
-
   // Get handler string representation (safely)
   const getHandlerString = function(handler) {
     try {
@@ -63,7 +54,6 @@
     const originalSetTimeout = originals.setTimeout;
 
     window.setTimeout = function(handler, delay /*, ...args */) {
-      const stackTrace = getStackTrace();
       const handlerStr = getHandlerString(handler);
       const timerId = originalSetTimeout.apply(this, arguments);
 
@@ -73,7 +63,6 @@
         operation: 'create',
         handler: handlerStr,
         delay: delay || 0,
-        stackTrace: stackTrace,
         timerId: timerId,
         timestamp: Date.now()
       });
@@ -87,7 +76,6 @@
     const originalSetInterval = originals.setInterval;
 
     window.setInterval = function(handler, delay /*, ...args */) {
-      const stackTrace = getStackTrace();
       const handlerStr = getHandlerString(handler);
       const timerId = originalSetInterval.apply(this, arguments);
 
@@ -97,7 +85,6 @@
         operation: 'create',
         handler: handlerStr,
         delay: delay || 0,
-        stackTrace: stackTrace,
         timerId: timerId,
         timestamp: Date.now()
       });
@@ -111,7 +98,6 @@
     const originalRequestAnimationFrame = originals.requestAnimationFrame;
 
     window.requestAnimationFrame = function(callback) {
-      const stackTrace = getStackTrace();
       const handlerStr = getHandlerString(callback);
       const requestId = originalRequestAnimationFrame.apply(this, arguments);
 
@@ -120,7 +106,6 @@
         timerType: 'requestAnimationFrame',
         operation: 'create',
         handler: handlerStr,
-        stackTrace: stackTrace,
         requestId: requestId,
         timestamp: Date.now()
       });
