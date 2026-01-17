@@ -273,6 +273,43 @@ async function performCleanup(browser: Browser, eventLogger: EventLogger): Promi
   }
 }
 
+/**
+ * Generate spoofed user agent to mask headless browser indicators.
+ * Uses Windows to appear as the most common desktop platform.
+ */
+function generateSpoofedUserAgent(): string {
+  return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36';
+}
+
+/**
+ * Generate brand metadata for sec-ch-ua headers.
+ * This controls what appears in the Client Hints headers.
+ */
+function generateBrandMetadata(): Array<{ brand: string; version: string }> {
+  return [
+    { brand: 'Chromium', version: '143' },
+    { brand: 'Not A(Brand)', version: '24' },
+    { brand: 'Google Chrome', version: '143' }
+  ];
+}
+
+/**
+ * Generate spoofed headers to mask headless browser indicators.
+ * Note: User-Agent and sec-ch-ua are handled via CDP Emulation.setUserAgentOverride.
+ * These headers serve as fallback for any subrequests.
+ */
+function generateSpoofedHeaders(): Record<string, string> {
+  return {
+    'Upgrade-Insecure-Requests': '1',
+    'sec-ch-ua': '"Chromium";v="143", "Not A(Brand";v="24", "Google Chrome";v="143"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br'
+  };
+}
+
 async function runMonitoring(args: Args): Promise<void> {
   const config = loadInstrumentationConfig(args.config);
   console.log(`Monitoring ${args.url}, outputting to ${args.out}`);
@@ -282,9 +319,28 @@ async function runMonitoring(args: Args): Promise<void> {
   // Initialize event logger
   const eventLogger = new EventLogger(sessionConfig);
 
-  // Launch browser
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+  // Generate spoofed values for headless mitigation
+  const useHeadlessMitigation = config.enableHeadlessMitigation;
+  const spoofedUserAgent = useHeadlessMitigation ? generateSpoofedUserAgent() : '';
+  const spoofedHeaders = useHeadlessMitigation ? generateSpoofedHeaders() : {};
+  const brandMetadata = useHeadlessMitigation ? generateBrandMetadata() : undefined;
+  
+  // Launch browser with headless mitigation settings
+  const browser = await chromium.launch({ 
+    headless: true,
+    args: useHeadlessMitigation 
+      ? ['--disable-blink-features=AutomationControlled']
+      : []
+  });
+  
+  // Create context with custom user agent and headers if headless mitigation is enabled
+  const contextOptions = useHeadlessMitigation
+    ? { 
+        userAgent: spoofedUserAgent,
+        extraHTTPHeaders: spoofedHeaders
+      }
+    : {};
+  const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
 
   // Initialize CDP session manager
@@ -292,6 +348,28 @@ async function runMonitoring(args: Args): Promise<void> {
 
   try {
     await cdpManager.initialize(page);
+
+    // Apply header spoofing BEFORE navigation if headless mitigation is enabled
+    if (config.enableHeadlessMitigation) {
+      // Use CDP Emulation.setUserAgentOverride with brand metadata
+      // This affects both network requests AND the navigator API
+      // The userAgentMetadata parameter controls sec-ch-ua headers
+      await cdpManager.setUserAgentOverride(spoofedUserAgent, 'Windows', brandMetadata);
+
+      // Apply additional headers for subrequests (fallback)
+      await page.setExtraHTTPHeaders(spoofedHeaders);
+
+      // Remove webdriver property detection
+      await page.addInitScript({
+        content: `
+          Object.defineProperty(navigator, 'webdriver', {
+            get: () => false,
+            configurable: true
+          });
+        `
+      });
+    }
+
     await injectInstrumentation(page, config, sessionId);
 
     // Navigate to the URL
@@ -359,5 +437,8 @@ export {
   loadInstrumentationScripts,
   injectInstrumentation,
   performCleanup,
-  runMonitoring
+  runMonitoring,
+  generateSpoofedUserAgent,
+  generateBrandMetadata,
+  generateSpoofedHeaders
 };

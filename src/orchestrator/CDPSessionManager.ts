@@ -190,6 +190,48 @@ export class CDPSessionManager {
     }
   }
 
+  /**
+   * Set user agent override via CDP to spoof headless browser headers.
+   * This must be called before navigation to take effect.
+   */
+  async setUserAgentOverride(
+    userAgent: string,
+    platform: string = 'Linux',
+    brands?: Array<{ brand: string; version: string }>
+  ): Promise<void> {
+    if (!this.cdpSession) {
+      console.warn('[JS Unshroud] Cannot set user agent override: CDP session not initialized');
+      return;
+    }
+
+    try {
+      // Use Emulation.setUserAgentOverride instead of Network.setUserAgentOverride
+      // The Emulation domain affects both network requests AND navigator API
+      // Also need to set userAgentMetadata to control sec-ch-ua headers
+
+      const userAgentMetadata = brands ? {
+        brands: brands,
+        fullVersionList: brands,
+        platform: platform,
+        platformVersion: '10.0.0',
+        architecture: 'x86',
+        model: '',
+        mobile: false,
+        bitness: '64',
+        wow64: false
+      } : undefined;
+
+      await this.cdpSession.send('Emulation.setUserAgentOverride', {
+        userAgent: userAgent,
+        acceptLanguage: 'en-US,en',
+        platform: platform,
+        ...(userAgentMetadata && { userAgentMetadata })
+      });
+    } catch (error) {
+      console.warn('[JS Unshroud] Failed to set user agent override:', error);
+    }
+  }
+
   async disconnect(): Promise<void> {
     // Flush any pending event logs before disconnecting
     await this.flushPendingEvents();

@@ -11,7 +11,8 @@ export class EventLogger {
 
   constructor(sessionConfig: SessionConfig) {
     this.sessionConfig = sessionConfig;
-    this.writeStream = createWriteStream(sessionConfig.outputPath, { flags: 'a' });
+    // Use 'w' (write) mode to overwrite file each run, not 'a' (append) mode
+    this.writeStream = createWriteStream(sessionConfig.outputPath, { flags: 'w' });
 
     this.writeStream.on('error', (error) => {
       console.error('Error writing to log file:', error);
