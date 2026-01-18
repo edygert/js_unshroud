@@ -1,0 +1,21 @@
+{
+  "enableConsole": true,
+  "enableNetwork": true,
+  "enableStorage": true,
+  "enableWebSocket": true,
+  "enableTimer": true,
+  "enableError": true,
+  "enableDOM": true,
+  "enableFingerprinting": false,
+  "enableObjectTracking": false,
+  "enableHeadlessMitigation": false,
+  "enableServiceWorker": false,
+  "sampleRate": 1.0,
+  "maxEventsPerSecond": 10000,
+  "dedupeWindowMs": 0,
+  "maxPayloadSize": 10240,
+  "maxStackDepth": 50,
+  "enableSampling": false,
+  "enableRateLimiting": false,
+  "enableDeduplication": false
+}
