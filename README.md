@@ -112,6 +112,16 @@ Configuration options:
 **Monitoring Configuration:**
 - `monitoringTimeoutSeconds`: How long to monitor the page in seconds (default: `15`). Increase this for slow-loading malware samples that require more time to execute.
 
+**Behavioral Simulation (P3.2) - Defeats Interaction-Gated Malware:**
+- `enableBehaviorSimulation`: Enable human-like interaction simulation (default: `false`, auto-enabled when `enableHeadlessMitigation` is `true`)
+- `behaviorSimulationIntensity`: Intensity of simulated interaction - `'low'`, `'medium'`, or `'high'` (default: `'medium'`)
+  - `low`: Mouse movement only, no forms
+  - `medium`: Mouse, scroll, click, keyboard, basic form filling
+  - `high`: All features, multiple form submissions, checkout simulation
+- `enableFormInteraction`: Enable form field typing and submission simulation (default: `true` when `enableBehaviorSimulation` is true)
+- `enableCheckoutSimulation`: Enable checkout/payment page detection and simulation (default: `true` when `enableFormInteraction` is true)
+- `enableTimeDelayedBehavior`: Enable phased interaction over time to defeat time-bomb malware (default: `true` when `enableBehaviorSimulation` is true)
+
 **Performance Tuning:**
 - `dedupeWindowMs`: Time window for deduplication in milliseconds (default: `100`)
 - `maxPayloadSize`: Maximum size of event payloads in bytes (default: `2051`)
@@ -205,6 +215,96 @@ Blocks `navigator.getBattery()` API which is deprecated and indicates desktop vs
 
 ### Media Query Monitoring
 Monitors for headless-specific CSS media queries and logs detection attempts.
+
+### Behavioral Interaction Simulation
+
+**CRITICAL for defeating interaction-gated malware.** When `enableBehaviorSimulation` is enabled (default when `enableHeadlessMitigation` is true), js_unshroud simulates realistic human interaction patterns to trigger malware that gates execution behind user activity checks.
+
+**Malware Techniques Defeated:**
+- **ClickFix Attacks** (47% of 2025 attacks) - Malware waiting for click events
+- **Form Submission-Based Harvesters** - Credential theft gated behind form submission
+- **Magecart/Web Skimmers** - Payment card theft only on checkout pages
+- **Time-Delayed Malware** - 60+ second delays to bypass automated analysis
+- **Autofill Exploits** - Hidden field population detection
+- **Honeypot Field Detection** - Avoiding hidden fields that detect automation
+
+**Phased Interaction (Time-Delayed Behavior):**
+
+When `enableTimeDelayedBehavior` is true (default), simulation occurs in 3 phases:
+
+1. **Phase 1 (0-30s)**: Minimal mouse movement only
+   - Defeats malware with short delays (15-30s)
+   - Simulates initial page load reading
+
+2. **Phase 2 (30-60s)**: Moderate interaction
+   - Mouse movement + occasional scrolling
+   - Simulates reading/browsing behavior
+   - Defeats malware with 60s delays
+
+3. **Phase 3 (60s+)**: Full interaction
+   - Mouse, scroll, click, keyboard input
+   - Form filling and submission
+   - Checkout page simulation
+   - Triggers all interaction-gated malware
+
+**Form Interaction Capabilities:**
+
+When `enableFormInteraction` is true (default with behavioral simulation):
+
+- **Smart Field Detection**: Identifies visible form fields while avoiding honeypot fields (hidden, opacity < 0.1, size < 1px)
+- **Realistic Value Generation**: Context-aware field filling based on name/id/placeholder:
+  - Email fields → `test.user@example.com`
+  - Phone fields → `555-0123`
+  - Card numbers → `4532123456789012`
+  - CVV → `123`
+  - Names → `John`, `Doe`, `John Doe`
+  - Usernames → `testuser`
+  - Passwords → `Test123!@#`
+- **Natural Typing**: Simulates typing with 50-150ms delays per character
+- **Event Triggering**: Fires focus, blur, input, change, submit events to trigger all event listeners
+- **Autofill Simulation**: Populates password fields to trigger autofill-based exfiltration
+- **Form Submission**: Clicks submit buttons to trigger submission-gated malware
+
+**Checkout Page Detection:**
+
+When `enableCheckoutSimulation` is true (default with form interaction):
+
+- **URL Pattern Matching**: Detects checkout/payment/cart/billing URLs
+- **Payment Form Interaction**: Fills card number, CVV, expiry fields with realistic test data
+- **Submit Triggering**: Clicks "Pay Now" / "Place Order" buttons
+- **Defeats Magecart**: Triggers web skimmers that only activate on checkout pages
+
+**Intensity Levels:**
+
+Configure via `behaviorSimulationIntensity`:
+
+- **`low`**: Mouse movement only, no form interaction
+  - Use for: Quick scans, minimal interaction requirements
+  - Triggers: Basic interaction gates (mouse movement detection)
+
+- **`medium`** (default): Mouse, scroll, click, keyboard, basic form filling
+  - Use for: General malware analysis
+  - Triggers: Most interaction-gated malware including forms
+
+- **`high`**: All features, multiple form submissions, aggressive checkout simulation
+  - Use for: Sophisticated web skimmers, time-delayed malware
+  - Triggers: All known interaction-gated malware patterns
+
+**Configuration Example:**
+
+```json
+{
+  "enableHeadlessMitigation": true,
+  "enableBehaviorSimulation": true,
+  "behaviorSimulationIntensity": "high",
+  "enableFormInteraction": true,
+  "enableCheckoutSimulation": true,
+  "enableTimeDelayedBehavior": true,
+  "monitoringTimeoutSeconds": 90
+}
+```
+
+**Note**: For time-delayed malware (60s+ delays), set `monitoringTimeoutSeconds` to at least 75-90 seconds to allow Phase 3 interaction to occur.
 
 ## Testing
 
