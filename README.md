@@ -68,11 +68,21 @@ You can optionally provide a configuration file to control what instrumentation 
   "enableTimer": false,
   "enableError": true,
   "enableDOM": false,
-  "sampleRate": 1.0
+  "enableCodeExecution": true,
+  "enableEncoding": true,
+  "monitoringTimeoutSeconds": 15,
+  "outputMode": "file",
+  "udpLogging": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 514
+  }
 }
 ```
 
 Configuration options:
+
+**Event Capture:**
 - `enableConsole`: Capture console.log, console.warn, console.error, etc. (default: `true`)
 - `enableNetwork`: Capture XMLHttpRequest and fetch network requests (default: `true`)
 - `enableStorage`: Capture localStorage and sessionStorage operations (default: `true`)
@@ -83,13 +93,24 @@ Configuration options:
 - `enableFingerprinting`: Capture canvas fingerprinting, WebGL properties, and navigator probes (default: `false`)
 - `enableObjectTracking`: Enable proxy-based tracking of specific JavaScript objects (default: `false`)
 - `enableHeadlessMitigation`: Enable countermeasures against headless browser detection (default: `false`)
-- `sampleRate`: Sample rate for events (0.0 to 1.0, default: `1.0` for 100% sampling)
-- `maxEventsPerSecond`: Rate limiting threshold (default: `1000`)
+- `enableServiceWorker`: Capture Service Worker registration, lifecycle, and messaging (default: `false`)
+- `enableCodeExecution`: Capture eval(), Function(), and dynamic code execution (default: `true`)
+- `enableEncoding`: Capture atob/btoa, fromCharCode, URI encoding/decoding (default: `true`)
+
+**Output Configuration:**
+- `outputMode`: Output destination - `'file'`, `'udp'`, or `'both'` (default: `'file'`)
+- `udpLogging`: UDP logging configuration object
+  - `enabled`: Enable UDP logging (default: `false`)
+  - `host`: UDP destination IP address (default: `'127.0.0.1'`)
+  - `port`: UDP destination port (default: `514`)
+
+**Monitoring Configuration:**
+- `monitoringTimeoutSeconds`: How long to monitor the page in seconds (default: `15`). Increase this for slow-loading malware samples that require more time to execute.
+
+**Performance Tuning:**
 - `dedupeWindowMs`: Time window for deduplication in milliseconds (default: `100`)
-- `maxPayloadSize`: Maximum size of event payloads in bytes (default: `1024`)
+- `maxPayloadSize`: Maximum size of event payloads in bytes (default: `2051`)
 - `maxStackDepth`: Maximum stack trace depth for captured events (default: `20`)
-- `enableSampling`: Enable/disable event sampling (default: `true`)
-- `enableRateLimiting`: Enable/disable rate limiting (default: `true`)
 - `enableDeduplication`: Enable/disable event deduplication (default: `true`)
 
 Create a config file `my-config.json` and run:
@@ -102,22 +123,18 @@ Create a config file `my-config.json` and run:
 
 js_unshroud includes built-in performance monitoring and optimization features to manage high-volume event capture:
 
-### Sampling
-Control the percentage of events captured using `sampleRate` (0.0 to 1.0):
-- `1.0` = 100% of events (no sampling)
-- `0.5` = 50% of events sampled
-- `0.1` = 10% of events sampled
-
-### Rate Limiting
-Limit the maximum events per second with `maxEventsPerSecond` to prevent overwhelming the monitoring system.
-
 ### Deduplication
-Automatically deduplicate similar events within a time window (`dedupeWindowMs`). This prevents log spam from repeated operations.
+Automatically deduplicate similar events within a time window (`dedupeWindowMs`). This prevents log spam from repeated operations like tight loops or high-frequency timer callbacks. Events are deduplicated based on a signature combining event type, method, and key properties (URL, payload snippet, etc.).
 
 ### Payload Size Control
-Limit maximum payload sizes with `maxPayloadSize` and stack trace depths with `maxStackDepth` to keep event data manageable.
+Code execution and encoding events can generate very large payloads (obfuscated JavaScript can be megabytes). The `maxPayloadSize` setting limits payload sizes by truncating to the first 1024 bytes + "..." + last 1024 bytes, preserving both the beginning and end of the code for analysis.
 
-Performance metrics are automatically logged every 30 seconds, including acceptance rates, sampled vs. dropped events, and current configuration status.
+Stack traces are limited to `maxStackDepth` frames to keep event data manageable while still providing debugging context.
+
+### UDP Logging
+For real-time monitoring and SIEM integration, events can be sent via UDP to a remote collector using the `outputMode` and `udpLogging` configuration options. UDP logging is fire-and-forget (no acknowledgment) and suitable for high-volume scenarios where some event loss is acceptable.
+
+Performance metrics are automatically logged every 30 seconds, including total events processed, acceptance rates, and deduplication statistics.
 
 ## Headless Browser Mitigation
 
@@ -173,8 +190,10 @@ The excluded files include:
 - `fingerprinting-hooks.js` - Canvas/WebGL fingerprinting detection
 - `object-tracking.js` - Proxy-based object monitoring
 - `headless-mitigation.js` - Browser evasion techniques
-- `performance-monitor.js` - Event filtering and sampling
+- `performance-monitor.js` - Event filtering and deduplication
 - `service-worker-hooks.js` - Service Worker monitoring
+- `code-execution-hooks.js` - eval/Function/dynamic code execution
+- `encoding-hooks.js` - atob/btoa/fromCharCode/URI encoding
 
 All other TypeScript/JavaScript code (CLI, orchestration, analysis) runs in Node.js and contributes to coverage metrics normally.
 
@@ -360,11 +379,41 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 }
 ```
 
+**Code Execution Events:**
+```json
+{
+  "id": "evt_1234567890_006",
+  "timestamp": 1640995200500,
+  "sessionId": "session_1640995200_abc123",
+  "type": "code_execution",
+  "method": "eval",
+  "operation": "execute",
+  "code": "console.log('Dynamically executed code'); alert('XSS attempt');",
+  "codeLength": 62,
+  "codeHash": "a1b2c3d4e5f6"
+}
+```
+
+**Encoding Events (Deobfuscation):**
+```json
+{
+  "id": "evt_1234567890_007",
+  "timestamp": 1640995200600,
+  "sessionId": "session_1640995200_abc123",
+  "type": "encoding",
+  "method": "atob",
+  "operation": "decode",
+  "output": "eval(function(p,a,c,k,e,d){...})",
+  "outputLength": 1247,
+  "success": true
+}
+```
+
 **Performance Monitoring Events:**
 ```json
 {
   "id": "perf_1234567890_001",
-  "timestamp": 1640995200500,
+  "timestamp": 1640995200700,
   "sessionId": "session_1640995200_abc123",
   "type": "performance_stats",
   "method": "periodic_report",
@@ -373,12 +422,8 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
   "totalEventsProcessed": 1250,
   "eventsAccepted": 1200,
   "eventsRejected": 50,
-  "eventsSampled": 25,
-  "eventsRateLimited": 20,
-  "eventsDeduplicated": 5,
-  "acceptanceRate": "96.00%",
-  "samplingRate": 0.8,
-  "maxEventsPerSecond": 1000
+  "eventsDeduplicated": 50,
+  "acceptanceRate": "96.00%"
 }
 ```
 

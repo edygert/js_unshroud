@@ -93,6 +93,22 @@
     clearTimeout: window.clearTimeout,
     clearInterval: window.clearInterval,
     cancelAnimationFrame: window.cancelAnimationFrame,
+    // Code execution originals
+    eval: window.eval,
+    Function: window.Function,
+    AsyncFunction: (async function() {}).constructor,
+    GeneratorFunction: (function*() {}).constructor,
+    // Encoding/decoding originals
+    atob: window.atob,
+    btoa: window.btoa,
+    fromCharCode: String.fromCharCode,
+    fromCodePoint: String.fromCodePoint,
+    decodeURI: window.decodeURI,
+    decodeURIComponent: window.decodeURIComponent,
+    unescape: window.unescape,
+    encodeURI: window.encodeURI,
+    encodeURIComponent: window.encodeURIComponent,
+    escape: window.escape,
     // DOM manipulation originals
     EventTarget: window.EventTarget,
     addEventListener: window.EventTarget?.prototype?.addEventListener,

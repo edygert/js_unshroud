@@ -108,6 +108,16 @@ export class TimelineFormatter {
         return `Service Worker: ${swEvent.eventType}${swEvent.scriptUrl ? ` ${swEvent.scriptUrl}` : ''}${swEvent.cacheName ? ` ${swEvent.cacheName}` : ''}`;
       }
 
+      case 'code_execution': {
+        const codeEvent = event;
+        return `Code Execution: ${codeEvent.method}(${codeEvent.code.slice(0, 50)}...)`;
+      }
+
+      case 'encoding': {
+        const encEvent = event;
+        return `Encoding: ${encEvent.method}.${encEvent.operation} -> ${encEvent.output.slice(0, 30)}...`;
+      }
+
       default:
         return `${(event as BaseEvent).type} event`;
     }

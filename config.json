@@ -1,0 +1,26 @@
+{
+  "enableConsole": true,
+  "enableNetwork": true,
+  "enableStorage": true,
+  "enableWebSocket": true,
+  "enableTimer": false,
+  "enableError": true,
+  "enableDOM": true,
+  "enableFingerprinting": true,
+  "enableObjectTracking": true,
+  "enableHeadlessMitigation": true,
+  "enableServiceWorker": true,
+  "enableCodeExecution": true,
+  "enableEncoding": true,
+  "dedupeWindowMs": 100,
+  "maxPayloadSize": 2051,
+  "maxStackDepth": 20,
+  "enableDeduplication": true,
+  "monitoringTimeoutSeconds": 15,
+  "outputMode": "file",
+  "udpLogging": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 514
+  }
+}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Code Execution Test</title>
+</head>
+<body>
+    <h1>Code Execution Test</h1>
+    <script>
+        console.log('=== STARTING CODE EXECUTION TEST ===');
+
+        // Test 1: Direct eval
+        eval('console.log("Test 1: Direct eval executed")');
+
+        // Test 2: Indirect eval
+        const indirectEval = eval;
+        indirectEval('console.log("Test 2: Indirect eval executed")');
+
+        // Test 3: Function constructor
+        const fn1 = new Function('console.log("Test 3: Function constructor (new) executed")');
+        fn1();
+
+        // Test 4: Function constructor without new
+        const fn2 = Function('console.log("Test 4: Function constructor (call) executed")');
+        fn2();
+
+        // Test 5: Function with arguments
+        const fn3 = new Function('a', 'b', 'return a + b');
+        console.log('Test 5: Function with arguments result:', fn3(2, 3));
+
+        // Test 6: Multi-line function
+        const fn4 = new Function(`
+            const x = 10;
+            const y = 20;
+            console.log("Test 6: Multi-line function executed, x + y =", x + y);
+        `);
+        fn4();
+
+        // Test 7: AsyncFunction (if supported)
+        try {
+            const AsyncFunction = (async function() {}).constructor;
+            const asyncFn = new AsyncFunction('console.log("Test 7: AsyncFunction executed")');
+            asyncFn();
+        } catch (e) {
+            console.log('Test 7: AsyncFunction not supported');
+        }
+
+        // Test 8: GeneratorFunction (if supported)
+        try {
+            const GeneratorFunction = (function*() {}).constructor;
+            const genFn = new GeneratorFunction('yield 1; console.log("Test 8: GeneratorFunction executed")');
+            const gen = genFn();
+            gen.next();
+            gen.next();
+        } catch (e) {
+            console.log('Test 8: GeneratorFunction not supported');
+        }
+
+        // Test 9: eval with complex code
+        eval(`
+            const data = {
+                name: "test",
+                value: 123
+            };
+            console.log("Test 9: Eval with complex code, data:", JSON.stringify(data));
+        `);
+
+        // Test 10: Nested eval
+        eval('eval("console.log(\\"Test 10: Nested eval executed\\")")');
+
+        console.log('=== CODE EXECUTION TEST COMPLETE ===');
+    </script>
+</body>
+</html>

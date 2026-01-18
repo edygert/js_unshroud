@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Encoding Test</title>
+</head>
+<body>
+    <h1>Encoding Test</h1>
+    <script>
+        console.log('=== STARTING ENCODING TEST ===');
+
+        // Test 1: atob - Base64 decode
+        const decoded1 = atob('SGVsbG8gV29ybGQ=');
+        console.log('Test 1: atob result:', decoded1);
+
+        // Test 2: btoa - Base64 encode
+        const encoded2 = btoa('Hello World');
+        console.log('Test 2: btoa result:', encoded2);
+
+        // Test 3: String.fromCharCode
+        const decoded3 = String.fromCharCode(72, 101, 108, 108, 111);
+        console.log('Test 3: fromCharCode result:', decoded3);
+
+        // Test 4: String.fromCodePoint
+        const decoded4 = String.fromCodePoint(72, 101, 108, 108, 111);
+        console.log('Test 4: fromCodePoint result:', decoded4);
+
+        // Test 5: decodeURI
+        const decoded5 = decodeURI('Hello%20World');
+        console.log('Test 5: decodeURI result:', decoded5);
+
+        // Test 6: decodeURIComponent
+        const decoded6 = decodeURIComponent('Hello%20World%21');
+        console.log('Test 6: decodeURIComponent result:', decoded6);
+
+        // Test 7: unescape (deprecated but used in malware)
+        const decoded7 = unescape('Hello%20World');
+        console.log('Test 7: unescape result:', decoded7);
+
+        // Test 8: encodeURI
+        const encoded8 = encodeURI('Hello World');
+        console.log('Test 8: encodeURI result:', encoded8);
+
+        // Test 9: encodeURIComponent
+        const encoded9 = encodeURIComponent('Hello World!');
+        console.log('Test 9: encodeURIComponent result:', encoded9);
+
+        // Test 10: escape (deprecated but used in malware)
+        const encoded10 = escape('Hello World');
+        console.log('Test 10: escape result:', encoded10);
+
+        // Test 11: Large base64 decode (to test truncation)
+        const largeBase64 = 'TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gU2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlxdWEuIFV0IGVuaW0gYWQgbWluaW0gdmVuaWFtLCBxdWlzIG5vc3RydWQgZXhlcmNpdGF0aW9uIHVsbGFtY28gbGFib3JpcyBuaXNpIHV0IGFsaXF1aXAgZXggZWEgY29tbW9kbyBjb25zZXF1YXQuIER1aXMgYXV0ZSBpcnVyZSBkb2xvciBpbiByZXByZWhlbmRlcml0IGluIHZvbHVwdGF0ZSB2ZWxpdCBlc3NlIGNpbGx1bSBkb2xvcmUgZXUgZnVnaWF0IG51bGxhIHBhcmlhdHVyLiBFeGNlcHRldXIgc2ludCBvY2NhZWNhdCBjdXBpZGF0YXQgbm9uIHByb2lkZW50LCBzdW50IGluIGN1bHBhIHF1aSBvZmZpY2lhIGRlc2VydW50IG1vbGxpdCBhbmltIGlkIGVzdCBsYWJvcnVtLg==';
+        const decoded11 = atob(largeBase64);
+        console.log('Test 11: Large base64 decode (length:', decoded11.length + ')');
+
+        // Test 12: fromCharCode with many arguments
+        const decoded12 = String.fromCharCode(84, 104, 105, 115, 32, 105, 115, 32, 97, 32, 116, 101, 115, 116, 32, 111, 102, 32, 109, 97, 110, 121, 32, 99, 104, 97, 114, 97, 99, 116, 101, 114, 115);
+        console.log('Test 12: fromCharCode with many arguments:', decoded12);
+
+        console.log('=== ENCODING TEST COMPLETE ===');
+    </script>
+</body>
+</html>

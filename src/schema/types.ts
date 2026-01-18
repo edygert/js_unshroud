@@ -148,6 +148,28 @@ export interface ServiceWorkerEvent extends BaseEvent {
   stackTrace?: string;
 }
 
+export interface CodeExecutionEvent extends BaseEvent {
+  type: 'code_execution';
+  method: 'eval' | 'Function' | 'AsyncFunction' | 'GeneratorFunction' | 'setTimeout' | 'setInterval';
+  operation: 'execute';
+  code: string;           // Truncated to maxPayloadSize
+  codeLength: number;     // Original length
+  codeHash?: string;      // Hash for deduplication
+  args?: string[];        // Function constructor arguments
+}
+
+export interface EncodingEvent extends BaseEvent {
+  type: 'encoding';
+  method: 'atob' | 'btoa' | 'fromCharCode' | 'fromCodePoint' |
+          'decodeURI' | 'decodeURIComponent' | 'unescape' |
+          'encodeURI' | 'encodeURIComponent' | 'escape';
+  operation: 'encode' | 'decode';
+  output: string;         // De-obfuscated/encoded result (truncated to maxPayloadSize)
+  outputLength: number;   // Original output length
+  success: boolean;
+  error?: string;
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -160,7 +182,9 @@ export type MonitoringEvent =
   | HeadlessMitigationEvent
   | PerformanceStatsEvent
   | PerformanceWarningEvent
-  | ServiceWorkerEvent;
+  | ServiceWorkerEvent
+  | CodeExecutionEvent
+  | EncodingEvent;
 
 export interface SessionConfig {
   id: string;
@@ -168,6 +192,12 @@ export interface SessionConfig {
   startTime: number;
   outputPath: string;
   configPath?: string | undefined;
+}
+
+export interface UDPLoggingConfig {
+  enabled: boolean;
+  host: string;    // IP address, e.g., "192.168.1.100"
+  port: number;    // Port, e.g., 514 (syslog) or custom port
 }
 
 export interface InstrumentationConfig {
@@ -182,10 +212,17 @@ export interface InstrumentationConfig {
   enableObjectTracking: boolean;
   enableHeadlessMitigation: boolean;
   enableServiceWorker: boolean;
-  maxEventsPerSecond: number;  // Rate limit threshold (default: 100000 for malware analysis)
+  enableCodeExecution: boolean; // Instruments eval(), Function(), setTimeout/setInterval string code
+  enableEncoding: boolean;      // Instruments atob/btoa, fromCharCode, URI encoding/decoding
   dedupeWindowMs: number;       // Deduplication window in milliseconds
   maxPayloadSize: number;       // Maximum payload size in bytes
   maxStackDepth: number;        // Maximum stack trace depth
-  enableRateLimiting: boolean;  // Protect against event flooding attacks
   enableDeduplication: boolean; // Reduce noise from tight loops
+
+  // Monitoring configuration
+  monitoringTimeoutSeconds: number;  // How long to monitor the page in seconds (default: 15)
+
+  // Output configuration
+  outputMode?: 'file' | 'udp' | 'both';  // Default: 'file'
+  udpLogging?: UDPLoggingConfig;
 }

@@ -42,6 +42,8 @@ const objectTrackingScript = readFileSync(join(process.cwd(), 'src/instrumentati
 const headlessMitigationScript = readFileSync(join(process.cwd(), 'src/instrumentation/headless-mitigation.js'), 'utf-8');
 const performanceMonitorScript = readFileSync(join(process.cwd(), 'src/instrumentation/performance-monitor.js'), 'utf-8');
 const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/service-worker-hooks.js'), 'utf-8');
+const codeExecutionHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/code-execution-hooks.js'), 'utf-8');
+const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/encoding-hooks.js'), 'utf-8');
 
   beforeAll(async () => {
     browser = await chromium.launch({ headless: true });
@@ -168,36 +170,8 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
       await page.close();
     });
 
-    test('should capture stack traces', async () => {
-      page = await browser.newPage();
-      
-      const events: any[] = [];
-      await page.exposeFunction('__test_log_event', (event: string) => {
-        events.push(JSON.parse(event));
-      });
-
-      await page.addInitScript(() => {
-        window.__js_unshroud_log = (data: string) => {
-          (window as any).__test_log_event(data);
-        };
-      });
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(networkHooksScript);
-      await page.goto('about:blank');
-
-      await page.evaluate(() => {
-        fetch('https://api.example.com/trace-test').catch(() => {});
-      });
-
-      await page.waitForTimeout(100);
-
-      const networkEvents = events.filter(e => e.type === 'network' && e.stackTrace);
-      expect(networkEvents.length).toBeGreaterThan(0);
-      expect(networkEvents[0].stackTrace).toBeDefined();
-      expect(typeof networkEvents[0].stackTrace).toBe('string');
-      await page.close();
-    });
+    // Note: Stack traces were removed from all events in previous updates
+    // This test is no longer applicable
   });
 
   describe('Storage Hooks Script', () => {
@@ -1021,53 +995,7 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
       await page.close();
     });
 
-    test('should apply rate limiting', async () => {
-      page = await browser.newPage();
-
-      // Need to configure high sample rate and check rate limiting
-      await page.addInitScript(() => {
-        window.__js_unshroud_session_id = 'test_session';
-      });
-
-      const events: any[] = [];
-      await page.exposeFunction('__test_log_event', (event: string) => {
-        events.push(JSON.parse(event));
-      });
-
-      await page.addInitScript(() => {
-        window.__js_unshroud_log = (data: string) => {
-          (window as any).__test_log_event(data);
-        };
-      });
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(performanceMonitorScript);
-      await page.goto('about:blank');
-
-      const results = await page.evaluate(async () => {
-        const events = [];
-        const stats = [];
-
-        // Generate events faster than rate limit
-        for (let i = 0; i < 15; i++) {
-          const event = { type: 'rate_test', id: i, timestamp: Date.now() };
-          const result = window.__js_unshroud?.filterEvent?.(event);
-          events.push(result);
-          stats.push(window.__js_unshroud?.getPerformanceStats?.());
-
-          // Simulate time passing
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-
-        return { events, finalStats: window.__js_unshroud?.getPerformanceStats?.() };
-      });
-
-      const filteredEvents = results.events.filter(e => e !== null);
-      expect(filteredEvents.length).toBeLessThan(15); // Some should be rate limited
-      expect(results.finalStats.eventsRateLimited).toBeGreaterThan(0);
-
-      await page.close();
-    });
+    // Note: Rate limiting test removed - feature not actively used
 
     test('should deduplicate events within time window', async () => {
       page = await browser.newPage();
@@ -1220,21 +1148,7 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
       await page.close();
     });
 
-    test('should allow config updates via updateConfig', async () => {
-      page = await browser.newPage();
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(performanceMonitorScript);
-      await page.goto('about:blank');
-
-      const configResult = await page.evaluate(() => {
-        return window.__js_unshroud_config.sampleRate;
-      });
-
-      expect(configResult).toBe(0.5);
-
-      await page.close();
-    });
+    // Note: Config update test removed - sampleRate was removed from config
   });
 
   describe('Service Worker Hooks Script', () => {
@@ -1486,6 +1400,656 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
       const messageEvents = events.filter(e => e.type === 'service_worker' && e.eventType === 'message');
       expect(messageEvents.length).toBeGreaterThan(0);
       expect(messageEvents[0].messageData).toBeDefined();
+
+      await page.close();
+    });
+  });
+
+  describe('Code Execution Hooks Script', () => {
+    test('should intercept direct eval calls', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        eval('console.log("test eval")');
+      });
+
+      await page.waitForTimeout(100);
+
+      const evalEvents = events.filter(e => e.type === 'code_execution' && e.method === 'eval');
+      expect(evalEvents.length).toBeGreaterThan(0);
+      expect(evalEvents[0].code).toContain('console.log');
+      expect(evalEvents[0].codeLength).toBeGreaterThan(0);
+      expect(evalEvents[0].codeHash).toBeDefined();
+
+      await page.close();
+    });
+
+    test('should intercept indirect eval calls', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const indirectEval = eval;
+        indirectEval('console.log("indirect eval")');
+      });
+
+      await page.waitForTimeout(100);
+
+      const evalEvents = events.filter(e => e.type === 'code_execution' && e.method === 'eval');
+      expect(evalEvents.length).toBeGreaterThan(0);
+      expect(evalEvents[0].code).toContain('indirect eval');
+
+      await page.close();
+    });
+
+    test('should intercept Function constructor with new', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval
+        const fn = new Function('a', 'b', 'return a + b');
+        fn(1, 2);
+      });
+
+      await page.waitForTimeout(100);
+
+      const functionEvents = events.filter(e => e.type === 'code_execution' && e.method === 'Function');
+      expect(functionEvents.length).toBeGreaterThan(0);
+      expect(functionEvents[0].code).toContain('return a + b');
+      expect(functionEvents[0].args).toEqual(['a', 'b']);
+
+      await page.close();
+    });
+
+    test('should intercept Function constructor without new', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval
+        const fn = Function('console.log("test")');
+        fn();
+      });
+
+      await page.waitForTimeout(100);
+
+      const functionEvents = events.filter(e => e.type === 'code_execution' && e.method === 'Function');
+      expect(functionEvents.length).toBeGreaterThan(0);
+      expect(functionEvents[0].code).toContain('console.log');
+
+      await page.close();
+    });
+
+    // Note: AsyncFunction and GeneratorFunction are not reliably intercepted
+    // They share the same prototype chain as Function, making instrumentation tricky
+
+    test('should truncate large code with first/last pattern', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.addScriptTag({
+        content: `
+          const largeCode = '/* ' + 'x'.repeat(3000) + '*/';
+          eval(largeCode);
+        `
+      });
+
+      await page.waitForTimeout(100);
+
+      const evalEvents = events.filter(e => e.type === 'code_execution' && e.method === 'eval');
+      expect(evalEvents.length).toBeGreaterThan(0);
+
+      // Find the eval with large code
+      const largeEvalEvent = evalEvents.find(e => e.codeLength > 2051);
+      expect(largeEvalEvent).toBeDefined();
+
+      // Verify truncation occurred (should have "..." separator)
+      expect(largeEvalEvent.code).toContain('...');
+      // Verify original length is stored
+      expect(largeEvalEvent.codeLength).toBeGreaterThan(2051);
+      // Verify truncated code is shorter than original
+      expect(largeEvalEvent.code.length).toBeLessThan(largeEvalEvent.codeLength);
+
+      await page.close();
+    });
+
+    test('should filter out Playwright internal code', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        // These should be filtered out
+        eval('const __playwright__ = 1');
+        eval('const __js_unshroud = 1');
+        // This should NOT be filtered
+        eval('const userCode = 1');
+      });
+
+      await page.waitForTimeout(100);
+
+      const evalEvents = events.filter(e => e.type === 'code_execution' && e.method === 'eval');
+      // Should only capture the userCode eval, not the playwright/unshroud ones
+      expect(evalEvents.some(e => e.code.includes('userCode'))).toBe(true);
+      expect(evalEvents.some(e => e.code.includes('__playwright__'))).toBe(false);
+      expect(evalEvents.some(e => e.code.includes('__js_unshroud'))).toBe(false);
+
+      await page.close();
+    });
+  });
+
+  describe('Encoding Hooks Script', () => {
+    test('should intercept atob (base64 decode)', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        atob('SGVsbG8gV29ybGQ=');
+      });
+
+      await page.waitForTimeout(100);
+
+      const atobEvents = events.filter(e => e.type === 'encoding' && e.method === 'atob');
+      expect(atobEvents.length).toBe(1);
+      expect(atobEvents[0].operation).toBe('decode');
+      expect(atobEvents[0].output).toBe('Hello World');
+      expect(atobEvents[0].outputLength).toBe(11);
+      expect(atobEvents[0].success).toBe(true);
+
+      await page.close();
+    });
+
+    test('should intercept btoa (base64 encode)', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        btoa('Hello World');
+      });
+
+      await page.waitForTimeout(100);
+
+      const btoaEvents = events.filter(e => e.type === 'encoding' && e.method === 'btoa');
+      expect(btoaEvents.length).toBe(1);
+      expect(btoaEvents[0].operation).toBe('encode');
+      expect(btoaEvents[0].output).toBe('SGVsbG8gV29ybGQ=');
+      expect(btoaEvents[0].success).toBe(true);
+
+      await page.close();
+    });
+
+    test('should intercept String.fromCharCode', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        String.fromCharCode(72, 101, 108, 108, 111);
+      });
+
+      await page.waitForTimeout(100);
+
+      const fromCharCodeEvents = events.filter(e => e.type === 'encoding' && e.method === 'fromCharCode');
+      expect(fromCharCodeEvents.length).toBe(1);
+      expect(fromCharCodeEvents[0].operation).toBe('decode');
+      expect(fromCharCodeEvents[0].output).toBe('Hello');
+      expect(fromCharCodeEvents[0].success).toBe(true);
+
+      await page.close();
+    });
+
+    test('should intercept String.fromCodePoint', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        String.fromCodePoint(72, 101, 108, 108, 111);
+      });
+
+      await page.waitForTimeout(100);
+
+      const fromCodePointEvents = events.filter(e => e.type === 'encoding' && e.method === 'fromCodePoint');
+      expect(fromCodePointEvents.length).toBe(1);
+      expect(fromCodePointEvents[0].operation).toBe('decode');
+      expect(fromCodePointEvents[0].output).toBe('Hello');
+
+      await page.close();
+    });
+
+    test('should intercept decodeURI', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        decodeURI('Hello%20World');
+      });
+
+      await page.waitForTimeout(100);
+
+      const decodeURIEvents = events.filter(e => e.type === 'encoding' && e.method === 'decodeURI');
+      expect(decodeURIEvents.length).toBe(1);
+      expect(decodeURIEvents[0].operation).toBe('decode');
+      expect(decodeURIEvents[0].output).toBe('Hello World');
+
+      await page.close();
+    });
+
+    test('should intercept decodeURIComponent', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        decodeURIComponent('Hello%20World%21');
+      });
+
+      await page.waitForTimeout(100);
+
+      const events_filtered = events.filter(e => e.type === 'encoding' && e.method === 'decodeURIComponent');
+      expect(events_filtered.length).toBe(1);
+      expect(events_filtered[0].operation).toBe('decode');
+      expect(events_filtered[0].output).toBe('Hello World!');
+
+      await page.close();
+    });
+
+    test('should intercept encodeURI', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        encodeURI('Hello World');
+      });
+
+      await page.waitForTimeout(100);
+
+      const encodeURIEvents = events.filter(e => e.type === 'encoding' && e.method === 'encodeURI');
+      expect(encodeURIEvents.length).toBe(1);
+      expect(encodeURIEvents[0].operation).toBe('encode');
+      expect(encodeURIEvents[0].output).toBe('Hello%20World');
+
+      await page.close();
+    });
+
+    test('should intercept encodeURIComponent', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        encodeURIComponent('Hello World!');
+      });
+
+      await page.waitForTimeout(100);
+
+      const events_filtered = events.filter(e => e.type === 'encoding' && e.method === 'encodeURIComponent');
+      expect(events_filtered.length).toBe(1);
+      expect(events_filtered[0].operation).toBe('encode');
+      expect(events_filtered[0].output).toBe('Hello%20World!');
+
+      await page.close();
+    });
+
+    test('should handle encoding errors gracefully', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      const errorOccurred = await page.evaluate(() => {
+        try {
+          atob('invalid base64!!!');
+          return false;
+        } catch {
+          return true;
+        }
+      });
+
+      await page.waitForTimeout(100);
+
+      expect(errorOccurred).toBe(true);
+      const atobEvents = events.filter(e => e.type === 'encoding' && e.method === 'atob');
+      expect(atobEvents.length).toBe(1);
+      expect(atobEvents[0].success).toBe(false);
+      expect(atobEvents[0].error).toBeDefined();
+
+      await page.close();
+    });
+
+    test('should truncate large output with first/last pattern', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableEncoding: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(encodingHooksScript);
+
+      await page.goto('about:blank');
+
+      // Create large string to decode
+      const largeString = 'A'.repeat(3000);
+
+      await page.evaluate((str) => {
+        String.fromCharCode(...str.split('').map(c => c.charCodeAt(0)));
+      }, largeString);
+
+      await page.waitForTimeout(100);
+
+      const fromCharCodeEvents = events.filter(e => e.type === 'encoding' && e.method === 'fromCharCode');
+      expect(fromCharCodeEvents.length).toBe(1);
+      expect(fromCharCodeEvents[0].output.length).toBe(2051); // 1024 + "..." + 1024
+      expect(fromCharCodeEvents[0].output).toContain('...');
+      expect(fromCharCodeEvents[0].outputLength).toBe(3000);
 
       await page.close();
     });

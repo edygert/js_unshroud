@@ -1,0 +1,9 @@
+{
+  "enableHeadlessMitigation": true,
+  "enableTimer": true,
+  "enableDOM": true,
+  "enableStorage": true,
+  "enableCodeExecution": true,
+  "enableEncoding": true,
+  "monitoringTimeoutSeconds": 15
+}

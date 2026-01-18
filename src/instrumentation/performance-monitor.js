@@ -1,44 +1,18 @@
-// Performance optimization - sampling, rate limiting, and overhead control
+// Performance optimization - deduplication and overhead control
 (function() {
   'use strict';
 
   // === CONFIGURATION ===
   let config = {
-    maxEventsPerSecond: 100000, // High threshold for malware analysis - protects against flooding
     dedupeWindowMs: 100,        // Window for deduplication (ms)
     maxPayloadSize: 1024,       // Max bytes for payload logging
     maxStackDepth: 20,          // Max stack frames to capture
-    enableRateLimiting: true,
     enableDeduplication: true
   };
 
   // Initialize configuration from global object if available
   if (window.__js_unshroud_config) {
     config = { ...config, ...window.__js_unshroud_config };
-  }
-
-  // === RATE LIMITING SYSTEM ===
-  let eventCount = 0;
-  let rateLimitWindow = Date.now();
-
-  function checkRateLimit() {
-    if (!config.enableRateLimiting) return true;
-
-    const now = Date.now();
-    const windowDuration = 1000; // 1 second window
-
-    if (now - rateLimitWindow >= windowDuration) {
-      // Reset window
-      eventCount = 0;
-      rateLimitWindow = now;
-    }
-
-    if (eventCount >= config.maxEventsPerSecond * (Math.min(windowDuration, now - rateLimitWindow) / windowDuration)) {
-      return false; // Rate limited
-    }
-
-    eventCount++;
-    return true;
   }
 
   // === DEDUPLICATION SYSTEM ===
@@ -106,7 +80,6 @@
   const performanceStats = {
     eventsAccepted: 0,
     eventsRejected: 0,
-    eventsRateLimited: 0,
     eventsDeduplicated: 0,
     startTime: Date.now(),
     lastReportTime: Date.now()
@@ -115,10 +88,7 @@
   function updatePerformanceStats(event, decision, _reason) {
     performanceStats.eventsAccepted++;
 
-    if (decision === 'rate_limited') {
-      performanceStats.eventsRejected++;
-      performanceStats.eventsRateLimited++;
-    } else if (decision === 'deduplicated') {
+    if (decision === 'deduplicated') {
       performanceStats.eventsRejected++;
       performanceStats.eventsDeduplicated++;
     }
@@ -149,10 +119,8 @@
       totalEventsProcessed: totalEvents,
       eventsAccepted: performanceStats.eventsAccepted,
       eventsRejected: performanceStats.eventsRejected,
-      eventsRateLimited: performanceStats.eventsRateLimited,
       eventsDeduplicated: performanceStats.eventsDeduplicated,
-      acceptanceRate: acceptanceRate.toFixed(2) + '%',
-      maxEventsPerSecond: config.maxEventsPerSecond
+      acceptanceRate: acceptanceRate.toFixed(2) + '%'
     };
 
     window.__js_unshroud_log(JSON.stringify(performanceEvent));
@@ -160,13 +128,7 @@
 
   // === MAIN PERFORMANCE GATE ===
   function filterEvent(rawEvent) {
-    // 1. Check rate limiting
-    if (!checkRateLimit()) {
-      updatePerformanceStats(rawEvent, 'rate_limited');
-      return null;
-    }
-
-    // 2. Check deduplication
+    // Check deduplication
     const signature = generateEventSignature(rawEvent);
     if (shouldDedupe(rawEvent.type, signature)) {
       updatePerformanceStats(rawEvent, 'deduplicated');
@@ -273,5 +235,5 @@
     window.__js_unshroud_config = { ...window.__js_unshroud_config, ...newConfig };
   };
 
-  console.log('[JS Unshroud] Performance monitor loaded - Max Events/sec:', config.maxEventsPerSecond);
+  console.log('[JS Unshroud] Performance monitor loaded');
 })();

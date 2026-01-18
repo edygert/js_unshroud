@@ -214,12 +214,13 @@ describe('Instrumentation Script Loading', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      maxEventsPerSecond: 1000,
+      enableCodeExecution: false,
+      enableEncoding: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableRateLimiting: true,
-      enableDeduplication: true
+      enableDeduplication: true,
+      monitoringTimeoutSeconds: 15
     };
 
     const scripts = loadInstrumentationScripts(config);
@@ -245,12 +246,13 @@ describe('Instrumentation Script Loading', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      maxEventsPerSecond: 1000,
+      enableCodeExecution: false,
+      enableEncoding: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableRateLimiting: true,
-      enableDeduplication: true
+      enableDeduplication: true,
+      monitoringTimeoutSeconds: 15
     };
 
     const scripts = loadInstrumentationScripts(config);
@@ -275,12 +277,13 @@ describe('Instrumentation Script Loading', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      maxEventsPerSecond: 1000,
+      enableCodeExecution: false,
+      enableEncoding: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableRateLimiting: true,
-      enableDeduplication: true
+      enableDeduplication: true,
+      monitoringTimeoutSeconds: 15
     };
 
     const scripts = loadInstrumentationScripts(config);
@@ -306,12 +309,13 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      maxEventsPerSecond: 1000,
+      enableCodeExecution: false,
+      enableEncoding: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableRateLimiting: true,
-      enableDeduplication: true
+      enableDeduplication: true,
+      monitoringTimeoutSeconds: 15
     };
 
     // Mock page with addInitScript and exposeFunction spies
@@ -343,12 +347,13 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      maxEventsPerSecond: 1000,
+      enableCodeExecution: false,
+      enableEncoding: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableRateLimiting: true,
-      enableDeduplication: true
+      enableDeduplication: true,
+      monitoringTimeoutSeconds: 15
     };
 
     const addInitScript = vi.fn();
@@ -379,12 +384,13 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      maxEventsPerSecond: 1000,
+      enableCodeExecution: false,
+      enableEncoding: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableRateLimiting: true,
-      enableDeduplication: true
+      enableDeduplication: true,
+      monitoringTimeoutSeconds: 15
     };
 
     const addInitScript = vi.fn().mockRejectedValueOnce(new Error('Injection failed'));
@@ -411,12 +417,13 @@ describe('Instrumentation Injection', () => {
       enableObjectTracking: false,
       enableHeadlessMitigation: false,
       enableServiceWorker: false,
-      maxEventsPerSecond: 1000,
+      enableCodeExecution: false,
+      enableEncoding: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableRateLimiting: true,
-      enableDeduplication: true
+      enableDeduplication: true,
+      monitoringTimeoutSeconds: 15
     };
 
     const addInitScript = vi.fn();
