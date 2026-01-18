@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Time Delay Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 2px solid #ccc;
+      background: #f0f0f0;
+    }
+    #stats {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>Time Delay Test</h1>
+  <p>This page simulates malware that waits 60 seconds before activating.</p>
+  <p>It also requires continuous user interaction to prove it's not automated.</p>
+
+  <div id="result">Waiting 60 seconds...</div>
+  <div id="stats">
+    Elapsed: <span id="elapsed">0</span>s<br>
+    Mouse moves: <span id="mouseMoves">0</span><br>
+    Scrolls: <span id="scrolls">0</span><br>
+    Clicks: <span id="clicks">0</span><br>
+    Total interactions: <span id="total">0</span>
+  </div>
+
+  <script>
+    let interactions = 0;
+    let mouseMoves = 0;
+    let scrolls = 0;
+    let clicks = 0;
+    const startTime = Date.now();
+
+    // Track mouse movement
+    document.addEventListener('mousemove', () => {
+      interactions++;
+      mouseMoves++;
+    });
+
+    // Track scroll
+    document.addEventListener('scroll', () => {
+      interactions++;
+      scrolls++;
+    });
+
+    // Track click
+    document.addEventListener('click', () => {
+      interactions++;
+      clicks++;
+    });
+
+    // Update stats every second
+    setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById('elapsed').textContent = elapsed;
+      document.getElementById('mouseMoves').textContent = mouseMoves;
+      document.getElementById('scrolls').textContent = scrolls;
+      document.getElementById('clicks').textContent = clicks;
+      document.getElementById('total').textContent = interactions;
+    }, 1000);
+
+    // Malware activates only after 60 seconds + 5 interactions
+    setTimeout(() => {
+      const passed = interactions >= 5;
+      const resultDiv = document.getElementById('result');
+
+      if (passed) {
+        resultDiv.textContent = 'TIME_DELAY_BYPASS_SUCCESS';
+        resultDiv.style.background = '#90EE90';
+        console.log('TIME_DELAYED_MALWARE_EXECUTED');
+        console.log('Interaction stats:', { interactions, mouseMoves, scrolls, clicks });
+      } else {
+        resultDiv.textContent = `FAILED: interactions=${interactions} (need 5+)`;
+        resultDiv.style.background = '#FFB6C1';
+      }
+    }, 60000); // 60 seconds
+  </script>
+</body>
+</html>

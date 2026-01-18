@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Interaction Gate Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 2px solid #ccc;
+      background: #f0f0f0;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Interaction Gate Test</h1>
+  <p>This page requires human interaction to trigger malicious code.</p>
+  <button id="testBtn">Click Me</button>
+  <div id="result">Waiting for interaction...</div>
+
+  <script>
+    let mouseMoves = 0;
+    let scrolls = 0;
+    let clicks = 0;
+
+    // Track mouse movement
+    document.addEventListener('mousemove', () => {
+      mouseMoves++;
+    });
+
+    // Track scroll
+    document.addEventListener('scroll', () => {
+      scrolls++;
+    });
+
+    // Track click on button
+    document.getElementById('testBtn').addEventListener('click', () => {
+      clicks++;
+    });
+
+    // Check after 5 seconds
+    setTimeout(() => {
+      const passed = mouseMoves >= 3 && scrolls >= 1 && clicks >= 1;
+      const resultDiv = document.getElementById('result');
+
+      if (passed) {
+        resultDiv.textContent = 'INTERACTION_DETECTED';
+        resultDiv.style.background = '#90EE90';
+        console.log('MALICIOUS_CODE_EXECUTED');
+        console.log('Interaction stats:', { mouseMoves, scrolls, clicks });
+      } else {
+        resultDiv.textContent = `FAILED: moves=${mouseMoves}, scrolls=${scrolls}, clicks=${clicks}`;
+        resultDiv.style.background = '#FFB6C1';
+      }
+    }, 5000);
+  </script>
+</body>
+</html>

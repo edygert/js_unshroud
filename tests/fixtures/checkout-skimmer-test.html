@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Checkout Skimmer Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    form {
+      max-width: 400px;
+      margin: 20px 0;
+      padding: 20px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 2px solid #ccc;
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Checkout Page - Payment</h1>
+  <p>This simulates a checkout/payment page that web skimmers target.</p>
+
+  <form id="checkoutForm">
+    <h3>Payment Information</h3>
+    <input type="text" name="cardnumber" placeholder="Card Number" autocomplete="cc-number" id="cardField" />
+    <input type="text" name="cvv" placeholder="CVV" autocomplete="cc-csc" id="cvvField" />
+    <input type="text" name="expiry" placeholder="MM/YY" autocomplete="cc-exp" id="expiryField" />
+    <button type="submit">Pay Now</button>
+  </form>
+
+  <div id="result">Waiting for payment...</div>
+
+  <script>
+    let cardEntered = false;
+    let cvvEntered = false;
+    let submitted = false;
+
+    // Simulate Magecart-style skimmer - only activate on checkout pages
+    const isCheckoutPage = /checkout|payment|cart|billing/i.test(window.location.href);
+
+    if (!isCheckoutPage) {
+      console.log('NOT_CHECKOUT_PAGE');
+      document.getElementById('result').textContent = 'NOT A CHECKOUT PAGE - SKIMMER INACTIVE';
+      document.getElementById('result').style.background = '#FFB6C1';
+    } else {
+      console.log('CHECKOUT_PAGE_DETECTED');
+
+      // Monitor card field
+      document.getElementById('cardField').addEventListener('input', (e) => {
+        if (e.target.value.length > 10) {
+          cardEntered = true;
+          console.log('CARD_NUMBER_CAPTURED:', e.target.value);
+        }
+      });
+
+      // Monitor CVV field
+      document.getElementById('cvvField').addEventListener('input', (e) => {
+        if (e.target.value.length >= 3) {
+          cvvEntered = true;
+          console.log('CVV_CAPTURED:', e.target.value);
+        }
+      });
+
+      // Monitor form submission
+      document.getElementById('checkoutForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitted = true;
+        console.log('PAYMENT_FORM_SUBMITTED');
+      });
+
+      // Check after 10 seconds
+      setTimeout(() => {
+        const passed = cardEntered && cvvEntered && submitted;
+        const resultDiv = document.getElementById('result');
+
+        if (passed) {
+          resultDiv.textContent = 'CARD_DATA_CAPTURED';
+          resultDiv.style.background = '#90EE90';
+          console.log('SKIMMER_ACTIVATED');
+          console.log('Checkout stats:', { cardEntered, cvvEntered, submitted });
+        } else {
+          resultDiv.textContent = `FAILED: card=${cardEntered}, cvv=${cvvEntered}, submitted=${submitted}`;
+          resultDiv.style.background = '#FFB6C1';
+        }
+      }, 10000);
+    }
+  </script>
+</body>
+</html>

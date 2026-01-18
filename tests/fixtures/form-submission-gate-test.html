@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Form Submission Gate Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    form {
+      max-width: 400px;
+      margin: 20px 0;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 2px solid #ccc;
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Form Submission Gate Test</h1>
+  <p>This page requires form interaction and submission to trigger malicious code.</p>
+
+  <form id="testForm">
+    <input type="text" name="username" placeholder="Username" id="usernameField" />
+    <input type="email" name="email" placeholder="Email" id="emailField" />
+    <input type="password" name="password" placeholder="Password" id="passwordField" />
+    <button type="submit">Submit</button>
+  </form>
+
+  <div id="result">Waiting for form submission...</div>
+
+  <script>
+    let formSubmitted = false;
+    let fieldsTyped = 0;
+    const fieldsInteracted = new Set();
+
+    // Track field interaction (input events)
+    document.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', () => {
+        if (input.value.length > 0 && !fieldsInteracted.has(input.name)) {
+          fieldsTyped++;
+          fieldsInteracted.add(input.name);
+        }
+      });
+    });
+
+    // Track form submission
+    document.getElementById('testForm').addEventListener('submit', (e) => {
+      e.preventDefault(); // Prevent actual submission
+      formSubmitted = true;
+    });
+
+    // Check after 8 seconds
+    setTimeout(() => {
+      const passed = formSubmitted && fieldsTyped >= 2;
+      const resultDiv = document.getElementById('result');
+
+      if (passed) {
+        resultDiv.textContent = 'FORM_INTERACTION_DETECTED';
+        resultDiv.style.background = '#90EE90';
+        console.log('MALICIOUS_CODE_EXECUTED');
+        console.log('Form stats:', { formSubmitted, fieldsTyped, fieldsInteracted: Array.from(fieldsInteracted) });
+      } else {
+        resultDiv.textContent = `FAILED: submitted=${formSubmitted}, fieldsTyped=${fieldsTyped}`;
+        resultDiv.style.background = '#FFB6C1';
+      }
+    }, 8000);
+  </script>
+</body>
+</html>

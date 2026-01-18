@@ -332,6 +332,16 @@ export interface InstrumentationConfig {
   // Monitoring configuration
   monitoringTimeoutSeconds: number;  // How long to monitor the page in seconds (default: 15)
 
+  // Behavioral simulation (P3.2) - Defeats interaction-gated malware
+  enableBehaviorSimulation?: boolean;      // Enable human-like interaction simulation (default: true when enableHeadlessMitigation is true)
+  behaviorSimulationIntensity?: 'low' | 'medium' | 'high';  // Intensity of interaction (default: 'medium')
+  // low: minimal interaction (mouse movement only, no forms)
+  // medium: realistic interaction (mouse, scroll, click, basic form filling)
+  // high: aggressive interaction (all features, multiple form submissions, checkout simulation)
+  enableFormInteraction?: boolean;         // Enable form field typing and submission simulation (default: true when enableBehaviorSimulation is true)
+  enableCheckoutSimulation?: boolean;      // Enable checkout/payment page detection and simulation (default: true when enableFormInteraction is true)
+  enableTimeDelayedBehavior?: boolean;     // Enable phased interaction over time (defeats time-bomb malware) (default: true when enableBehaviorSimulation is true)
+
   // Output configuration
   outputMode?: 'file' | 'udp' | 'both';  // Default: 'file'
   udpLogging?: UDPLoggingConfig;
