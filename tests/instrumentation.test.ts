@@ -44,6 +44,7 @@ const performanceMonitorScript = readFileSync(join(process.cwd(), 'src/instrumen
 const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/service-worker-hooks.js'), 'utf-8');
 const codeExecutionHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/code-execution-hooks.js'), 'utf-8');
 const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/encoding-hooks.js'), 'utf-8');
+const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/cryptojs-hooks.js'), 'utf-8');
 
   beforeAll(async () => {
     browser = await chromium.launch({ headless: true });
@@ -3326,6 +3327,255 @@ const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
         );
         expect(batteryEvents.length).toBeGreaterThan(0);
       }
+
+      await page.close();
+    });
+  });
+
+  describe('CryptoJS Instrumentation', () => {
+    test('should capture AES decryption', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableCryptoJS: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(cryptojsHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        // Simulate CryptoJS library
+        (window as any).CryptoJS = {
+          AES: {
+            decrypt: (_ciphertext: any, _key: any) => ({
+              toString: (_enc: any) => 'console.log("decrypted malicious code");'
+            })
+          },
+          enc: { Utf8: {} }
+        };
+      });
+
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        const encrypted = 'U2FsdGVkX1+...';
+        const decrypted = (window as any).CryptoJS.AES.decrypt(encrypted, 'secret-key');
+        decrypted.toString((window as any).CryptoJS.enc.Utf8);
+      });
+
+      await page.waitForTimeout(200);
+
+      const cryptojsEvents = events.filter(e => e.type === 'cryptojs' && e.method === 'AES.decrypt');
+      expect(cryptojsEvents.length).toBeGreaterThan(0);
+      expect(cryptojsEvents[0].operation).toBe('decrypt');
+      expect(cryptojsEvents[0].algorithm).toBe('AES');
+      expect(cryptojsEvents[0].key).toBe('secret-key');
+      expect(cryptojsEvents[0].output).toContain('decrypted malicious code');
+
+      await page.close();
+    });
+
+    test('should capture AES encryption with cleartext input', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableCryptoJS: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(cryptojsHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        // Simulate CryptoJS library
+        (window as any).CryptoJS = {
+          AES: {
+            encrypt: (_message: any, _key: any) => ({
+              toString: () => 'U2FsdGVkX1+encrypted...'
+            })
+          },
+          enc: { Utf8: {} }
+        };
+      });
+
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        const cleartext = 'this is the cleartext message to encrypt';
+        (window as any).CryptoJS.AES.encrypt(cleartext, 'my-password');
+      });
+
+      await page.waitForTimeout(200);
+
+      const cryptojsEvents = events.filter(e => e.type === 'cryptojs' && e.method === 'AES.encrypt');
+      expect(cryptojsEvents.length).toBeGreaterThan(0);
+      expect(cryptojsEvents[0].operation).toBe('encrypt');
+      expect(cryptojsEvents[0].algorithm).toBe('AES');
+      expect(cryptojsEvents[0].key).toBe('my-password');
+      // Should capture cleartext INPUT, not encrypted output
+      expect(cryptojsEvents[0].output).toBe('this is the cleartext message to encrypt');
+
+      await page.close();
+    });
+
+    test('should capture encoding conversions', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableCryptoJS: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(cryptojsHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        // Simulate CryptoJS library
+        (window as any).CryptoJS = {
+          enc: {
+            Base64: {
+              stringify: (_wordArray: any) => 'SGVsbG8gV29ybGQ=',
+              parse: (_str: any) => ({
+                toString: (_enc: any) => 'Hello World'
+              })
+            },
+            Utf8: {}
+          }
+        };
+      });
+
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        const wordArray = { words: [1, 2, 3] };
+        (window as any).CryptoJS.enc.Base64.stringify(wordArray);
+        const parsed = (window as any).CryptoJS.enc.Base64.parse('SGVsbG8gV29ybGQ=');
+        parsed.toString((window as any).CryptoJS.enc.Utf8);
+      });
+
+      await page.waitForTimeout(200);
+
+      const stringifyEvents = events.filter(e => e.type === 'cryptojs' && e.method === 'enc.Base64.stringify');
+      expect(stringifyEvents.length).toBeGreaterThan(0);
+      expect(stringifyEvents[0].operation).toBe('stringify');
+      expect(stringifyEvents[0].encoding).toBe('Base64');
+
+      const parseEvents = events.filter(e => e.type === 'cryptojs' && e.method === 'enc.Base64.parse');
+      expect(parseEvents.length).toBeGreaterThan(0);
+      expect(parseEvents[0].operation).toBe('parse');
+      expect(parseEvents[0].encoding).toBe('Base64');
+      expect(parseEvents[0].output).toBe('Hello World');
+
+      await page.close();
+    });
+
+    test('should capture multiple algorithms', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableCryptoJS: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(cryptojsHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        // Simulate CryptoJS library with multiple algorithms
+        (window as any).CryptoJS = {
+          AES: {
+            decrypt: (_ciphertext: any, _key: any) => ({
+              toString: (_enc: any) => 'AES decrypted'
+            })
+          },
+          DES: {
+            decrypt: (_ciphertext: any, _key: any) => ({
+              toString: (_enc: any) => 'DES decrypted'
+            })
+          },
+          RC4: {
+            decrypt: (_ciphertext: any, _key: any) => ({
+              toString: (_enc: any) => 'RC4 decrypted'
+            })
+          },
+          enc: { Utf8: {} }
+        };
+      });
+
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        (window as any).CryptoJS.AES.decrypt('encrypted1', 'key1').toString((window as any).CryptoJS.enc.Utf8);
+        (window as any).CryptoJS.DES.decrypt('encrypted2', 'key2').toString((window as any).CryptoJS.enc.Utf8);
+        (window as any).CryptoJS.RC4.decrypt('encrypted3', 'key3').toString((window as any).CryptoJS.enc.Utf8);
+      });
+
+      await page.waitForTimeout(200);
+
+      const aesEvents = events.filter(e => e.type === 'cryptojs' && e.algorithm === 'AES');
+      const desEvents = events.filter(e => e.type === 'cryptojs' && e.algorithm === 'DES');
+      const rc4Events = events.filter(e => e.type === 'cryptojs' && e.algorithm === 'RC4');
+
+      expect(aesEvents.length).toBeGreaterThan(0);
+      expect(desEvents.length).toBeGreaterThan(0);
+      expect(rc4Events.length).toBeGreaterThan(0);
 
       await page.close();
     });

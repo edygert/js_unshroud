@@ -74,6 +74,7 @@ function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
     enableServiceWorker: false,
     enableCodeExecution: true,    // Critical for malware analysis - instruments eval, Function, etc.
     enableEncoding: true,          // Critical for malware analysis - instruments atob, fromCharCode, URI encoding
+    enableCryptoJS: true,          // Critical for malware analysis - instruments CryptoJS library (AES, DES, etc.)
     enableEventHandlers: false,    // Instruments event handler property assignments (element.onclick = ...)
     enableBlobTracking: false,     // Instruments Blob creation and URL.createObjectURL/revokeObjectURL
     enableURLExecution: false,     // Instruments javascript: URL execution (location.href, anchor.href, etc.)
@@ -133,6 +134,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   serviceWorker: string | null;
   codeExecution: string | null;
   encoding: string | null;
+  cryptojs: string | null;
   eventHandler: string | null;
   blobTracking: string | null;
   urlExecution: string | null;
@@ -149,6 +151,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   const serviceWorkerScript = readFileSync('./src/instrumentation/service-worker-hooks.js', 'utf-8');
   const codeExecutionScript = readFileSync('./src/instrumentation/code-execution-hooks.js', 'utf-8');
   const encodingScript = readFileSync('./src/instrumentation/encoding-hooks.js', 'utf-8');
+  const cryptojsScript = readFileSync('./src/instrumentation/cryptojs-hooks.js', 'utf-8');
   const eventHandlerScript = readFileSync('./src/instrumentation/event-handler-hooks.js', 'utf-8');
   const blobTrackingScript = readFileSync('./src/instrumentation/blob-hooks.js', 'utf-8');
   const urlExecutionScript = readFileSync('./src/instrumentation/url-execution-hooks.js', 'utf-8');
@@ -166,6 +169,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
     serviceWorker: config.enableServiceWorker ? serviceWorkerScript : null,
     codeExecution: config.enableCodeExecution ? codeExecutionScript : null,
     encoding: config.enableEncoding ? encodingScript : null,
+    cryptojs: config.enableCryptoJS ? cryptojsScript : null,
     eventHandler: config.enableEventHandlers ? eventHandlerScript : null,
     blobTracking: config.enableBlobTracking ? blobTrackingScript : null,
     urlExecution: config.enableURLExecution ? urlExecutionScript : null,
@@ -260,6 +264,12 @@ async function injectInstrumentation(
   // Encoding operations (atob, fromCharCode, etc.) are often used in malware obfuscation
   if (scripts.encoding) {
     await page.addInitScript({ content: scripts.encoding });
+  }
+
+  // Inject CryptoJS hooks after encoding hooks
+  // CryptoJS is commonly used for malware payload encryption
+  if (scripts.cryptojs) {
+    await page.addInitScript({ content: scripts.cryptojs });
   }
 
   // Inject other scripts if enabled

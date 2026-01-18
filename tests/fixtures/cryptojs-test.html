@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>CryptoJS Deobfuscation Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+  <h1>CryptoJS Deobfuscation Test</h1>
+  <div id="results"></div>
+
+  <script>
+    const results = [];
+
+    // Test 1: AES Encryption/Decryption
+    results.push('=== AES Test ===');
+    const aesPlaintext = 'console.log("malicious code executed");';
+    const aesKey = 'secret-key-123';
+
+    // Encrypt
+    const aesEncrypted = CryptoJS.AES.encrypt(aesPlaintext, aesKey);
+    const aesEncryptedString = aesEncrypted.toString();
+    results.push(`Encrypted: ${aesEncryptedString.substring(0, 50)}...`);
+
+    // Decrypt
+    const aesDecrypted = CryptoJS.AES.decrypt(aesEncryptedString, aesKey);
+    const aesDecryptedString = aesDecrypted.toString(CryptoJS.enc.Utf8);
+    results.push(`Decrypted: ${aesDecryptedString}`);
+
+    // Execute decrypted code
+    eval(aesDecryptedString);
+
+    // Test 2: DES Encryption/Decryption
+    results.push('\n=== DES Test ===');
+    const desPlaintext = 'alert("DES decrypted");';
+    const desKey = 'des-key';
+
+    const desEncrypted = CryptoJS.DES.encrypt(desPlaintext, desKey);
+    const desDecrypted = CryptoJS.DES.decrypt(desEncrypted.toString(), desKey);
+    const desDecryptedString = desDecrypted.toString(CryptoJS.enc.Utf8);
+    results.push(`Decrypted: ${desDecryptedString}`);
+
+    // Test 3: Base64 Encoding
+    results.push('\n=== Base64 Encoding Test ===');
+    const base64Input = 'Hello World';
+    const base64WordArray = CryptoJS.enc.Utf8.parse(base64Input);
+    const base64Encoded = CryptoJS.enc.Base64.stringify(base64WordArray);
+    results.push(`Encoded: ${base64Encoded}`);
+
+    const base64DecodedWordArray = CryptoJS.enc.Base64.parse(base64Encoded);
+    const base64Decoded = CryptoJS.enc.Utf8.stringify(base64DecodedWordArray);
+    results.push(`Decoded: ${base64Decoded}`);
+
+    // Test 4: Hex Encoding
+    results.push('\n=== Hex Encoding Test ===');
+    const hexWordArray = CryptoJS.enc.Utf8.parse('Test');
+    const hexEncoded = CryptoJS.enc.Hex.stringify(hexWordArray);
+    results.push(`Hex: ${hexEncoded}`);
+
+    // Test 5: TripleDES
+    results.push('\n=== TripleDES Test ===');
+    const tripleDesPlaintext = 'TripleDES payload';
+    const tripleDesKey = '3des-key';
+    const tripleDesEncrypted = CryptoJS.TripleDES.encrypt(tripleDesPlaintext, tripleDesKey);
+    const tripleDesDecrypted = CryptoJS.TripleDES.decrypt(tripleDesEncrypted.toString(), tripleDesKey);
+    const tripleDesDecryptedString = tripleDesDecrypted.toString(CryptoJS.enc.Utf8);
+    results.push(`Decrypted: ${tripleDesDecryptedString}`);
+
+    // Test 6: RC4
+    results.push('\n=== RC4 Test ===');
+    const rc4Plaintext = 'RC4 encrypted data';
+    const rc4Key = 'rc4-key';
+    const rc4Encrypted = CryptoJS.RC4.encrypt(rc4Plaintext, rc4Key);
+    const rc4Decrypted = CryptoJS.RC4.decrypt(rc4Encrypted.toString(), rc4Key);
+    const rc4DecryptedString = rc4Decrypted.toString(CryptoJS.enc.Utf8);
+    results.push(`Decrypted: ${rc4DecryptedString}`);
+
+    // Test 7: Rabbit
+    results.push('\n=== Rabbit Test ===');
+    const rabbitPlaintext = 'Rabbit stream cipher';
+    const rabbitKey = 'rabbit-key';
+    const rabbitEncrypted = CryptoJS.Rabbit.encrypt(rabbitPlaintext, rabbitKey);
+    const rabbitDecrypted = CryptoJS.Rabbit.decrypt(rabbitEncrypted.toString(), rabbitKey);
+    const rabbitDecryptedString = rabbitDecrypted.toString(CryptoJS.enc.Utf8);
+    results.push(`Decrypted: ${rabbitDecryptedString}`);
+
+    // Display results
+    document.getElementById('results').innerHTML = '<pre>' + results.join('\n') + '</pre>';
+    console.log('CryptoJS test completed');
+  </script>
+</body>
+</html>

@@ -170,6 +170,19 @@ export interface EncodingEvent extends BaseEvent {
   error?: string;
 }
 
+export interface CryptoJSEvent extends BaseEvent {
+  type: 'cryptojs';
+  method: string;         // e.g., 'AES.decrypt', 'DES.encrypt', 'enc.Base64.parse'
+  operation: 'decrypt' | 'encrypt' | 'parse' | 'stringify';
+  algorithm?: 'AES' | 'DES' | 'TripleDES' | 'RC4' | 'Rabbit';
+  encoding?: 'Base64' | 'Utf8' | 'Hex' | 'Latin1';
+  key?: string;           // Decryption/encryption key (if available)
+  output: string;         // For decrypt: decrypted plaintext, For encrypt: cleartext input, For parse/stringify: result (truncated to maxPayloadSize)
+  outputLength: number;   // Original length
+  success: boolean;
+  error?: string;
+}
+
 export interface ScriptInjectionEvent extends BaseEvent {
   type: 'script_injection';
   method: 'innerHTML' | 'outerHTML' | 'insertAdjacentHTML' | 'document.write' | 'document.writeln' |
@@ -234,6 +247,7 @@ export type MonitoringEvent =
   | ServiceWorkerEvent
   | CodeExecutionEvent
   | EncodingEvent
+  | CryptoJSEvent
   | ScriptInjectionEvent
   | EventHandlerEvent
   | BlobEvent
@@ -267,6 +281,7 @@ export interface InstrumentationConfig {
   enableServiceWorker: boolean;
   enableCodeExecution: boolean; // Instruments eval(), Function(), setTimeout/setInterval string code
   enableEncoding: boolean;      // Instruments atob/btoa, fromCharCode, URI encoding/decoding
+  enableCryptoJS: boolean;      // Instruments CryptoJS library (AES/DES/TripleDES/RC4/Rabbit decrypt/encrypt)
   enableEventHandlers: boolean; // Instruments event handler property assignments (element.onclick = ...)
   enableBlobTracking: boolean;  // Instruments Blob creation and URL.createObjectURL/revokeObjectURL
   enableURLExecution: boolean;  // Instruments javascript: URL execution (location.href, anchor.href, etc.)

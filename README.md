@@ -70,6 +70,7 @@ You can optionally provide a configuration file to control what instrumentation 
   "enableDOM": false,
   "enableCodeExecution": true,
   "enableEncoding": true,
+  "enableCryptoJS": true,
   "monitoringTimeoutSeconds": 15,
   "outputMode": "file",
   "udpLogging": {
@@ -96,6 +97,7 @@ Configuration options:
 - `enableServiceWorker`: Capture Service Worker registration, lifecycle, and messaging (default: `false`)
 - `enableCodeExecution`: Capture eval(), Function(), and dynamic code execution (default: `true`)
 - `enableEncoding`: Capture atob/btoa, fromCharCode, URI encoding/decoding (default: `true`)
+- `enableCryptoJS`: Capture CryptoJS library encryption/decryption (AES, DES, TripleDES, RC4, Rabbit) (default: `true`)
 
 **Output Configuration:**
 - `outputMode`: Output destination - `'file'`, `'udp'`, or `'both'` (default: `'file'`)
@@ -434,6 +436,25 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
   "success": true
 }
 ```
+
+**CryptoJS Events (Encryption/Decryption):**
+```json
+{
+  "id": "evt_1234567890_008",
+  "timestamp": 1640995200700,
+  "sessionId": "session_1640995200_abc123",
+  "type": "cryptojs",
+  "method": "AES.decrypt",
+  "operation": "decrypt",
+  "algorithm": "AES",
+  "key": "secret-key-123",
+  "output": "console.log('malicious payload');",
+  "outputLength": 34,
+  "success": true
+}
+```
+
+Note: For `decrypt` operations, `output` contains the decrypted plaintext. For `encrypt` operations, `output` contains the cleartext input (not the encrypted result). This allows analysts to see what data is being encrypted without storing large encrypted payloads.
 
 **Performance Monitoring Events:**
 ```json

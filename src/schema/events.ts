@@ -17,6 +17,7 @@ const EVENT_TYPES = [
   'service_worker',
   'code_execution',
   'encoding',
+  'cryptojs',
   'script_injection',
   'event_handler',
   'blob',

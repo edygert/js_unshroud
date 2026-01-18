@@ -118,6 +118,11 @@ export class TimelineFormatter {
         return `Encoding: ${encEvent.method}.${encEvent.operation} -> ${encEvent.output.slice(0, 30)}...`;
       }
 
+      case 'cryptojs': {
+        const cryptoEvent = event;
+        return `CryptoJS: ${cryptoEvent.method}.${cryptoEvent.operation} (${cryptoEvent.algorithm ?? cryptoEvent.encoding ?? 'unknown'})${cryptoEvent.key ? ` key=${cryptoEvent.key}` : ''}`;
+      }
+
       case 'script_injection': {
         const siEvent = event;
         const scriptInfo = siEvent.scriptSrc ?? siEvent.scriptContent ?? siEvent.htmlContent ?? '';
