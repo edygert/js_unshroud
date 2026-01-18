@@ -72,9 +72,12 @@ function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
     enableObjectTracking: false,
     enableHeadlessMitigation: false,
     enableServiceWorker: false,
-    enableCodeExecution: true,   // Critical for malware analysis - instruments eval, Function, etc.
-    enableEncoding: true,         // Critical for malware analysis - instruments atob, fromCharCode, URI encoding
-    dedupeWindowMs: 100,          // Short window to reduce noise from tight loops
+    enableCodeExecution: true,    // Critical for malware analysis - instruments eval, Function, etc.
+    enableEncoding: true,          // Critical for malware analysis - instruments atob, fromCharCode, URI encoding
+    enableEventHandlers: false,    // Instruments event handler property assignments (element.onclick = ...)
+    enableBlobTracking: false,     // Instruments Blob creation and URL.createObjectURL/revokeObjectURL
+    enableURLExecution: false,     // Instruments javascript: URL execution (location.href, anchor.href, etc.)
+    dedupeWindowMs: 100,           // Short window to reduce noise from tight loops
     maxPayloadSize: 2051,         // Captures first 1024 + "..." + last 1024 chars for code/encoding output
     maxStackDepth: 20,
     enableDeduplication: true,
@@ -130,6 +133,9 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   serviceWorker: string | null;
   codeExecution: string | null;
   encoding: string | null;
+  eventHandler: string | null;
+  blobTracking: string | null;
+  urlExecution: string | null;
   performanceMonitor: string;
 } {
   const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
@@ -143,6 +149,9 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   const serviceWorkerScript = readFileSync('./src/instrumentation/service-worker-hooks.js', 'utf-8');
   const codeExecutionScript = readFileSync('./src/instrumentation/code-execution-hooks.js', 'utf-8');
   const encodingScript = readFileSync('./src/instrumentation/encoding-hooks.js', 'utf-8');
+  const eventHandlerScript = readFileSync('./src/instrumentation/event-handler-hooks.js', 'utf-8');
+  const blobTrackingScript = readFileSync('./src/instrumentation/blob-hooks.js', 'utf-8');
+  const urlExecutionScript = readFileSync('./src/instrumentation/url-execution-hooks.js', 'utf-8');
   const performanceMonitorScript = readFileSync('./src/instrumentation/performance-monitor.js', 'utf-8');
 
   return {
@@ -157,6 +166,9 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
     serviceWorker: config.enableServiceWorker ? serviceWorkerScript : null,
     codeExecution: config.enableCodeExecution ? codeExecutionScript : null,
     encoding: config.enableEncoding ? encodingScript : null,
+    eventHandler: config.enableEventHandlers ? eventHandlerScript : null,
+    blobTracking: config.enableBlobTracking ? blobTrackingScript : null,
+    urlExecution: config.enableURLExecution ? urlExecutionScript : null,
     performanceMonitor: performanceMonitorScript // Always loaded for performance controls
   };
 }
@@ -223,7 +235,10 @@ async function injectInstrumentation(
         enableDeduplication: config.enableDeduplication,
         enableServiceWorker: config.enableServiceWorker,
         enableCodeExecution: config.enableCodeExecution,
-        enableEncoding: config.enableEncoding
+        enableEncoding: config.enableEncoding,
+        enableEventHandlers: config.enableEventHandlers,
+        enableBlobTracking: config.enableBlobTracking,
+        enableURLExecution: config.enableURLExecution
       })};
       window.__js_unshroud_session_id = '${sessionId}';
     `
@@ -260,8 +275,26 @@ async function injectInstrumentation(
     await page.addInitScript({ content: scripts.timer });
   }
 
+  // Inject blob tracking BEFORE DOM hooks
+  // DOM hooks may need to look up blob content when analyzing blob: URLs
+  if (scripts.blobTracking) {
+    await page.addInitScript({ content: scripts.blobTracking });
+  }
+
   if (scripts.dom) {
     await page.addInitScript({ content: scripts.dom });
+  }
+
+  // Inject event handler hooks after DOM hooks
+  // Tracks event handler property assignments (element.onclick = ...)
+  if (scripts.eventHandler) {
+    await page.addInitScript({ content: scripts.eventHandler });
+  }
+
+  // Inject URL execution hooks after event handler hooks
+  // Tracks javascript: URL execution (location.href, anchor.href, etc.)
+  if (scripts.urlExecution) {
+    await page.addInitScript({ content: scripts.urlExecution });
   }
 
   if (scripts.fingerprinting) {

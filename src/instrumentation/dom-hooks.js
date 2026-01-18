@@ -176,6 +176,19 @@
       }
     }
 
+    if (isBlobUrl) {
+      // Look up blob content from blob map
+      try {
+        if (window.__js_unshroud_blob_map && window.__js_unshroud_blob_map[url]) {
+          const blobInfo = window.__js_unshroud_blob_map[url];
+          decodedContent = blobInfo.content;
+        }
+      } catch {
+        // Blob map might not be available yet
+        decodedContent = null;
+      }
+    }
+
     return {
       isDataUrl: isDataUrl,
       isBlobUrl: isBlobUrl,

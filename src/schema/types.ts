@@ -192,6 +192,33 @@ export interface ScriptInjectionEvent extends BaseEvent {
   targetSelector?: string;        // CSS selector of target element
 }
 
+export interface EventHandlerEvent extends BaseEvent {
+  type: 'event_handler';
+  eventType: 'property_set';
+  handlerName: string;            // Event handler property name (onclick, onerror, etc.)
+  handlerCode: string;            // Handler function code (truncated to 200 chars)
+  element: string;                // CSS selector of target element or 'document' or 'window'
+  method: 'property_assignment';
+}
+
+export interface BlobEvent extends BaseEvent {
+  type: 'blob';
+  eventType: 'blob_create' | 'blob_url_create' | 'blob_url_revoke';
+  blobUrl?: string;               // Blob URL (for blob_url_create/blob_url_revoke)
+  blobType?: string;              // MIME type of blob
+  blobSize?: number;              // Size of blob in bytes
+  content?: string;               // Blob content (truncated to 1KB for logging)
+  isJavaScript?: boolean;         // Is blob type JavaScript?
+}
+
+export interface URLExecutionEvent extends BaseEvent {
+  type: 'url_execution';
+  eventType: 'location_href_set' | 'location_assign' | 'location_replace' | 'anchor_href_set';
+  url: string;                    // Full javascript: URL
+  code: string;                   // Extracted and decoded JavaScript code
+  element?: string;               // CSS selector of anchor element (for anchor_href_set)
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -207,7 +234,10 @@ export type MonitoringEvent =
   | ServiceWorkerEvent
   | CodeExecutionEvent
   | EncodingEvent
-  | ScriptInjectionEvent;
+  | ScriptInjectionEvent
+  | EventHandlerEvent
+  | BlobEvent
+  | URLExecutionEvent;
 
 export interface SessionConfig {
   id: string;
@@ -237,6 +267,9 @@ export interface InstrumentationConfig {
   enableServiceWorker: boolean;
   enableCodeExecution: boolean; // Instruments eval(), Function(), setTimeout/setInterval string code
   enableEncoding: boolean;      // Instruments atob/btoa, fromCharCode, URI encoding/decoding
+  enableEventHandlers: boolean; // Instruments event handler property assignments (element.onclick = ...)
+  enableBlobTracking: boolean;  // Instruments Blob creation and URL.createObjectURL/revokeObjectURL
+  enableURLExecution: boolean;  // Instruments javascript: URL execution (location.href, anchor.href, etc.)
   dedupeWindowMs: number;       // Deduplication window in milliseconds
   maxPayloadSize: number;       // Maximum payload size in bytes
   maxStackDepth: number;        // Maximum stack trace depth

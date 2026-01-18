@@ -124,6 +124,27 @@ export class TimelineFormatter {
         return `Script Injection: ${siEvent.method} (${scriptInfo.slice(0, 50)}...)`;
       }
 
+      case 'event_handler': {
+        const ehEvent = event;
+        return `Event Handler: ${ehEvent.handlerName} on ${ehEvent.element} (${ehEvent.handlerCode.slice(0, 50)}...)`;
+      }
+
+      case 'blob': {
+        const blobEvent = event;
+        if (blobEvent.eventType === 'blob_create') {
+          return `Blob Create: ${blobEvent.blobType} (${blobEvent.blobSize} bytes)`;
+        } else if (blobEvent.eventType === 'blob_url_create') {
+          return `Blob URL Create: ${blobEvent.blobUrl} (${blobEvent.blobType})`;
+        } else {
+          return `Blob URL Revoke: ${blobEvent.blobUrl}`;
+        }
+      }
+
+      case 'url_execution': {
+        const urlEvent = event;
+        return `JavaScript URL: ${urlEvent.eventType} (${urlEvent.code.slice(0, 50)}...)`;
+      }
+
       default:
         return `${(event as BaseEvent).type} event`;
     }
