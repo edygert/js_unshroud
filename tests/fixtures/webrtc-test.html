@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>WebRTC Fingerprint Test</title>
+</head>
+<body>
+  <h1>WebRTC Fingerprinting Test</h1>
+  <div id="results"></div>
+
+  <script>
+    // WebRTC IP leak and fingerprinting techniques
+    async function testWebRTC() {
+      const results = [];
+
+      // Test 1: RTCPeerConnection availability
+      results.push('=== RTCPeerConnection Test ===');
+      try {
+        const pc = new RTCPeerConnection({
+          iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+        });
+        results.push('✓ RTCPeerConnection created successfully');
+
+        // Create data channel
+        pc.createDataChannel('test');
+        results.push('✓ Data channel created');
+
+        // Create offer to trigger ICE gathering
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        results.push('✓ Local description set');
+
+        // Listen for ICE candidates (potential IP leak)
+        pc.onicecandidate = (e) => {
+          if (e.candidate) {
+            results.push(`ICE candidate: ${e.candidate.candidate}`);
+            updateResults();
+          } else {
+            results.push('ICE gathering complete');
+            updateResults();
+          }
+        };
+
+        // Wait a bit for ICE candidates
+        setTimeout(() => {
+          pc.close();
+          updateResults();
+        }, 2000);
+
+      } catch (e) {
+        results.push(`✗ RTCPeerConnection blocked: ${e.name} - ${e.message}`);
+      }
+
+      // Test 2: getUserMedia (camera/mic access)
+      results.push('\n=== getUserMedia Test ===');
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          results.push('✓ getUserMedia succeeded');
+          stream.getTracks().forEach(track => track.stop());
+        } else {
+          results.push('✗ getUserMedia not available');
+        }
+      } catch (e) {
+        results.push(`✗ getUserMedia blocked: ${e.name} - ${e.message}`);
+      }
+
+      // Test 3: enumerateDevices (device fingerprinting)
+      results.push('\n=== enumerateDevices Test ===');
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          results.push(`Device count: ${devices.length}`);
+
+          if (devices.length > 0) {
+            results.push('Devices:');
+            devices.forEach((device, i) => {
+              results.push(`  ${i+1}. ${device.kind} - ${device.label || '(no label)'}`);
+            });
+          } else {
+            results.push('No devices enumerated (blocked)');
+          }
+        } else {
+          results.push('✗ enumerateDevices not available');
+        }
+      } catch (e) {
+        results.push(`✗ enumerateDevices failed: ${e.name} - ${e.message}`);
+      }
+
+      updateResults();
+      console.log('WebRTC fingerprinting test completed');
+
+      function updateResults() {
+        document.getElementById('results').innerHTML = '<pre>' + results.join('\n') + '</pre>';
+      }
+    }
+
+    testWebRTC();
+  </script>
+</body>
+</html>

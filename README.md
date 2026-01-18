@@ -155,6 +155,32 @@ Adds small random entropy to canvas `toDataURL()` and `getImageData()` outputs t
 ### WebGL Override
 Overrides GPU vendor/renderer information to appear as typical desktop hardware.
 
+### Audio Fingerprinting Mitigation
+- Spoofs `AudioContext.sampleRate` to standard 44.1kHz
+- Injects imperceptible random noise (±0.00005) into `OfflineAudioContext` rendering to prevent exact audio fingerprinting
+
+### Font Fingerprinting Mitigation
+Returns a realistic minimal Windows font list (Arial, Times New Roman, Courier New, Verdana) via `document.fonts` API instead of exposing actual system fonts, preventing VM detection through Linux-specific font enumeration.
+
+### WebRTC Blocking
+- Blocks `RTCPeerConnection` to prevent IP address leaks
+- Blocks `navigator.mediaDevices.getUserMedia()` to prevent camera/microphone access
+- Blocks `navigator.mediaDevices.enumerateDevices()` to prevent device fingerprinting
+
+### Screen & Viewport Spoofing
+Spoofs screen and window dimensions to common desktop resolution:
+- `screen.width/height`: 1920x1080
+- `window.innerWidth/innerHeight`: 1280x720
+- `devicePixelRatio`: 1.0 (standard non-retina)
+- `screen.colorDepth`: 24-bit color
+
+### Timezone Spoofing
+- Overrides `Date.prototype.getTimezoneOffset()` to return US Eastern Time (-300 minutes)
+- Overrides `Intl.DateTimeFormat().resolvedOptions().timeZone` to return "America/New_York"
+
+### Battery API Blocking
+Blocks `navigator.getBattery()` API which is deprecated and indicates desktop vs mobile environment.
+
 ### Media Query Monitoring
 Monitors for headless-specific CSS media queries and logs detection attempts.
 

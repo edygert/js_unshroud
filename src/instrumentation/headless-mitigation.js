@@ -322,5 +322,369 @@
     console.warn('[JS Unshroud] Could not apply WebGL mitigations:', e.message);
   }
 
+
+  // === AUDIO FINGERPRINTING MITIGATION ===
+
+  // 1. Override AudioContext sampleRate to standard 44.1kHz
+  try {
+    const OriginalAudioContext = window.AudioContext || window.webkitAudioContext;
+    if (OriginalAudioContext) {
+      const AudioContextWrapper = function() {
+        const ctx = new OriginalAudioContext(...arguments);
+
+        // Override sampleRate getter to return standard value
+        Object.defineProperty(ctx, 'sampleRate', {
+          get: function() {
+            logEvent({
+              type: 'headless_mitigation',
+              method: 'AudioContext.sampleRate',
+              operation: 'audio_samplerate_spoofed',
+              originalValue: 48000, // Actual value varies by system
+              newValue: 44100,
+              timestamp: Date.now()
+            });
+            return 44100; // Standard audio CD quality
+          },
+          configurable: false
+        });
+
+        return ctx;
+      };
+
+      AudioContextWrapper.prototype = OriginalAudioContext.prototype;
+      window.AudioContext = AudioContextWrapper;
+      if (window.webkitAudioContext) {
+        window.webkitAudioContext = AudioContextWrapper;
+      }
+    }
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override AudioContext:', e.message);
+  }
+
+  // 2. Inject noise into OfflineAudioContext rendering
+  try {
+    if (window.OfflineAudioContext && window.OfflineAudioContext.prototype.startRendering) {
+      const originalStartRendering = window.OfflineAudioContext.prototype.startRendering;
+
+      window.OfflineAudioContext.prototype.startRendering = function() {
+        const renderPromise = originalStartRendering.apply(this, arguments);
+
+        return renderPromise.then(function(audioBuffer) {
+          // Add imperceptible noise to prevent exact fingerprinting
+          for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+            const channelData = audioBuffer.getChannelData(channel);
+            // Add noise to every 100th sample to minimize overhead
+            for (let i = 0; i < channelData.length; i += 100) {
+              channelData[i] += (Math.random() - 0.5) * 0.0001; // ±0.00005 noise
+            }
+          }
+
+          logEvent({
+            type: 'headless_mitigation',
+            method: 'OfflineAudioContext.startRendering',
+            operation: 'audio_noise_injection',
+            originalValue: audioBuffer.numberOfChannels + ' channels, ' + audioBuffer.length + ' samples',
+            timestamp: Date.now()
+          });
+
+          return audioBuffer;
+        });
+      };
+    }
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not apply OfflineAudioContext mitigations:', e.message);
+  }
+
+
+  // === FONT FINGERPRINTING MITIGATION ===
+
+  // Spoof document.fonts to return realistic minimal Windows font list
+  try {
+    Object.defineProperty(document, 'fonts', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'document.fonts',
+          operation: 'font_list_spoofed',
+          originalValue: 'actual_system_fonts',
+          newValue: 'fake_windows_fonts',
+          timestamp: Date.now()
+        });
+
+        // Fake font faces matching common Windows fonts
+        const fakeFonts = [
+          { family: 'Arial', style: 'normal', weight: '400' },
+          { family: 'Times New Roman', style: 'normal', weight: '400' },
+          { family: 'Courier New', style: 'normal', weight: '400' },
+          { family: 'Verdana', style: 'normal', weight: '400' }
+        ];
+
+        return {
+          size: 4,
+
+          check: function(fontSpec) {
+            // Extract font family from spec like "12px Arial"
+            const normalized = fontSpec.toLowerCase();
+            const families = ['arial', 'times new roman', 'courier new', 'verdana'];
+            const hasFont = families.some(function(f) {
+              return normalized.includes(f);
+            });
+
+            logEvent({
+              type: 'headless_mitigation',
+              method: 'document.fonts.check',
+              operation: 'font_check_spoofed',
+              originalValue: fontSpec,
+              newValue: hasFont,
+              timestamp: Date.now()
+            });
+
+            return hasFont;
+          },
+
+          load: function() {
+            return Promise.resolve(this);
+          },
+
+          ready: Promise.resolve(this),
+          status: 'loaded',
+
+          [Symbol.iterator]: function*() {
+            for (let i = 0; i < fakeFonts.length; i++) {
+              yield fakeFonts[i];
+            }
+          },
+
+          forEach: function(callback) {
+            for (let i = 0; i < fakeFonts.length; i++) {
+              callback(fakeFonts[i], i, this);
+            }
+          }
+        };
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override document.fonts:', e.message);
+  }
+
+
+  // === WEBRTC FINGERPRINTING MITIGATION ===
+
+  // 1. Block RTCPeerConnection
+  try {
+    window.RTCPeerConnection = function() {
+      logEvent({
+        type: 'headless_mitigation',
+        method: 'RTCPeerConnection',
+        operation: 'webrtc_blocked',
+        timestamp: Date.now()
+      });
+
+      // eslint-disable-next-line no-undef
+      throw new DOMException('WebRTC is not supported in this browser', 'NotSupportedError');
+    };
+
+    window.webkitRTCPeerConnection = window.RTCPeerConnection;
+    window.mozRTCPeerConnection = window.RTCPeerConnection;
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not block RTCPeerConnection:', e.message);
+  }
+
+  // 2. Block getUserMedia and enumerateDevices
+  try {
+    if (navigator.mediaDevices) {
+      navigator.mediaDevices.getUserMedia = function(constraints) {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.mediaDevices.getUserMedia',
+          operation: 'media_access_blocked',
+          originalValue: JSON.stringify(constraints),
+          timestamp: Date.now()
+        });
+
+        // eslint-disable-next-line no-undef
+        return Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
+      };
+
+      // Block device enumeration
+      navigator.mediaDevices.enumerateDevices = function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.mediaDevices.enumerateDevices',
+          operation: 'device_enumeration_blocked',
+          timestamp: Date.now()
+        });
+
+        return Promise.resolve([]); // No devices available
+      };
+    }
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not block mediaDevices:', e.message);
+  }
+
+
+  // === SCREEN/VIEWPORT FINGERPRINTING MITIGATION ===
+
+  // 1. Spoof screen dimensions to 1920x1080
+  try {
+    Object.defineProperties(window.screen, {
+      width: {
+        get: function() {
+          logEvent({
+            type: 'headless_mitigation',
+            method: 'screen.width',
+            operation: 'screen_dimension_spoofed',
+            newValue: 1920,
+            timestamp: Date.now()
+          });
+          return 1920;
+        },
+        configurable: true
+      },
+      height: {
+        get: function() { return 1080; },
+        configurable: true
+      },
+      availWidth: {
+        get: function() { return 1920; },
+        configurable: true
+      },
+      availHeight: {
+        get: function() { return 1040; }, // Account for taskbar
+        configurable: true
+      },
+      colorDepth: {
+        get: function() { return 24; },
+        configurable: true
+      },
+      pixelDepth: {
+        get: function() { return 24; },
+        configurable: true
+      }
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override screen properties:', e.message);
+  }
+
+  // 2. Spoof devicePixelRatio
+  try {
+    Object.defineProperty(window, 'devicePixelRatio', {
+      get: function() { return 1.0; }, // Standard non-retina
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override devicePixelRatio:', e.message);
+  }
+
+  // 3. Spoof window dimensions
+  try {
+    Object.defineProperty(window, 'innerWidth', {
+      get: function() { return 1280; },
+      configurable: true
+    });
+
+    Object.defineProperty(window, 'innerHeight', {
+      get: function() { return 720; },
+      configurable: true
+    });
+
+    Object.defineProperty(window, 'outerWidth', {
+      get: function() { return 1296; }, // Account for scrollbar
+      configurable: true
+    });
+
+    Object.defineProperty(window, 'outerHeight', {
+      get: function() { return 825; }, // Account for browser chrome
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override window dimensions:', e.message);
+  }
+
+
+  // === TIMEZONE FINGERPRINTING MITIGATION ===
+
+  // 1. Override Date.prototype.getTimezoneOffset
+  try {
+    const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
+
+    Date.prototype.getTimezoneOffset = function() {
+      const spoofedOffset = 300; // US Eastern Time (UTC-5, or -300 minutes)
+
+      logEvent({
+        type: 'headless_mitigation',
+        method: 'Date.prototype.getTimezoneOffset',
+        operation: 'timezone_spoofed',
+        originalValue: originalGetTimezoneOffset.call(this),
+        newValue: spoofedOffset,
+        timestamp: Date.now()
+      });
+
+      return spoofedOffset;
+    };
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override getTimezoneOffset:', e.message);
+  }
+
+  // 2. Override Intl.DateTimeFormat resolvedOptions
+  try {
+    const OriginalDateTimeFormat = Intl.DateTimeFormat;
+
+    Intl.DateTimeFormat = function() {
+      const formatter = new OriginalDateTimeFormat(...arguments);
+      const originalResolvedOptions = formatter.resolvedOptions;
+
+      formatter.resolvedOptions = function() {
+        const options = originalResolvedOptions.call(this);
+        options.timeZone = 'America/New_York'; // Match getTimezoneOffset offset
+
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'Intl.DateTimeFormat.resolvedOptions',
+          operation: 'timezone_spoofed',
+          newValue: 'America/New_York',
+          timestamp: Date.now()
+        });
+
+        return options;
+      };
+
+      return formatter;
+    };
+
+    Intl.DateTimeFormat.prototype = OriginalDateTimeFormat.prototype;
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override Intl.DateTimeFormat:', e.message);
+  }
+
+
+  // === BATTERY API FINGERPRINTING MITIGATION ===
+
+  // 1. Block navigator.getBattery
+  try {
+    if (navigator.getBattery) {
+      navigator.getBattery = function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.getBattery',
+          operation: 'battery_api_blocked',
+          timestamp: Date.now()
+        });
+
+        // eslint-disable-next-line no-undef
+        return Promise.reject(new DOMException('Battery Status API is not supported', 'NotSupportedError'));
+      };
+    }
+
+    // Remove battery property if it exists
+    if ('battery' in navigator) {
+      delete navigator.battery;
+    }
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not block Battery API:', e.message);
+  }
+
+
   console.log('[JS Unshroud] Headless mitigation hooks loaded');
 })();

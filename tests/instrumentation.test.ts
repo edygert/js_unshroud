@@ -3063,4 +3063,271 @@ const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.close();
     });
   });
+
+  describe('Fingerprinting Countermeasures', () => {
+    let headlessMitigationScript: string;
+    const fixturesPath = join(__dirname, 'fixtures');
+
+    beforeAll(() => {
+      headlessMitigationScript = readFileSync(
+        join(__dirname, '..', 'src', 'instrumentation', 'headless-mitigation.js'),
+        'utf-8'
+      );
+    });
+
+    test('audio fingerprinting mitigation', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        (window as any).__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto(`file://${fixturesPath}/audio-fingerprint-test.html`);
+      await page.waitForTimeout(2000); // Wait for audio rendering
+
+      const audioEvents = events.filter(e =>
+        e.type === 'headless_mitigation' &&
+        (e.operation === 'audio_noise_injection' || e.operation === 'audio_samplerate_spoofed')
+      );
+      expect(audioEvents.length).toBeGreaterThan(0);
+
+      // Verify AudioContext sampleRate is spoofed
+      const sampleRate = await page.evaluate(() => {
+        const ctx = new AudioContext();
+        return ctx.sampleRate;
+      });
+      expect(sampleRate).toBe(44100);
+
+      await page.close();
+    });
+
+    test('font enumeration spoofed', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        (window as any).__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto(`file://${fixturesPath}/font-fingerprint-test.html`);
+      await page.waitForTimeout(500);
+
+      const result = await page.evaluate(() => {
+        return {
+          size: (document.fonts as any).size,
+          hasArial: document.fonts.check('12px Arial'),
+          hasTimes: document.fonts.check('12px Times New Roman'),
+          hasCalibri: document.fonts.check('12px Calibri'), // Should be false
+          hasDejaVu: document.fonts.check('12px DejaVu Sans'), // Should be false
+          fontList: Array.from(document.fonts as any).map((f: any) => f.family)
+        };
+      });
+
+      expect(result.size).toBe(4);
+      expect(result.hasArial).toBe(true);
+      expect(result.hasTimes).toBe(true);
+      expect(result.hasCalibri).toBe(false); // Not in our fake list
+      expect(result.hasDejaVu).toBe(false); // Linux font, not in fake list
+      expect(result.fontList).toEqual(['Arial', 'Times New Roman', 'Courier New', 'Verdana']);
+
+      const fontEvents = events.filter(e =>
+        e.type === 'headless_mitigation' &&
+        (e.operation === 'font_list_spoofed' || e.operation === 'font_check_spoofed')
+      );
+      expect(fontEvents.length).toBeGreaterThan(0);
+
+      await page.close();
+    });
+
+    test('WebRTC blocked', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        (window as any).__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto(`file://${fixturesPath}/webrtc-test.html`);
+      await page.waitForTimeout(500);
+
+      const error = await page.evaluate(() => {
+        try {
+          new RTCPeerConnection();
+          return null;
+        } catch (e: any) {
+          return e.name;
+        }
+      });
+
+      expect(error).toBe('NotSupportedError');
+
+      const webrtcEvents = events.filter(e =>
+        e.type === 'headless_mitigation' &&
+        e.operation === 'webrtc_blocked'
+      );
+      expect(webrtcEvents.length).toBeGreaterThan(0);
+
+      await page.close();
+    });
+
+    test('screen dimensions spoofed', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        (window as any).__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+
+      const dims = await page.evaluate(() => ({
+        width: screen.width,
+        height: screen.height,
+        availWidth: screen.availWidth,
+        availHeight: screen.availHeight,
+        colorDepth: screen.colorDepth,
+        pixelDepth: screen.pixelDepth,
+        pixelRatio: devicePixelRatio,
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        outerWidth: window.outerWidth,
+        outerHeight: window.outerHeight
+      }));
+
+      expect(dims.width).toBe(1920);
+      expect(dims.height).toBe(1080);
+      expect(dims.availWidth).toBe(1920);
+      expect(dims.availHeight).toBe(1040);
+      expect(dims.colorDepth).toBe(24);
+      expect(dims.pixelDepth).toBe(24);
+      expect(dims.pixelRatio).toBe(1.0);
+      expect(dims.innerWidth).toBe(1280);
+      expect(dims.innerHeight).toBe(720);
+      expect(dims.outerWidth).toBe(1296);
+      expect(dims.outerHeight).toBe(825);
+
+      const screenEvents = events.filter(e =>
+        e.type === 'headless_mitigation' &&
+        e.operation === 'screen_dimension_spoofed'
+      );
+      expect(screenEvents.length).toBeGreaterThan(0);
+
+      await page.close();
+    });
+
+    test('timezone spoofed', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        (window as any).__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+
+      const offset = await page.evaluate(() => new Date().getTimezoneOffset());
+      expect(offset).toBe(300); // US Eastern Time (-300 minutes = UTC-5)
+
+      const timeZone = await page.evaluate(() => {
+        const formatter = new Intl.DateTimeFormat();
+        return formatter.resolvedOptions().timeZone;
+      });
+      expect(timeZone).toBe('America/New_York');
+
+      const timezoneEvents = events.filter(e =>
+        e.type === 'headless_mitigation' &&
+        e.operation === 'timezone_spoofed'
+      );
+      expect(timezoneEvents.length).toBeGreaterThan(0);
+
+      await page.close();
+    });
+
+    test('battery API blocked', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        (window as any).__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+
+      const result = await page.evaluate(async () => {
+        // Check if getBattery exists
+        if (!(navigator as any).getBattery) {
+          return 'undefined';
+        }
+
+        // Try to call it
+        try {
+          await (navigator as any).getBattery();
+          return 'success';
+        } catch (e: any) {
+          return e.name;
+        }
+      });
+
+      expect(result).toMatch(/NotSupportedError|undefined/);
+
+      if (result === 'NotSupportedError') {
+        const batteryEvents = events.filter(e =>
+          e.type === 'headless_mitigation' &&
+          e.operation === 'battery_api_blocked'
+        );
+        expect(batteryEvents.length).toBeGreaterThan(0);
+      }
+
+      await page.close();
+    });
+  });
 });

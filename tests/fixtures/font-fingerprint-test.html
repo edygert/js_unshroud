@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Font Fingerprint Test</title>
+</head>
+<body>
+  <h1>Font Fingerprinting Test</h1>
+  <div id="results"></div>
+
+  <script>
+    // Font fingerprinting techniques
+    function testFontFingerprint() {
+      const results = [];
+
+      try {
+        // Test 1: document.fonts.size
+        results.push(`Total fonts available: ${document.fonts.size}`);
+
+        // Test 2: Check for common fonts
+        const commonFonts = [
+          'Arial',
+          'Times New Roman',
+          'Verdana',
+          'Courier New',
+          'Calibri',
+          'Segoe UI',
+          'Comic Sans MS',
+          'DejaVu Sans',
+          'Liberation Sans',
+          'Ubuntu'
+        ];
+
+        results.push('\nFont availability:');
+        for (const font of commonFonts) {
+          const available = document.fonts.check(`12px ${font}`);
+          results.push(`  ${font}: ${available ? '✓' : '✗'}`);
+        }
+
+        // Test 3: Enumerate all fonts
+        results.push('\nEnumerated fonts:');
+        let fontCount = 0;
+        for (const fontFace of document.fonts) {
+          results.push(`  - ${fontFace.family} (${fontFace.style}, ${fontFace.weight})`);
+          fontCount++;
+        }
+
+        if (fontCount === 0) {
+          results.push('  (No fonts enumerated)');
+        }
+
+        // Test 4: Font loading
+        results.push('\nFont loading test:');
+        document.fonts.load('12px Arial').then(() => {
+          results.push('  Arial loaded successfully');
+          updateResults();
+        }).catch((e) => {
+          results.push(`  Font loading failed: ${e.message}`);
+          updateResults();
+        });
+
+        // Test 5: Text measurement technique (alternative fingerprinting)
+        const span = document.createElement('span');
+        span.style.font = '12px Arial';
+        span.textContent = 'mmmmmmmmmmlli';
+        span.style.position = 'absolute';
+        span.style.visibility = 'hidden';
+        document.body.appendChild(span);
+        results.push(`\nText width measurement (Arial): ${span.offsetWidth}px`);
+        document.body.removeChild(span);
+
+        updateResults();
+        console.log('Font fingerprinting test completed');
+      } catch (e) {
+        results.push(`\nError: ${e.message}`);
+        updateResults();
+      }
+
+      function updateResults() {
+        document.getElementById('results').innerHTML = '<pre>' + results.join('\n') + '</pre>';
+      }
+    }
+
+    testFontFingerprint();
+  </script>
+</body>
+</html>
