@@ -78,6 +78,9 @@ function loadInstrumentationConfig(configPath?: string): InstrumentationConfig {
     enableEventHandlers: false,    // Instruments event handler property assignments (element.onclick = ...)
     enableBlobTracking: false,     // Instruments Blob creation and URL.createObjectURL/revokeObjectURL
     enableURLExecution: false,     // Instruments javascript: URL execution (location.href, anchor.href, etc.)
+    enableWorkers: false,          // Instruments Web Workers and SharedWorkers (creation and messaging)
+    enableModules: false,          // Instruments ES module <script type="module"> injection
+    enableIframes: false,          // Instruments iframe creation and srcdoc injection
     dedupeWindowMs: 100,           // Short window to reduce noise from tight loops
     maxPayloadSize: 2051,         // Captures first 1024 + "..." + last 1024 chars for code/encoding output
     maxStackDepth: 20,
@@ -138,6 +141,9 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   eventHandler: string | null;
   blobTracking: string | null;
   urlExecution: string | null;
+  worker: string | null;
+  module: string | null;
+  iframe: string | null;
   performanceMonitor: string;
 } {
   const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
@@ -155,6 +161,9 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   const eventHandlerScript = readFileSync('./src/instrumentation/event-handler-hooks.js', 'utf-8');
   const blobTrackingScript = readFileSync('./src/instrumentation/blob-hooks.js', 'utf-8');
   const urlExecutionScript = readFileSync('./src/instrumentation/url-execution-hooks.js', 'utf-8');
+  const workerScript = readFileSync('./src/instrumentation/worker-hooks.js', 'utf-8');
+  const moduleScript = readFileSync('./src/instrumentation/module-hooks.js', 'utf-8');
+  const iframeScript = readFileSync('./src/instrumentation/iframe-hooks.js', 'utf-8');
   const performanceMonitorScript = readFileSync('./src/instrumentation/performance-monitor.js', 'utf-8');
 
   return {
@@ -173,6 +182,9 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
     eventHandler: config.enableEventHandlers ? eventHandlerScript : null,
     blobTracking: config.enableBlobTracking ? blobTrackingScript : null,
     urlExecution: config.enableURLExecution ? urlExecutionScript : null,
+    worker: config.enableWorkers ? workerScript : null,
+    module: config.enableModules ? moduleScript : null,
+    iframe: config.enableIframes ? iframeScript : null,
     performanceMonitor: performanceMonitorScript // Always loaded for performance controls
   };
 }
@@ -305,6 +317,21 @@ async function injectInstrumentation(
   // Tracks javascript: URL execution (location.href, anchor.href, etc.)
   if (scripts.urlExecution) {
     await page.addInitScript({ content: scripts.urlExecution });
+  }
+
+  // Inject worker hooks after URL execution hooks
+  if (scripts.worker) {
+    await page.addInitScript({ content: scripts.worker });
+  }
+
+  // Inject module hooks after worker hooks
+  if (scripts.module) {
+    await page.addInitScript({ content: scripts.module });
+  }
+
+  // Inject iframe hooks after module hooks
+  if (scripts.iframe) {
+    await page.addInitScript({ content: scripts.iframe });
   }
 
   if (scripts.fingerprinting) {

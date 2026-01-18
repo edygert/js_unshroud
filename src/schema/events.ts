@@ -21,7 +21,10 @@ const EVENT_TYPES = [
   'script_injection',
   'event_handler',
   'blob',
-  'url_execution'
+  'url_execution',
+  'worker',
+  'module',
+  'iframe'
 ] as const satisfies readonly MonitoringEvent['type'][];
 
 function isValidEventType(type: string): type is MonitoringEvent['type'] {

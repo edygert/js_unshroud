@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Web Worker Test</title>
+</head>
+<body>
+  <h1>Web Worker Test</h1>
+  <div id="results"></div>
+
+  <script>
+    const results = [];
+
+    // Test 1: Worker from external file
+    try {
+      const worker1 = new Worker('test-worker.js');
+
+      worker1.onmessage = function(e) {
+        results.push('Main received from worker1: ' + e.data);
+        document.getElementById('results').innerHTML = results.join('<br>');
+      };
+
+      worker1.onerror = function(e) {
+        results.push('Worker1 error: ' + e.message);
+        document.getElementById('results').innerHTML = results.join('<br>');
+      };
+
+      // Send message to worker
+      setTimeout(function() {
+        worker1.postMessage({ test: 'data from main' });
+      }, 100);
+    } catch (e) {
+      results.push('Failed to create worker1: ' + e.message);
+    }
+
+    // Test 2: Worker from blob URL
+    try {
+      const workerCode = `
+        self.addEventListener('message', function(e) {
+          self.postMessage('Blob worker received: ' + e.data);
+        });
+        self.postMessage('Blob worker started');
+      `;
+
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      const blobUrl = URL.createObjectURL(blob);
+      const worker2 = new Worker(blobUrl);
+
+      worker2.onmessage = function(e) {
+        results.push('Main received from worker2 (blob): ' + e.data);
+        document.getElementById('results').innerHTML = results.join('<br>');
+      };
+
+      // Send message to blob worker
+      setTimeout(function() {
+        worker2.postMessage('test message');
+      }, 200);
+
+      // Cleanup
+      setTimeout(function() {
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
+    } catch (e) {
+      results.push('Failed to create worker2 (blob): ' + e.message);
+    }
+
+    // Test 3: Worker using addEventListener
+    try {
+      const workerCode3 = `
+        self.addEventListener('message', function(e) {
+          self.postMessage('EventListener worker: ' + JSON.stringify(e.data));
+        });
+      `;
+
+      const blob3 = new Blob([workerCode3], { type: 'application/javascript' });
+      const blobUrl3 = URL.createObjectURL(blob3);
+      const worker3 = new Worker(blobUrl3);
+
+      worker3.addEventListener('message', function(e) {
+        results.push('Main received from worker3 (addEventListener): ' + e.data);
+        document.getElementById('results').innerHTML = results.join('<br>');
+      });
+
+      // Send message
+      setTimeout(function() {
+        worker3.postMessage({ method: 'addEventListener' });
+      }, 300);
+    } catch (e) {
+      results.push('Failed to create worker3: ' + e.message);
+    }
+
+    // Test 4: Worker error handling
+    try {
+      const errorWorkerCode = `
+        // Intentionally cause an error
+        throw new Error('Intentional worker error');
+      `;
+
+      const errorBlob = new Blob([errorWorkerCode], { type: 'application/javascript' });
+      const errorBlobUrl = URL.createObjectURL(errorBlob);
+      const worker4 = new Worker(errorBlobUrl);
+
+      worker4.onerror = function(e) {
+        results.push('Worker4 error caught: ' + e.message);
+        document.getElementById('results').innerHTML = results.join('<br>');
+        e.preventDefault(); // Prevent error from propagating
+      };
+    } catch (e) {
+      results.push('Failed to create worker4: ' + e.message);
+    }
+
+    // Display initial results after a delay
+    setTimeout(function() {
+      if (results.length === 0) {
+        results.push('No events captured yet...');
+      }
+      document.getElementById('results').innerHTML = results.join('<br>');
+    }, 50);
+  </script>
+</body>
+</html>

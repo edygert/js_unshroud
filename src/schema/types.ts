@@ -232,6 +232,39 @@ export interface URLExecutionEvent extends BaseEvent {
   element?: string;               // CSS selector of anchor element (for anchor_href_set)
 }
 
+export interface WorkerEvent extends BaseEvent {
+  type: 'worker';
+  eventType: 'worker_create' | 'worker_postmessage' | 'worker_message' | 'worker_error';
+  workerType: 'Worker' | 'SharedWorker';
+  scriptURL: string;              // URL of worker script
+  blobContent?: string;           // Resolved content from blob: URL (if applicable)
+  message?: string;               // Serialized message data (for postmessage/message events)
+  direction?: 'to_worker' | 'from_worker';  // Message direction
+  error?: string;                 // Error message (for worker_error)
+  stackTrace?: string;
+}
+
+export interface ModuleEvent extends BaseEvent {
+  type: 'module';
+  eventType: 'module_script_inject';
+  src?: string;                   // Source URL for external module scripts
+  content?: string;               // Inline module script content (truncated)
+  isInline: boolean;              // Whether this is an inline module vs external
+  stackTrace?: string;
+}
+
+export interface IframeEvent extends BaseEvent {
+  type: 'iframe';
+  eventType: 'iframe_create' | 'iframe_srcdoc_set' | 'iframe_eval';
+  src?: string;                   // Source URL for iframe
+  srcdoc?: string;                // Inline srcdoc HTML content (truncated)
+  scriptCount?: number;           // Number of scripts found in srcdoc
+  scripts?: string[];             // Extracted scripts from srcdoc (truncated)
+  code?: string;                  // For iframe_eval event
+  element: string;                // CSS selector of iframe element
+  stackTrace?: string;
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -251,7 +284,10 @@ export type MonitoringEvent =
   | ScriptInjectionEvent
   | EventHandlerEvent
   | BlobEvent
-  | URLExecutionEvent;
+  | URLExecutionEvent
+  | WorkerEvent
+  | ModuleEvent
+  | IframeEvent;
 
 export interface SessionConfig {
   id: string;
@@ -285,6 +321,9 @@ export interface InstrumentationConfig {
   enableEventHandlers: boolean; // Instruments event handler property assignments (element.onclick = ...)
   enableBlobTracking: boolean;  // Instruments Blob creation and URL.createObjectURL/revokeObjectURL
   enableURLExecution: boolean;  // Instruments javascript: URL execution (location.href, anchor.href, etc.)
+  enableWorkers: boolean;       // Instruments Web Workers and SharedWorkers (creation and messaging)
+  enableModules: boolean;       // Instruments ES module <script type="module"> injection
+  enableIframes: boolean;       // Instruments iframe creation and srcdoc injection
   dedupeWindowMs: number;       // Deduplication window in milliseconds
   maxPayloadSize: number;       // Maximum payload size in bytes
   maxStackDepth: number;        // Maximum stack trace depth

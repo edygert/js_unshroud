@@ -150,6 +150,39 @@ export class TimelineFormatter {
         return `JavaScript URL: ${urlEvent.eventType} (${urlEvent.code.slice(0, 50)}...)`;
       }
 
+      case 'worker': {
+        const workerEvent = event;
+        if (workerEvent.eventType === 'worker_create') {
+          return `Worker Create: ${workerEvent.workerType} (${workerEvent.scriptURL})`;
+        } else if (workerEvent.eventType === 'worker_postmessage') {
+          return `Worker PostMessage: ${workerEvent.direction} (${workerEvent.message?.slice(0, 30) ?? ''}...)`;
+        } else if (workerEvent.eventType === 'worker_message') {
+          return `Worker Message: ${workerEvent.direction} (${workerEvent.message?.slice(0, 30) ?? ''}...)`;
+        } else {
+          return `Worker Error: ${workerEvent.error}`;
+        }
+      }
+
+      case 'module': {
+        const moduleEvent = event;
+        if (moduleEvent.isInline) {
+          return `Module Script Inject: inline (${moduleEvent.content?.slice(0, 50) ?? ''}...)`;
+        } else {
+          return `Module Script Inject: ${moduleEvent.src}`;
+        }
+      }
+
+      case 'iframe': {
+        const iframeEvent = event;
+        if (iframeEvent.eventType === 'iframe_create') {
+          return `Iframe Create: ${iframeEvent.src ?? 'inline srcdoc'} (${iframeEvent.scriptCount ?? 0} scripts)`;
+        } else if (iframeEvent.eventType === 'iframe_srcdoc_set') {
+          return `Iframe Srcdoc Set: ${iframeEvent.element} (${iframeEvent.scriptCount ?? 0} scripts)`;
+        } else {
+          return `Iframe Eval: ${iframeEvent.code?.slice(0, 50) ?? ''}...`;
+        }
+      }
+
       default:
         return `${(event as BaseEvent).type} event`;
     }

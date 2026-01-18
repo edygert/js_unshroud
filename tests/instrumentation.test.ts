@@ -25,6 +25,7 @@ declare global {
     };
     __js_unshroud_config?: any;
     __js_unshroud_session_id?: string;
+    __js_unshroud_blob_map?: any;
     __test_log_event?: (event: string) => void;
   }
 }
@@ -3576,6 +3577,303 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       expect(aesEvents.length).toBeGreaterThan(0);
       expect(desEvents.length).toBeGreaterThan(0);
       expect(rc4Events.length).toBeGreaterThan(0);
+
+      await page.close();
+    });
+  });
+
+  describe('Web Worker Instrumentation', () => {
+    const workerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/worker-hooks.js'), 'utf-8');
+    const blobHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/blob-hooks.js'), 'utf-8');
+
+    test('should capture Worker creation', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      // Set up instrumentation
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableWorkers: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(blobHooksScript);
+      await page.addInitScript(workerHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      // Create a worker from a blob URL
+      await page.evaluate(() => {
+        const workerCode = `
+          self.addEventListener('message', function(e) {
+            self.postMessage('response: ' + e.data);
+          });
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        const worker = new Worker(blobUrl);
+
+        // Send a message
+        worker.postMessage('test message');
+
+        // Store for later access
+        (window as any).testWorker = worker;
+        (window as any).testBlobUrl = blobUrl;
+      });
+
+      await page.waitForTimeout(500);
+
+      const workerCreateEvents = events.filter(e => e.type === 'worker' && e.eventType === 'worker_create');
+      expect(workerCreateEvents.length).toBeGreaterThan(0);
+      expect(workerCreateEvents[0].workerType).toBe('Worker');
+      expect(workerCreateEvents[0].scriptURL).toContain('blob:');
+
+      await page.close();
+    });
+
+    test('should capture Worker postMessage (to worker)', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableWorkers: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(blobHooksScript);
+      await page.addInitScript(workerHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      // Create a worker and send messages
+      await page.evaluate(() => {
+        const workerCode = `
+          self.addEventListener('message', function(e) {
+            self.postMessage('response');
+          });
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        const worker = new Worker(blobUrl);
+
+        worker.postMessage({ action: 'test', data: 'hello' });
+      });
+
+      await page.waitForTimeout(500);
+
+      const postMessageEvents = events.filter(e =>
+        e.type === 'worker' &&
+        e.eventType === 'worker_postmessage' &&
+        e.direction === 'to_worker'
+      );
+
+      expect(postMessageEvents.length).toBeGreaterThan(0);
+      expect(postMessageEvents[0].message).toContain('action');
+      expect(postMessageEvents[0].message).toContain('test');
+
+      await page.close();
+    });
+
+    test('should capture Worker message (from worker)', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableWorkers: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(blobHooksScript);
+      await page.addInitScript(workerHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      // Create a worker that sends a message immediately
+      await page.evaluate(() => {
+        const workerCode = `
+          self.postMessage('worker initialized');
+
+          self.addEventListener('message', function(e) {
+            self.postMessage('received: ' + e.data);
+          });
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        const worker = new Worker(blobUrl);
+
+        worker.onmessage = function() {
+          // Handler will be wrapped and logged
+        };
+
+        // Send a message to trigger response
+        setTimeout(function() {
+          worker.postMessage('ping');
+        }, 100);
+      });
+
+      await page.waitForTimeout(500);
+
+      const messageEvents = events.filter(e =>
+        e.type === 'worker' &&
+        e.eventType === 'worker_message' &&
+        e.direction === 'from_worker'
+      );
+
+      expect(messageEvents.length).toBeGreaterThan(0);
+      // Should have at least the 'worker initialized' message
+      const initMessage = messageEvents.find(e => e.message?.includes('initialized'));
+      expect(initMessage).toBeDefined();
+
+      await page.close();
+    });
+
+    test('should capture Worker errors', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableWorkers: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(blobHooksScript);
+      await page.addInitScript(workerHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      // Create a worker that throws an error
+      await page.evaluate(() => {
+        const workerCode = `
+          throw new Error('Test worker error');
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        const worker = new Worker(blobUrl);
+
+        worker.onerror = function(e) {
+          // Error handler will be wrapped and logged
+          e.preventDefault(); // Prevent error from propagating to console
+        };
+      });
+
+      await page.waitForTimeout(500);
+
+      const errorEvents = events.filter(e =>
+        e.type === 'worker' &&
+        e.eventType === 'worker_error'
+      );
+
+      expect(errorEvents.length).toBeGreaterThan(0);
+      expect(errorEvents[0].error).toBeDefined();
+
+      await page.close();
+    });
+
+    test('should resolve blob content for Worker created from blob URL', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableWorkers: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_blob_map = {};
+      });
+
+      await page.addInitScript(blobHooksScript);
+      await page.addInitScript(workerHooksScript);
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      // Create a worker from a blob with distinctive content
+      await page.evaluate(() => {
+        const workerCode = `
+          // DISTINCTIVE MALICIOUS CODE PATTERN
+          self.postMessage('malware worker ready');
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        // Wait a bit for blob content extraction
+        setTimeout(function() {
+          new Worker(blobUrl);
+        }, 100);
+      });
+
+      await page.waitForTimeout(500);
+
+      const workerCreateEvents = events.filter(e => e.type === 'worker' && e.eventType === 'worker_create');
+      expect(workerCreateEvents.length).toBeGreaterThan(0);
+
+      // Check if blob content was resolved
+      const workerWithContent = workerCreateEvents.find(e => e.blobContent);
+      expect(workerWithContent).toBeDefined();
+      if (workerWithContent) {
+        expect(workerWithContent.blobContent).toContain('DISTINCTIVE MALICIOUS CODE PATTERN');
+      }
 
       await page.close();
     });
