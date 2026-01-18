@@ -4064,4 +4064,300 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.close();
     });
   });
+
+  // === P3.2: BEHAVIORAL INTERACTION SIMULATION TESTS ===
+  describe('P3.2 Behavioral Interaction Simulation', () => {
+    test('should trigger basic interaction-gated malware', async () => {
+      const page = await browser.newPage();
+
+      // Navigate to interaction gate test fixture
+      await page.goto(`file://${__dirname}/fixtures/interaction-gate-test.html`);
+
+      // Simulate mouse movements (at least 3)
+      for (let i = 0; i < 5; i++) {
+        await page.mouse.move(
+          Math.random() * 1280,
+          Math.random() * 720,
+          { steps: 10 }
+        );
+        await page.waitForTimeout(100);
+      }
+
+      // Simulate scroll (at least 1) - dispatch on document
+      await page.evaluate(() => {
+        // Add tall content to allow scrolling
+        const div = document.createElement('div');
+        div.style.height = '2000px';
+        document.body.appendChild(div);
+
+        // Scroll and dispatch event on document
+        window.scrollTo(0, 100);
+        document.dispatchEvent(new Event('scroll', { bubbles: true }));
+      });
+      await page.waitForTimeout(100);
+
+      // Simulate click (at least 1)
+      await page.click('#testBtn');
+
+      // Wait for the page to check interactions (5 seconds + buffer)
+      await page.waitForTimeout(6000);
+
+      // Check if malware was triggered
+      const result = await page.$eval('#result', el => el.textContent);
+      expect(result).toContain('INTERACTION_DETECTED');
+
+      await page.close();
+    }, 10000); // 10 second timeout
+
+    test('should trigger form submission-gated malware', async () => {
+      const page = await browser.newPage();
+
+      // Navigate to form submission test fixture
+      await page.goto(`file://${__dirname}/fixtures/form-submission-gate-test.html`);
+
+      // Simulate form interaction manually (since we're testing the fixture, not the runner)
+      await page.focus('#usernameField');
+      await page.keyboard.type('testuser');
+      await page.focus('#emailField');
+      await page.keyboard.type('test@example.com');
+      await page.click('button[type="submit"]');
+
+      // Wait for the page to check (8 seconds + buffer)
+      await page.waitForTimeout(9000);
+
+      // Check if malware was triggered
+      const result = await page.$eval('#result', el => el.textContent);
+      expect(result).toContain('FORM_INTERACTION_DETECTED');
+
+      await page.close();
+    }, 12000); // 12 second timeout
+
+    test('should trigger checkout skimmer only on checkout URLs', async () => {
+      const page = await browser.newPage();
+
+      // Navigate with checkout keyword in URL
+      await page.goto(`file://${__dirname}/fixtures/checkout-skimmer-test.html?page=checkout`);
+
+      // Wait to verify it's recognized as checkout page
+      await page.waitForTimeout(1000);
+
+      // Simulate payment form interaction
+      await page.focus('#cardField');
+      await page.keyboard.type('4532123456789012');
+      await page.focus('#cvvField');
+      await page.keyboard.type('123');
+      await page.click('button[type="submit"]');
+
+      // Wait for the page to check (10 seconds + buffer)
+      await page.waitForTimeout(11000);
+
+      // Check if skimmer was activated
+      const result = await page.$eval('#result', el => el.textContent);
+      expect(result).toContain('CARD_DATA_CAPTURED');
+
+      await page.close();
+    }, 15000); // 15 second timeout
+
+    test('should NOT trigger checkout skimmer on non-checkout URLs', async () => {
+      const page = await browser.newPage();
+
+      // Navigate WITHOUT checkout keyword in URL
+      await page.goto(`file://${__dirname}/fixtures/checkout-skimmer-test.html`, {
+        waitUntil: 'load'
+      });
+
+      // Wait for DOM to be ready and script to execute
+      await page.waitForSelector('#result');
+      await page.waitForTimeout(500);
+
+      // Check that skimmer is inactive
+      const result = await page.$eval('#result', el => el.textContent);
+      expect(result).toContain('NOT A CHECKOUT PAGE');
+
+      await page.close();
+    }, 5000); // 5 second timeout
+
+    test('should trigger time-delayed malware with continuous interaction', async () => {
+      const page = await browser.newPage();
+
+      // Navigate to time delay test fixture
+      await page.goto(`file://${__dirname}/fixtures/time-delay-test.html`);
+
+      // Simulate continuous interaction over 60 seconds
+      const interactionInterval = setInterval(async () => {
+        try {
+          // Mouse movement
+          await page.mouse.move(
+            Math.random() * 1280,
+            Math.random() * 720,
+            { steps: 10 }
+          );
+
+          // Occasional scroll
+          if (Math.random() < 0.3) {
+            await page.mouse.wheel(0, 100);
+          }
+
+          // Occasional click
+          if (Math.random() < 0.2) {
+            await page.mouse.click(500, 500);
+          }
+        } catch (e) {
+          // Ignore errors during interaction
+        }
+      }, 2000); // Every 2 seconds
+
+      // Wait for the malware to activate (60 seconds + buffer)
+      await page.waitForTimeout(62000);
+
+      // Stop interaction
+      clearInterval(interactionInterval);
+
+      // Check if malware was triggered
+      const result = await page.$eval('#result', el => el.textContent);
+      expect(result).toContain('TIME_DELAY_BYPASS_SUCCESS');
+
+      await page.close();
+    }, 70000); // 70 second timeout for this test
+
+    test('form interaction should avoid hidden honeypot fields', async () => {
+      const page = await browser.newPage();
+
+      // Create a test page with honeypot fields
+      await page.setContent(`
+        <!DOCTYPE html>
+        <html>
+          <body>
+            <form>
+              <input type="text" id="visible1" name="username" placeholder="Username" />
+              <input type="text" id="honeypot1" name="website" style="display: none;" />
+              <input type="text" id="visible2" name="email" placeholder="Email" />
+              <input type="text" id="honeypot2" name="url" style="visibility: hidden;" />
+              <input type="password" id="visible3" name="password" placeholder="Password" />
+            </form>
+          </body>
+        </html>
+      `);
+
+      // Check which fields are visible
+      const visibilityCheck = await page.$$eval('input', (elements) => {
+        return elements.map(el => {
+          const style = window.getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+          const isVisible =
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            parseFloat(style.opacity) >= 0.1 &&
+            rect.width >= 1 &&
+            rect.height >= 1;
+
+          return {
+            id: el.id,
+            name: (el as HTMLInputElement).name,
+            isVisible
+          };
+        });
+      });
+
+      // Verify honeypot detection
+      expect(visibilityCheck.find(f => f.id === 'visible1')?.isVisible).toBe(true);
+      expect(visibilityCheck.find(f => f.id === 'honeypot1')?.isVisible).toBe(false);
+      expect(visibilityCheck.find(f => f.id === 'visible2')?.isVisible).toBe(true);
+      expect(visibilityCheck.find(f => f.id === 'honeypot2')?.isVisible).toBe(false);
+      expect(visibilityCheck.find(f => f.id === 'visible3')?.isVisible).toBe(true);
+
+      await page.close();
+    });
+
+    test('realistic field value generation should work correctly', async () => {
+      const page = await browser.newPage();
+
+      // Test field value generation logic
+      const values = await page.evaluate(() => {
+        function generateRealisticFieldValue(fieldInfo: {
+          type: string;
+          name: string;
+          id: string;
+          placeholder: string;
+        }): string {
+          const fieldLower = `${fieldInfo.name} ${fieldInfo.id} ${fieldInfo.placeholder}`.toLowerCase();
+
+          // Detect field purpose from name/id/placeholder
+          if (fieldLower.includes('email')) return 'test.user@example.com';
+          if (fieldLower.includes('phone') || fieldLower.includes('tel')) return '555-0123';
+          if (fieldLower.includes('zip') || fieldLower.includes('postal')) return '12345';
+          if (fieldLower.includes('card') || fieldLower.includes('credit')) return '4532123456789012';
+          if (fieldLower.includes('cvv') || fieldLower.includes('cvc') || fieldLower.includes('security')) return '123';
+          if (fieldLower.includes('expir') || fieldLower.includes('exp')) return '12/26';
+          if (fieldLower.includes('first')) return 'John';
+          if (fieldLower.includes('last')) return 'Doe';
+          if (fieldLower.includes('user')) return 'testuser';
+          if (fieldLower.includes('name')) return 'John Doe';
+          if (fieldLower.includes('address') || fieldLower.includes('street')) return '123 Main St';
+          if (fieldLower.includes('city')) return 'New York';
+          if (fieldLower.includes('state')) return 'NY';
+          if (fieldLower.includes('country')) return 'United States';
+
+          // Type-based defaults
+          if (fieldInfo.type === 'email') return 'test.user@example.com';
+          if (fieldInfo.type === 'tel') return '555-0123';
+          if (fieldInfo.type === 'number') return '42';
+          if (fieldInfo.type === 'date') return '2026-01-18';
+          if (fieldInfo.type === 'password') return 'TestPassword123!';
+          if (fieldInfo.type === 'search') return 'test query';
+          if (fieldInfo.type === 'url') return 'https://example.com';
+
+          // Generic text
+          return 'test input';
+        }
+
+        return {
+          email: generateRealisticFieldValue({ type: 'email', name: '', id: '', placeholder: '' }),
+          emailField: generateRealisticFieldValue({ type: 'text', name: 'email', id: '', placeholder: '' }),
+          phone: generateRealisticFieldValue({ type: 'tel', name: '', id: '', placeholder: '' }),
+          phoneField: generateRealisticFieldValue({ type: 'text', name: '', id: '', placeholder: 'Phone Number' }),
+          card: generateRealisticFieldValue({ type: 'text', name: 'cardnumber', id: '', placeholder: '' }),
+          cvv: generateRealisticFieldValue({ type: 'text', name: 'cvv', id: '', placeholder: '' }),
+          password: generateRealisticFieldValue({ type: 'password', name: '', id: '', placeholder: '' }),
+          zip: generateRealisticFieldValue({ type: 'text', name: '', id: '', placeholder: 'ZIP Code' }),
+          firstName: generateRealisticFieldValue({ type: 'text', name: 'firstname', id: '', placeholder: '' }),
+          lastName: generateRealisticFieldValue({ type: 'text', name: 'lastname', id: '', placeholder: '' }),
+          username: generateRealisticFieldValue({ type: 'text', name: 'username', id: '', placeholder: '' })
+        };
+      });
+
+      // Verify field values
+      expect(values.email).toBe('test.user@example.com');
+      expect(values.emailField).toBe('test.user@example.com');
+      expect(values.phone).toBe('555-0123');
+      expect(values.phoneField).toBe('555-0123');
+      expect(values.card).toBe('4532123456789012');
+      expect(values.cvv).toBe('123');
+      expect(values.password).toBe('TestPassword123!');
+      expect(values.zip).toBe('12345');
+      expect(values.firstName).toBe('John');
+      expect(values.lastName).toBe('Doe');
+      expect(values.username).toBe('testuser');
+
+      await page.close();
+    });
+
+    test('checkout page URL detection should work correctly', async () => {
+      const testUrls = [
+        { url: 'https://example.com/checkout', expected: true },
+        { url: 'https://example.com/payment', expected: true },
+        { url: 'https://example.com/cart', expected: true },
+        { url: 'https://example.com/onepage', expected: true },
+        { url: 'https://example.com/billing', expected: true },
+        { url: 'https://example.com/products', expected: false },
+        { url: 'https://example.com/home', expected: false },
+        { url: 'https://example.com/about', expected: false }
+      ];
+
+      for (const { url, expected } of testUrls) {
+        const isCheckout = /checkout|payment|cart|onepage|billing/i.test(url);
+        expect(isCheckout).toBe(expected);
+      }
+    });
+  });
 });

@@ -531,14 +531,14 @@ function generateRealisticFieldValue(fieldInfo: {
   if (fieldLower.includes('card') || fieldLower.includes('credit')) return '4532123456789012';
   if (fieldLower.includes('cvv') || fieldLower.includes('cvc') || fieldLower.includes('security')) return '123';
   if (fieldLower.includes('expir') || fieldLower.includes('exp')) return '12/26';
-  if (fieldLower.includes('name')) return 'John Doe';
   if (fieldLower.includes('first')) return 'John';
   if (fieldLower.includes('last')) return 'Doe';
+  if (fieldLower.includes('user')) return 'testuser';
+  if (fieldLower.includes('name')) return 'John Doe';
   if (fieldLower.includes('address') || fieldLower.includes('street')) return '123 Main St';
   if (fieldLower.includes('city')) return 'New York';
   if (fieldLower.includes('state')) return 'NY';
   if (fieldLower.includes('country')) return 'United States';
-  if (fieldLower.includes('user')) return 'testuser';
 
   // Type-based defaults
   if (fieldInfo.type === 'email') return 'test.user@example.com';
