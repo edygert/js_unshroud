@@ -98,6 +98,9 @@ Configuration options:
 - `enableCodeExecution`: Capture eval(), Function(), and dynamic code execution (default: `true`)
 - `enableEncoding`: Capture atob/btoa, fromCharCode, URI encoding/decoding (default: `true`)
 - `enableCryptoJS`: Capture CryptoJS library encryption/decryption (AES, DES, TripleDES, RC4, Rabbit) (default: `true`)
+- `enableWorkers`: Capture Web Worker and SharedWorker creation, messaging, and errors (default: `false`)
+- `enableModules`: Capture ES module script injection via `<script type="module">` (default: `false`)
+- `enableIframes`: Capture iframe creation, srcdoc injection, and embedded scripts (default: `false`)
 
 **Output Configuration:**
 - `outputMode`: Output destination - `'file'`, `'udp'`, or `'both'` (default: `'file'`)
@@ -146,7 +149,24 @@ When `enableHeadlessMitigation` is enabled, js_unshroud applies countermeasures 
 - `navigator.webdriver` returns `false` instead of `true`
 - `navigator.hardwareConcurrency` returns realistic values (8 cores)
 - `navigator.deviceMemory` returns realistic values (8GB)
-- `navigator.plugins` provides fake plugin entries
+- `navigator.plugins` provides fake Chrome PDF plugin entries
+- `navigator.languages` returns `['en-US', 'en']` instead of empty/single-entry array
+- `navigator.language` returns `'en-US'`
+- `navigator.platform` returns `'Win32'` for Windows desktop
+- `navigator.vendor` returns `'Google Inc.'` for Chrome branding
+- `navigator.maxTouchPoints` returns `0` for desktop (non-touch)
+- `navigator.pdfViewerEnabled` returns `true` matching Chrome PDF support
+- `navigator.cookieEnabled` returns `true`
+- `navigator.userAgent` returns realistic Chrome user agent string (spoofs HeadlessChrome)
+- `navigator.mimeTypes` provides fake MIME types matching plugin list (PDF, NaCl)
+
+### Browser Object Model (BOM) Spoofing
+- `window.chrome` object injected with realistic properties:
+  - `chrome.runtime` - Empty object for extension APIs
+  - `chrome.loadTimes()` - Returns realistic page load timing data
+  - `chrome.csi()` - Returns Chrome Speed Index metrics
+  - `chrome.app` - Empty object for Chrome app APIs
+- `Notification.permission` returns `'default'` instead of undefined
 
 ### Permission Overrides
 Intercepts permission queries to return "granted" instead of denying common permissions that indicate headless operation.
@@ -217,11 +237,17 @@ The excluded files include:
 - `dom-hooks.js` - DOM mutation tracking
 - `fingerprinting-hooks.js` - Canvas/WebGL fingerprinting detection
 - `object-tracking.js` - Proxy-based object monitoring
-- `headless-mitigation.js` - Browser evasion techniques
+- `headless-mitigation.js` - Browser evasion techniques (navigator overrides, BOM spoofing, fingerprinting mitigation)
 - `performance-monitor.js` - Event filtering and deduplication
 - `service-worker-hooks.js` - Service Worker monitoring
 - `code-execution-hooks.js` - eval/Function/dynamic code execution
 - `encoding-hooks.js` - atob/btoa/fromCharCode/URI encoding
+- `cryptojs-hooks.js` - CryptoJS encryption/decryption monitoring
+- `worker-hooks.js` - Web Worker and SharedWorker monitoring
+- `module-hooks.js` - ES module script injection detection
+- `iframe-hooks.js` - iframe creation and srcdoc monitoring
+- `blob-hooks.js` - Blob URL creation and content tracking
+- `url-execution-hooks.js` - javascript: URL execution detection
 
 All other TypeScript/JavaScript code (CLI, orchestration, analysis) runs in Node.js and contributes to coverage metrics normally.
 
@@ -455,6 +481,51 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 ```
 
 Note: For `decrypt` operations, `output` contains the decrypted plaintext. For `encrypt` operations, `output` contains the cleartext input (not the encrypted result). This allows analysts to see what data is being encrypted without storing large encrypted payloads.
+
+**Web Worker Events:**
+```json
+{
+  "id": "evt_1234567890_009",
+  "timestamp": 1640995200800,
+  "sessionId": "session_1640995200_abc123",
+  "type": "worker",
+  "eventType": "worker_create",
+  "workerType": "Worker",
+  "scriptURL": "blob:http://example.com/abc123",
+  "blobContent": "self.postMessage('malicious payload');",
+  "stackTrace": "createWorker@https://example.com/app.js:42:10"
+}
+```
+
+**ES Module Events:**
+```json
+{
+  "id": "evt_1234567890_010",
+  "timestamp": 1640995200900,
+  "sessionId": "session_1640995200_abc123",
+  "type": "module",
+  "eventType": "module_script_inject",
+  "src": "https://cdn.example.com/module.js",
+  "isInline": false,
+  "stackTrace": "loadModule@https://example.com/loader.js:15:5"
+}
+```
+
+**iframe Events:**
+```json
+{
+  "id": "evt_1234567890_011",
+  "timestamp": 1640995201000,
+  "sessionId": "session_1640995200_abc123",
+  "type": "iframe",
+  "eventType": "iframe_srcdoc_set",
+  "srcdoc": "<html><body><script>alert('XSS')</script></body></html>",
+  "scriptCount": 1,
+  "scripts": ["alert('XSS')"],
+  "element": "iframe#malicious-frame",
+  "stackTrace": "injectIframe@https://example.com/inject.js:20:3"
+}
+```
 
 **Performance Monitoring Events:**
 ```json
