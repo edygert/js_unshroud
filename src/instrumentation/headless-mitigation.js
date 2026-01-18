@@ -686,5 +686,276 @@
   }
 
 
+  // === P3.1: BROWSER OBJECT MODEL SPOOFING ===
+
+  // 1. window.chrome object - Common headless detection check
+  try {
+    if (!window.chrome) {
+      window.chrome = {
+        runtime: {},
+        loadTimes: function() {
+          return {
+            requestTime: Date.now() / 1000,
+            startLoadTime: Date.now() / 1000,
+            commitLoadTime: Date.now() / 1000,
+            finishDocumentLoadTime: Date.now() / 1000,
+            finishLoadTime: Date.now() / 1000,
+            firstPaintTime: Date.now() / 1000,
+            firstPaintAfterLoadTime: 0,
+            navigationType: 'Other',
+            wasFetchedViaSpdy: false,
+            wasNpnNegotiated: true,
+            npnNegotiatedProtocol: 'h2',
+            wasAlternateProtocolAvailable: false,
+            connectionInfo: 'h2'
+          };
+        },
+        csi: function() {
+          return {
+            startE: Date.now(),
+            onloadT: Date.now(),
+            pageT: Math.random() * 1000 + 500,
+            tran: 15
+          };
+        },
+        app: {}
+      };
+
+      logEvent({
+        type: 'headless_mitigation',
+        method: 'window.chrome',
+        operation: 'object_injection',
+        message: 'Injected fake window.chrome object',
+        timestamp: Date.now()
+      });
+    }
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not inject window.chrome:', e.message);
+  }
+
+  // 2. navigator.languages - Headless often has empty or single entry
+  try {
+    Object.defineProperty(navigator, 'languages', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.languages',
+          operation: 'value_override',
+          newValue: ['en-US', 'en'],
+          timestamp: Date.now()
+        });
+        return ['en-US', 'en'];
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.languages:', e.message);
+  }
+
+  // 3. navigator.mimeTypes - Should match fake plugins
+  try {
+    const fakeMimeTypes = [
+      {
+        type: 'application/pdf',
+        description: 'Portable Document Format',
+        suffixes: 'pdf',
+        enabledPlugin: { name: 'Chrome PDF Plugin' }
+      },
+      {
+        type: 'application/x-google-chrome-pdf',
+        description: 'Portable Document Format',
+        suffixes: 'pdf',
+        enabledPlugin: { name: 'Chrome PDF Plugin' }
+      },
+      {
+        type: 'application/x-nacl',
+        description: 'Native Client Executable',
+        suffixes: '',
+        enabledPlugin: { name: 'Native Client' }
+      },
+      {
+        type: 'application/x-pnacl',
+        description: 'Portable Native Client Executable',
+        suffixes: '',
+        enabledPlugin: { name: 'Native Client' }
+      }
+    ];
+
+    // Add length property and indexing
+    fakeMimeTypes.length = 4;
+    Object.defineProperty(navigator, 'mimeTypes', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.mimeTypes',
+          operation: 'value_override',
+          mimeTypeCount: 4,
+          timestamp: Date.now()
+        });
+        return fakeMimeTypes;
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.mimeTypes:', e.message);
+  }
+
+  // 4. navigator.vendor - Should be "Google Inc." for Chrome
+  try {
+    Object.defineProperty(navigator, 'vendor', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.vendor',
+          operation: 'value_override',
+          newValue: 'Google Inc.',
+          timestamp: Date.now()
+        });
+        return 'Google Inc.';
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.vendor:', e.message);
+  }
+
+  // 5. navigator.maxTouchPoints - Desktop should be 0
+  try {
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.maxTouchPoints',
+          operation: 'value_override',
+          newValue: 0,
+          timestamp: Date.now()
+        });
+        return 0;
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.maxTouchPoints:', e.message);
+  }
+
+  // 6. navigator.pdfViewerEnabled - Should be true for Chrome
+  try {
+    Object.defineProperty(navigator, 'pdfViewerEnabled', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.pdfViewerEnabled',
+          operation: 'value_override',
+          newValue: true,
+          timestamp: Date.now()
+        });
+        return true;
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.pdfViewerEnabled:', e.message);
+  }
+
+  // 7. navigator.cookieEnabled - Should be true
+  try {
+    Object.defineProperty(navigator, 'cookieEnabled', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.cookieEnabled',
+          operation: 'value_override',
+          newValue: true,
+          timestamp: Date.now()
+        });
+        return true;
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.cookieEnabled:', e.message);
+  }
+
+  // 8. navigator.userAgent - Override with realistic Chrome user agent
+  try {
+    const spoofedUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    Object.defineProperty(navigator, 'userAgent', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.userAgent',
+          operation: 'value_override',
+          newValue: spoofedUserAgent,
+          timestamp: Date.now()
+        });
+        return spoofedUserAgent;
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.userAgent:', e.message);
+  }
+
+  // 9. navigator.language - Should match first entry in languages
+  try {
+    Object.defineProperty(navigator, 'language', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.language',
+          operation: 'value_override',
+          newValue: 'en-US',
+          timestamp: Date.now()
+        });
+        return 'en-US';
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.language:', e.message);
+  }
+
+  // 10. navigator.platform - Should be realistic for OS
+  try {
+    Object.defineProperty(navigator, 'platform', {
+      get: function() {
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.platform',
+          operation: 'value_override',
+          newValue: 'Win32',
+          timestamp: Date.now()
+        });
+        return 'Win32';
+      },
+      configurable: true
+    });
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override navigator.platform:', e.message);
+  }
+
+  // 11. Notification.permission - Should be 'default' or 'granted'
+  try {
+    if (typeof Notification !== 'undefined') {
+      // eslint-disable-next-line no-undef
+      Object.defineProperty(Notification, 'permission', {
+        get: function() {
+          logEvent({
+            type: 'headless_mitigation',
+            method: 'Notification.permission',
+            operation: 'value_override',
+            newValue: 'default',
+            timestamp: Date.now()
+          });
+          return 'default';
+        },
+        configurable: true
+      });
+    }
+  } catch (e) {
+    console.warn('[JS Unshroud] Could not override Notification.permission:', e.message);
+  }
+
+
   console.log('[JS Unshroud] Headless mitigation hooks loaded');
 })();

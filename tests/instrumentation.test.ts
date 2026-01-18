@@ -3878,4 +3878,190 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.close();
     });
   });
+
+  // === P3.1: BROWSER OBJECT MODEL SPOOFING TESTS ===
+  describe('P3.1 Navigator Property Overrides', () => {
+    test('window.chrome object should be injected', async () => {
+      const page = await browser.newPage();
+
+      await page.addInitScript(() => {
+        (window as any).__test_log_event = () => {}; // no-op
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableHeadlessMitigation: true };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      const chromeCheck = await page.evaluate(() => {
+        const loadTimesResult = window.chrome?.loadTimes ? window.chrome.loadTimes() : null;
+        const csiResult = window.chrome?.csi ? window.chrome.csi() : null;
+
+        return {
+          hasChromeObject: typeof window.chrome === 'object',
+          hasRuntime: typeof window.chrome?.runtime === 'object',
+          hasLoadTimes: typeof window.chrome?.loadTimes === 'function',
+          hasCsi: typeof window.chrome?.csi === 'function',
+          hasApp: typeof window.chrome?.app === 'object',
+          loadTimesWorks: typeof loadTimesResult === 'object',
+          csiWorks: typeof csiResult === 'object'
+        };
+      });
+
+      expect(chromeCheck.hasChromeObject).toBe(true);
+      expect(chromeCheck.hasRuntime).toBe(true);
+      expect(chromeCheck.hasLoadTimes).toBe(true);
+      expect(chromeCheck.hasCsi).toBe(true);
+      expect(chromeCheck.hasApp).toBe(true);
+      expect(chromeCheck.loadTimesWorks).toBe(true);
+      expect(chromeCheck.csiWorks).toBe(true);
+
+      await page.close();
+    });
+
+    test('navigator.languages should return realistic array', async () => {
+      const page = await browser.newPage();
+
+      await page.addInitScript(() => {
+        (window as any).__test_log_event = () => {}; // no-op
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableHeadlessMitigation: true };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      const languages = await page.evaluate(() => navigator.languages);
+      expect(languages).toEqual(['en-US', 'en']);
+
+      await page.close();
+    });
+
+    test('navigator.mimeTypes should have realistic entries', async () => {
+      const page = await browser.newPage();
+
+      await page.addInitScript(() => {
+        (window as any).__test_log_event = () => {}; // no-op
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableHeadlessMitigation: true };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      const mimeTypesCheck = await page.evaluate(() => {
+        const types = [];
+        for (let i = 0; i < navigator.mimeTypes.length; i++) {
+          const mimeType = navigator.mimeTypes[i];
+          if (mimeType) {
+            types.push({
+              type: mimeType.type,
+              description: mimeType.description
+            });
+          }
+        }
+        return {
+          length: navigator.mimeTypes.length,
+          types: types,
+          hasPdf: types.some(m => m.type.includes('pdf'))
+        };
+      });
+
+      expect(mimeTypesCheck.length).toBeGreaterThan(0);
+      expect(mimeTypesCheck.hasPdf).toBe(true);
+      expect(mimeTypesCheck.types.some(m => m.type === 'application/pdf')).toBe(true);
+
+      await page.close();
+    });
+
+    test('navigator.vendor should return "Google Inc."', async () => {
+      const page = await browser.newPage();
+
+      await page.addInitScript(() => {
+        (window as any).__test_log_event = () => {}; // no-op
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableHeadlessMitigation: true };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      const vendor = await page.evaluate(() => navigator.vendor);
+      expect(vendor).toBe('Google Inc.');
+
+      await page.close();
+    });
+
+    test('all navigator overrides should work together', async () => {
+      const page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableHeadlessMitigation: true };
+        window.__js_unshroud_session_id = 'test-session';
+      });
+
+      await page.addInitScript(headlessMitigationScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      // Access all the properties to trigger logging
+      const results = await page.evaluate(() => {
+        return {
+          languages: navigator.languages,
+          vendor: navigator.vendor,
+          maxTouchPoints: navigator.maxTouchPoints,
+          pdfViewerEnabled: navigator.pdfViewerEnabled,
+          cookieEnabled: navigator.cookieEnabled,
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform,
+          mimeTypesLength: navigator.mimeTypes.length,
+          notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : null
+        };
+      });
+
+      // Verify all properties
+      expect(results.languages).toEqual(['en-US', 'en']);
+      expect(results.vendor).toBe('Google Inc.');
+      expect(results.maxTouchPoints).toBe(0);
+      expect(results.pdfViewerEnabled).toBe(true);
+      expect(results.cookieEnabled).toBe(true);
+      expect(results.userAgent).toContain('Chrome');
+      expect(results.userAgent).not.toContain('HeadlessChrome');
+      expect(results.language).toBe('en-US');
+      expect(results.platform).toBe('Win32');
+      expect(results.mimeTypesLength).toBeGreaterThan(0);
+
+      await page.waitForTimeout(500);
+
+      const mitigationEvents = events.filter(e => e.type === 'headless_mitigation');
+      expect(mitigationEvents.length).toBeGreaterThan(8);
+
+      await page.close();
+    });
+  });
 });
