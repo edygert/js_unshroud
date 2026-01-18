@@ -170,6 +170,28 @@ export interface EncodingEvent extends BaseEvent {
   error?: string;
 }
 
+export interface ScriptInjectionEvent extends BaseEvent {
+  type: 'script_injection';
+  method: 'innerHTML' | 'outerHTML' | 'insertAdjacentHTML' | 'document.write' | 'document.writeln' |
+          'createElement' | 'setAttribute' | 'script.src' | 'script.textContent' | 'script.innerHTML' |
+          'appendChild' | 'insertBefore';
+  htmlContent?: string;           // Full HTML content for innerHTML/outerHTML/insertAdjacentHTML/document.write
+  htmlLength?: number;            // Length of HTML content
+  containsScriptTag?: boolean;    // Does HTML contain <script> tags?
+  scriptTagCount?: number;        // Number of <script> tags found
+  scriptSources?: string[];       // Array of script src URLs found in HTML
+  containsEventHandlers?: boolean; // Does HTML contain event handler attributes (on*)?
+  eventHandlerTypes?: string[];   // Array of event handler types (onclick, onerror, etc.)
+  scriptSrc?: string;             // Script element src URL (for createElement/appendChild)
+  scriptContent?: string;         // Inline script content (for createElement/appendChild)
+  isDataUrl?: boolean;            // Is src a data: URL?
+  isBlobUrl?: boolean;            // Is src a blob: URL?
+  decodedContent?: string;        // Decoded content from data: URL
+  attributeName?: string;         // Attribute name for setAttribute
+  attributeValue?: string;        // Attribute value for setAttribute
+  targetSelector?: string;        // CSS selector of target element
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -184,7 +206,8 @@ export type MonitoringEvent =
   | PerformanceWarningEvent
   | ServiceWorkerEvent
   | CodeExecutionEvent
-  | EncodingEvent;
+  | EncodingEvent
+  | ScriptInjectionEvent;
 
 export interface SessionConfig {
   id: string;

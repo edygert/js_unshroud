@@ -118,6 +118,12 @@ export class TimelineFormatter {
         return `Encoding: ${encEvent.method}.${encEvent.operation} -> ${encEvent.output.slice(0, 30)}...`;
       }
 
+      case 'script_injection': {
+        const siEvent = event;
+        const scriptInfo = siEvent.scriptSrc ?? siEvent.scriptContent ?? siEvent.htmlContent ?? '';
+        return `Script Injection: ${siEvent.method} (${scriptInfo.slice(0, 50)}...)`;
+      }
+
       default:
         return `${(event as BaseEvent).type} event`;
     }

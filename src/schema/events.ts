@@ -16,7 +16,8 @@ const EVENT_TYPES = [
   'performance_warning',
   'service_worker',
   'code_execution',
-  'encoding'
+  'encoding',
+  'script_injection'
 ] as const satisfies readonly MonitoringEvent['type'][];
 
 function isValidEventType(type: string): type is MonitoringEvent['type'] {
