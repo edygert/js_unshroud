@@ -123,15 +123,25 @@
         return originalPostMessage.call(this, message, transfer);
       };
 
-      // Wrap onmessage setter
-      let onmessageHandler = null;
+      // Wrap onmessage setter - must call native setter to connect to browser's event system
+      const originalOnmessageDescriptor = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(worker),
+        'onmessage'
+      ) || Object.getOwnPropertyDescriptor(worker, 'onmessage');
+
+      const nativeOnmessageSetter = originalOnmessageDescriptor?.set;
+      const nativeOnmessageGetter = originalOnmessageDescriptor?.get;
+
       Object.defineProperty(worker, 'onmessage', {
         get: function() {
-          return onmessageHandler;
+          if (nativeOnmessageGetter) {
+            return nativeOnmessageGetter.call(this);
+          }
+          return null;
         },
         set: function(handler) {
           if (handler && typeof handler === 'function') {
-            onmessageHandler = function(event) {
+            const wrappedHandler = function(event) {
               try {
                 // Log message FROM worker
                 logWorkerEvent(
@@ -149,8 +159,16 @@
 
               return handler.call(this, event);
             };
+
+            // Set wrapped handler using native setter (connects to browser's event system)
+            if (nativeOnmessageSetter) {
+              nativeOnmessageSetter.call(this, wrappedHandler);
+            }
           } else {
-            onmessageHandler = handler;
+            // Setting to null/undefined
+            if (nativeOnmessageSetter) {
+              nativeOnmessageSetter.call(this, handler);
+            }
           }
         },
         enumerable: true,
@@ -186,15 +204,25 @@
         return originalAddEventListener.call(this, type, listener, options);
       };
 
-      // Wrap onerror setter
-      let onerrorHandler = null;
+      // Wrap onerror setter - must call native setter to connect to browser's event system
+      const originalOnerrorDescriptor = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(worker),
+        'onerror'
+      ) || Object.getOwnPropertyDescriptor(worker, 'onerror');
+
+      const nativeOnerrorSetter = originalOnerrorDescriptor?.set;
+      const nativeOnerrorGetter = originalOnerrorDescriptor?.get;
+
       Object.defineProperty(worker, 'onerror', {
         get: function() {
-          return onerrorHandler;
+          if (nativeOnerrorGetter) {
+            return nativeOnerrorGetter.call(this);
+          }
+          return null;
         },
         set: function(handler) {
           if (handler && typeof handler === 'function') {
-            onerrorHandler = function(event) {
+            const wrappedHandler = function(event) {
               try {
                 // Log worker error
                 logWorkerEvent(
@@ -212,8 +240,16 @@
 
               return handler.call(this, event);
             };
+
+            // Set wrapped handler using native setter (connects to browser's event system)
+            if (nativeOnerrorSetter) {
+              nativeOnerrorSetter.call(this, wrappedHandler);
+            }
           } else {
-            onerrorHandler = handler;
+            // Setting to null/undefined
+            if (nativeOnerrorSetter) {
+              nativeOnerrorSetter.call(this, handler);
+            }
           }
         },
         enumerable: true,

@@ -3731,11 +3731,9 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.goto('about:blank');
       await page.waitForTimeout(200);
 
-      // Create a worker that sends a message immediately
+      // Create a worker that responds to messages (no immediate postMessage to avoid race condition)
       await page.evaluate(() => {
         const workerCode = `
-          self.postMessage('worker initialized');
-
           self.addEventListener('message', function(e) {
             self.postMessage('received: ' + e.data);
           });
@@ -3749,10 +3747,8 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
           // Handler will be wrapped and logged
         };
 
-        // Send a message to trigger response
-        setTimeout(function() {
-          worker.postMessage('ping');
-        }, 100);
+        // Send a message to trigger response (handler is set first, no race condition)
+        worker.postMessage('ping');
       });
 
       await page.waitForTimeout(500);
@@ -3764,9 +3760,9 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       );
 
       expect(messageEvents.length).toBeGreaterThan(0);
-      // Should have at least the 'worker initialized' message
-      const initMessage = messageEvents.find(e => e.message?.includes('initialized'));
-      expect(initMessage).toBeDefined();
+      // Should have the echo message
+      const echoMessage = messageEvents.find(e => e.message?.includes('received'));
+      expect(echoMessage).toBeDefined();
 
       await page.close();
     });
@@ -3797,10 +3793,14 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.goto('about:blank');
       await page.waitForTimeout(200);
 
-      // Create a worker that throws an error
+      // Create a worker that throws an error when triggered (no immediate throw to avoid race condition)
       await page.evaluate(() => {
         const workerCode = `
-          throw new Error('Test worker error');
+          self.addEventListener('message', function(e) {
+            if (e.data === 'trigger_error') {
+              throw new Error('Test worker error');
+            }
+          });
         `;
 
         const blob = new Blob([workerCode], { type: 'application/javascript' });
@@ -3811,6 +3811,9 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
           // Error handler will be wrapped and logged
           e.preventDefault(); // Prevent error from propagating to console
         };
+
+        // Trigger error AFTER handler is set (no race condition)
+        worker.postMessage('trigger_error');
       });
 
       await page.waitForTimeout(500);
@@ -4167,10 +4170,12 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
     test('should NOT trigger checkout skimmer on non-checkout URLs', async () => {
       const page = await browser.newPage();
 
-      // Navigate WITHOUT checkout keyword in URL
-      await page.goto(`file://${__dirname}/fixtures/checkout-skimmer-test.html`, {
-        waitUntil: 'load'
-      });
+      // Navigate to a non-checkout URL (important: URL must NOT contain checkout/payment/cart/billing)
+      await page.goto('https://example.com/products/item-123');
+
+      // Inject the skimmer HTML via setContent (now window.location.href is example.com/products, not checkout)
+      const html = readFileSync(join(__dirname, 'fixtures/checkout-skimmer-test.html'), 'utf-8');
+      await page.setContent(html, { waitUntil: 'load' });
 
       // Wait for DOM to be ready and script to execute
       await page.waitForSelector('#result');
