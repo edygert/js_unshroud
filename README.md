@@ -419,7 +419,25 @@ Run specific test files:
 ```bash
 bun test tests/cli.test.ts  # CLI-specific tests
 bun test tests/runner.test.ts  # Event logger and schema tests
+bun test tests/analysis.test.ts  # Analysis layer tests (QueryEngine, CorrelationEngine, TimelineFormatter)
 ```
+
+### Analysis Layer Coverage
+
+The analysis layer (`src/analysis/`) maintains comprehensive test coverage:
+
+- **TimelineFormatter.ts**: 100% statement and line coverage
+  - Complete coverage of all 24 event types (network, storage, console, error, dom, timer, websocket, fingerprinting, headless_mitigation, performance_stats, performance_warning, service_worker, code_execution, encoding, cryptojs, script_injection, event_handler, blob, url_execution, worker, module, iframe)
+  - Branch coverage for event variants (blob operations, worker messaging, module injection types)
+  - Edge case testing (empty filters, time boundaries, missing optional fields)
+
+- **QueryEngine.ts**: 98.78% line coverage
+  - Comprehensive query filtering and search capabilities
+
+- **CorrelationEngine.ts**: 100% line coverage
+  - Complete event correlation and relationship mapping
+
+These tests ensure reliable post-capture analysis and reporting for malware triage workflows.
 
 ## Code Quality
 

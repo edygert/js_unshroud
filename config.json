@@ -10,7 +10,7 @@
   "enableDOM": false,
   "enableFingerprinting": false,
   "enableObjectTracking": false,
-  "enableHeadlessMitigation": false,
+  "enableHeadlessMitigation": true,
   "enableServiceWorker": false,
   "enableCodeExecution": true,
   "enableEncoding": false,
