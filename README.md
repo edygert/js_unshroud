@@ -49,11 +49,77 @@ bun run dev
 bun run dev --url https://example.com --out events.jsonl
 ```
 
-### Command-line options
+### Capture command options
 
 - `--url <url>`: Required. The URL to monitor
 - `--out <path>`: Required. Output file path (will be in JSONL format)
 - `--config <path>`: Optional. Path to instrumentation configuration JSON file
+
+## Analyzing Captured Events
+
+After capturing events, use the `analyze` subcommand to generate human-readable reports from the JSONL output.
+
+### Usage
+
+```bash
+js_unshroud analyze --input <events.jsonl> [options]
+```
+
+### Analyze command options
+
+**Required:**
+- `--input <file>`: Path to JSONL events file
+
+**Optional:**
+- `--format <text|json|stats>`: Output format (default: `text`)
+  - `text`: Human-readable timeline with timestamps and event summaries
+  - `json`: Structured JSON output for programmatic consumption
+  - `stats`: Event statistics summary (counts, time span, breakdown)
+- `--output <file>`: Write to file instead of stdout (default: stdout)
+
+### Examples
+
+```bash
+# Capture events
+js_unshroud --url https://example.com --out events.jsonl
+
+# Analyze: human-readable timeline to stdout
+js_unshroud analyze --input events.jsonl
+
+# Analyze: JSON format to file
+js_unshroud analyze --input events.jsonl --format json --output timeline.json
+
+# Analyze: statistics summary
+js_unshroud analyze --input events.jsonl --format stats
+
+# Pipeline-friendly: search for network events
+js_unshroud analyze --input events.jsonl | grep "GET"
+
+# Capture and analyze in sequence
+js_unshroud --url https://example.com --out events.jsonl && \
+  js_unshroud analyze --input events.jsonl --format stats
+```
+
+### Workflow
+
+**Typical malware analysis workflow:**
+
+1. **Capture** - Monitor JavaScript execution and capture events:
+   ```bash
+   js_unshroud --url https://malicious-site.com --out malware.jsonl
+   ```
+
+2. **Analyze** - Generate timeline to understand attack flow:
+   ```bash
+   js_unshroud analyze --input malware.jsonl
+   ```
+
+3. **Triage** - Get statistics to identify suspicious patterns:
+   ```bash
+   js_unshroud analyze --input malware.jsonl --format stats
+   ```
+
+The analyzer supports all 24 event types captured by the tool, including code execution, network requests, cryptographic operations, and advanced attack patterns.
 
 ### Configuration
 

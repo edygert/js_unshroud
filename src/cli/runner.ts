@@ -63,7 +63,9 @@ function parseArgs(): Args {
   }
 
   if (!url || !out) {
-    console.error('Usage: js_unshroud run --url <url> --out <output.jsonl> [--config <config.json>]');
+    console.error('Usage:');
+    console.error('  Capture: js_unshroud [run] --url <url> --out <output.jsonl> [--config <config.json>]');
+    console.error('  Analyze: js_unshroud analyze --input <events.jsonl> [--format text|json|stats] [--output <file>]');
     process.exit(1);
   }
 
@@ -1031,12 +1033,23 @@ async function runMonitoring(args: Args): Promise<void> {
 }
 
 async function main() {
-  const args = parseArgs();
+  const subcommand = process.argv[2];
 
-  try {
-    await runMonitoring(args);
-  } catch (error) {
-    console.error('Error during monitoring:', error);
+  if (subcommand === 'analyze') {
+    const { runAnalyze } = await import('./analyze.ts');
+    await runAnalyze();
+  } else {
+    // Support both direct flags and optional "run" subcommand
+    if (subcommand === 'run') {
+      process.argv.splice(2, 1); // Remove "run" keyword
+    }
+    const args = parseArgs();
+
+    try {
+      await runMonitoring(args);
+    } catch (error) {
+      console.error('Error during monitoring:', error);
+    }
   }
 }
 

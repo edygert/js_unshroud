@@ -41,10 +41,10 @@ describe('CLI Argument Parsing', () => {
     const originalExit = process.exit;
     const originalError = console.error;
     let exitCode: number | undefined;
-    let errorMessage = '';
+    const errorMessages: string[] = [];
 
     console.error = (message: string) => {
-      errorMessage = message;
+      errorMessages.push(message);
     };
 
     process.exit = ((code?: number) => {
@@ -54,7 +54,7 @@ describe('CLI Argument Parsing', () => {
 
     expect(() => parseArgs()).toThrow('Process exit');
     expect(exitCode).toBe(1);
-    expect(errorMessage).toContain('Usage:');
+    expect(errorMessages.join('\n')).toContain('Usage:');
 
     // Restore originals
     process.exit = originalExit;
@@ -67,10 +67,10 @@ describe('CLI Argument Parsing', () => {
     const originalExit = process.exit;
     const originalError = console.error;
     let exitCode: number | undefined;
-    let errorMessage = '';
+    const errorMessages: string[] = [];
 
     console.error = (message: string) => {
-      errorMessage = message;
+      errorMessages.push(message);
     };
 
     process.exit = ((code?: number) => {
@@ -80,7 +80,7 @@ describe('CLI Argument Parsing', () => {
 
     expect(() => parseArgs()).toThrow('Process exit');
     expect(exitCode).toBe(1);
-    expect(errorMessage).toContain('Usage:');
+    expect(errorMessages.join('\n')).toContain('Usage:');
 
     process.exit = originalExit;
     console.error = originalError;
