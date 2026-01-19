@@ -134,22 +134,148 @@ describe('runMonitoring Function', () => {
 });
 
 describe('Main Function Entry Point', () => {
+  let tempOutputFile: string;
+
+  beforeEach(() => {
+    tempOutputFile = `/tmp/main-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+  });
+
+  afterEach(() => {
+    try {
+      if (tempOutputFile && existsSync(tempOutputFile)) {
+        unlinkSync(tempOutputFile);
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
   test('should handle errors in monitoring gracefully', async () => {
     // Note: We can't easily test the main() function directly since it calls
     // process.exit(), but we can test runMonitoring which main() calls
     const args = {
       url: 'http://invalid-url-that-will-fail.test',
-      out: `/tmp/main-test-${Date.now()}.jsonl`,
+      out: tempOutputFile,
       config: undefined
     };
 
     await expect(runMonitoring(args)).rejects.toThrow();
+  }, 15000);
 
-    // Clean up
-    try {
-      unlinkSync(args.out);
-    } catch {
-      // Ignore
-    }
+  test('should execute with headless mitigation enabled', async () => {
+    const args = {
+      url: `file://${resolve('test_monitoring.html')}`,
+      out: tempOutputFile,
+      config: {
+        enableHeadlessMitigation: true,
+        monitoringTimeoutSeconds: 5
+      }
+    };
+
+    await runMonitoring(args);
+
+    expect(existsSync(tempOutputFile)).toBe(true);
+
+    const loggedData = readFileSync(tempOutputFile, 'utf-8');
+    const events = loggedData.trim().split('\n').map(line => JSON.parse(line));
+
+    expect(events.length).toBeGreaterThan(0);
+
+    // Should have headless_mitigation events
+    const mitigationEvents = events.filter(e => e.type === 'headless_mitigation');
+    expect(mitigationEvents.length).toBeGreaterThan(0);
+  }, 20000);
+
+  test('should execute with UDP logging enabled', async () => {
+    const args = {
+      url: `file://${resolve('test_monitoring.html')}`,
+      out: tempOutputFile,
+      config: {
+        outputMode: 'both' as const,
+        udpLogging: {
+          enabled: true,
+          host: '127.0.0.1',
+          port: 9999 // Use non-standard port that likely won't have anything listening
+        },
+        monitoringTimeoutSeconds: 3
+      }
+    };
+
+    // Should not throw even if UDP send fails
+    await runMonitoring(args);
+
+    expect(existsSync(tempOutputFile)).toBe(true);
+  }, 15000);
+
+  test('should execute with all instrumentation features enabled', async () => {
+    const args = {
+      url: `file://${resolve('test_monitoring.html')}`,
+      out: tempOutputFile,
+      config: {
+        enableHeadlessMitigation: true,
+        enableServiceWorker: true,
+        enableFingerprinting: true,
+        enableObjectTracking: true,
+        enableCodeExecution: true,
+        enableEncoding: true,
+        enableCryptoJS: true,
+        enableWorkers: true,
+        enableModules: true,
+        enableIframes: true,
+        monitoringTimeoutSeconds: 5
+      }
+    };
+
+    await runMonitoring(args);
+
+    expect(existsSync(tempOutputFile)).toBe(true);
+
+    const loggedData = readFileSync(tempOutputFile, 'utf-8');
+    const events = loggedData.trim().split('\n').map(line => JSON.parse(line));
+
+    expect(events.length).toBeGreaterThan(0);
+  }, 20000);
+
+  test('should execute with custom monitoring timeout', async () => {
+    const args = {
+      url: `file://${resolve('test_monitoring.html')}`,
+      out: tempOutputFile,
+      config: {
+        monitoringTimeoutSeconds: 2
+      }
+    };
+
+    await runMonitoring(args);
+
+    expect(existsSync(tempOutputFile)).toBe(true);
+
+    const loggedData = readFileSync(tempOutputFile, 'utf-8');
+    const events = loggedData.trim().split('\n').map(line => JSON.parse(line));
+
+    // Should have captured events even with short timeout
+    expect(events.length).toBeGreaterThan(0);
+  }, 15000);
+
+  test('should execute with performance tuning configuration', async () => {
+    const args = {
+      url: `file://${resolve('test_monitoring.html')}`,
+      out: tempOutputFile,
+      config: {
+        dedupeWindowMs: 200,
+        maxPayloadSize: 1024,
+        maxStackDepth: 10,
+        enableDeduplication: true,
+        monitoringTimeoutSeconds: 3
+      }
+    };
+
+    await runMonitoring(args);
+
+    expect(existsSync(tempOutputFile)).toBe(true);
+
+    const loggedData = readFileSync(tempOutputFile, 'utf-8');
+    const events = loggedData.trim().split('\n').map(line => JSON.parse(line));
+
+    expect(events.length).toBeGreaterThan(0);
   }, 15000);
 });

@@ -303,6 +303,21 @@ export interface UDPLoggingConfig {
   port: number;    // Port, e.g., 514 (syslog) or custom port
 }
 
+export interface EventFilteringConfig {
+  dom?: {
+    enableLoadEvents?: boolean;        // load, DOMContentLoaded events
+    enableMouseEvents?: boolean;        // mouseover, mouseout, pointermove
+    enablePageLifecycle?: boolean;      // pageshow, pagehide, visibilitychange
+    enableInteractionEvents?: boolean;  // click, submit, keydown, focus, blur
+    enableMutationEvents?: boolean;     // appendChild, innerHTML, etc.
+  };
+  encoding?: {
+    enableAtobBtoa?: boolean;          // Base64 encode/decode
+    enableFromCharCode?: boolean;       // Character code conversion
+    enableURIEncoding?: boolean;        // URI encode/decode
+  };
+}
+
 export interface InstrumentationConfig {
   enableConsole: boolean;
   enableNetwork: boolean;
@@ -345,4 +360,7 @@ export interface InstrumentationConfig {
   // Output configuration
   outputMode?: 'file' | 'udp' | 'both';  // Default: 'file'
   udpLogging?: UDPLoggingConfig;
+
+  // Event filtering configuration (P4.1) - Reduce noise during malware triage
+  eventFiltering?: EventFilteringConfig;
 }

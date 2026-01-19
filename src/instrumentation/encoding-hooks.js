@@ -49,8 +49,42 @@
     return start + '...' + end;
   };
 
+  // === ENCODING EVENT FILTERING (P4.1) ===
+
+  function shouldLogEncodingEvent(method) {
+    const config = window.__js_unshroud_config;
+    if (!config || !config.eventFiltering || !config.eventFiltering.encoding) {
+      return true; // No filtering config, log everything
+    }
+
+    const encodingConfig = config.eventFiltering.encoding;
+
+    // Base64 encoding/decoding
+    if (method === 'atob' || method === 'btoa') {
+      return encodingConfig.enableAtobBtoa === true;
+    }
+
+    // Character code conversion
+    if (method === 'fromCharCode' || method === 'fromCodePoint') {
+      return encodingConfig.enableFromCharCode === true;
+    }
+
+    // URI encoding/decoding
+    if (['encodeURI', 'decodeURI', 'encodeURIComponent',
+         'decodeURIComponent', 'escape', 'unescape'].indexOf(method) !== -1) {
+      return encodingConfig.enableURIEncoding === true;
+    }
+
+    return true; // Log unknown methods
+  }
+
   // Log encoding event AFTER execution
   const logEncodingEvent = function(method, operation, output, outputLength, success, error) {
+    // Check if we should log this encoding event
+    if (!shouldLogEncodingEvent(method)) {
+      return;
+    }
+
     if (typeof window.__js_unshroud_log === 'function') {
       window.__js_unshroud_log(JSON.stringify({
         id: generateEventId(),

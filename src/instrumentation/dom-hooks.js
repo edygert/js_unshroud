@@ -76,6 +76,61 @@
     return '<function>';
   };
 
+  // === DOM EVENT FILTERING (P4.1) ===
+
+  const DOM_EVENT_CATEGORIES = {
+    load: ['load', 'DOMContentLoaded', 'beforeunload', 'unload'],
+    mouse: ['mouseover', 'mouseout', 'mousemove', 'pointermove', 'mouseenter',
+            'mouseleave', 'pointerover', 'pointerout'],
+    lifecycle: ['pageshow', 'pagehide', 'visibilitychange', 'freeze', 'resume'],
+    interaction: ['click', 'dblclick', 'submit', 'focus', 'blur', 'focusin',
+                  'focusout', 'keydown', 'keyup', 'keypress', 'input', 'change'],
+    mutation: ['appendChild', 'insertBefore', 'removeChild', 'replaceChild',
+               'innerHTML', 'outerHTML', 'insertAdjacentHTML']
+  };
+
+  function shouldLogDomEvent(eventType, operation) {
+    // ALWAYS log addEventListener (malware registering handlers - critical signal)
+    if (operation === 'addEventListener') {
+      return true;
+    }
+
+    // NEVER log removeEventListener (cleanup noise)
+    if (operation === 'removeEventListener') {
+      return false;
+    }
+
+    const config = window.__js_unshroud_config;
+    if (!config || !config.eventFiltering || !config.eventFiltering.dom) {
+      return true; // No filtering config, log everything
+    }
+
+    const domConfig = config.eventFiltering.dom;
+
+    // Check mutation operations
+    if (operation && DOM_EVENT_CATEGORIES.mutation.includes(operation)) {
+      return domConfig.enableMutationEvents === true;
+    }
+
+    // For eventFired, apply category filtering based on eventType
+    if (eventType) {
+      if (DOM_EVENT_CATEGORIES.load.includes(eventType)) {
+        return domConfig.enableLoadEvents === true;
+      }
+      if (DOM_EVENT_CATEGORIES.mouse.includes(eventType)) {
+        return domConfig.enableMouseEvents === true;
+      }
+      if (DOM_EVENT_CATEGORIES.lifecycle.includes(eventType)) {
+        return domConfig.enablePageLifecycle === true;
+      }
+      if (DOM_EVENT_CATEGORIES.interaction.includes(eventType)) {
+        return domConfig.enableInteractionEvents === true;
+      }
+    }
+
+    return true; // Log unknown event types
+  }
+
   // === HTML ANALYSIS UTILITIES FOR SCRIPT INJECTION DETECTION ===
 
   // Analyze HTML for <script> tags and extract src attributes
@@ -205,30 +260,36 @@
       const listenerStr = getListenerString(listener);
       const targetSelector = getElementSelector(this);
 
-      logEvent({
-        type: 'dom',
-        eventType: type,
-        targetSelector: targetSelector,
-        operation: 'addEventListener',
-        listener: listenerStr,
-        options: options,
-        timestamp: Date.now()
-      });
-
-      // Create wrapped listener that logs when event fires
-      const wrappedListener = function(event) {
+      // Check if we should log addEventListener (always true per filtering logic)
+      if (shouldLogDomEvent(type, 'addEventListener')) {
         logEvent({
           type: 'dom',
           eventType: type,
           targetSelector: targetSelector,
-          operation: 'eventFired',
-          bubble: event.bubbles,
-          cancelable: event.cancelable,
-          defaultPrevented: event.defaultPrevented,
-          composed: event.composed,
-          eventPhase: event.eventPhase === 1 ? 'capture' : event.eventPhase === 2 ? 'target' : event.eventPhase === 3 ? 'bubble' : 'unknown',
+          operation: 'addEventListener',
+          listener: listenerStr,
+          options: options,
           timestamp: Date.now()
         });
+      }
+
+      // Create wrapped listener that logs when event fires
+      const wrappedListener = function(event) {
+        // Check if we should log eventFired (filtered by category)
+        if (shouldLogDomEvent(type, 'eventFired')) {
+          logEvent({
+            type: 'dom',
+            eventType: type,
+            targetSelector: targetSelector,
+            operation: 'eventFired',
+            bubble: event.bubbles,
+            cancelable: event.cancelable,
+            defaultPrevented: event.defaultPrevented,
+            composed: event.composed,
+            eventPhase: event.eventPhase === 1 ? 'capture' : event.eventPhase === 2 ? 'target' : event.eventPhase === 3 ? 'bubble' : 'unknown',
+            timestamp: Date.now()
+          });
+        }
 
         // Call original listener
         return listener.apply(this, arguments);
@@ -252,13 +313,16 @@
     window.EventTarget.prototype.removeEventListener = function(type, listener, options) {
       const targetSelector = getElementSelector(this);
 
-      logEvent({
-        type: 'dom',
-        eventType: type,
-        targetSelector: targetSelector,
-        operation: 'removeEventListener',
-        timestamp: Date.now()
-      });
+      // Check if we should log removeEventListener (always false per filtering logic)
+      if (shouldLogDomEvent(type, 'removeEventListener')) {
+        logEvent({
+          type: 'dom',
+          eventType: type,
+          targetSelector: targetSelector,
+          operation: 'removeEventListener',
+          timestamp: Date.now()
+        });
+      }
 
       // Try to find and remove from our tracking
       if (this.__js_unshroud_listeners) {
@@ -329,15 +393,18 @@
           }
         }
 
-        // Always log basic DOM mutation
-        logEvent({
-          type: 'dom',
-          operation: name,
-          targetSelector: targetSelector,
-          addedNode: addedSelector,
-          removedNode: removedSelector,
-          timestamp: Date.now()
-        });
+        // Always log basic DOM mutation (subject to filtering)
+        if (shouldLogDomEvent(null, name)) {
+          logEvent({
+            type: 'dom',
+            eventType: name,
+            operation: name,
+            targetSelector: targetSelector,
+            addedNode: addedSelector,
+            removedNode: removedSelector,
+            timestamp: Date.now()
+          });
+        }
 
         return originalMethod.apply(this, arguments);
       };
@@ -374,14 +441,17 @@
             timestamp: Date.now()
           });
         } else {
-          // Basic DOM event for non-injection innerHTML
-          logEvent({
-            type: 'dom',
-            operation: 'innerHTML',
-            targetSelector: targetSelector,
-            valueLength: htmlContent.length,
-            timestamp: Date.now()
-          });
+          // Basic DOM event for non-injection innerHTML (subject to filtering)
+          if (shouldLogDomEvent(null, 'innerHTML')) {
+            logEvent({
+              type: 'dom',
+              eventType: 'innerHTML',
+              operation: 'innerHTML',
+              targetSelector: targetSelector,
+              valueLength: htmlContent.length,
+              timestamp: Date.now()
+            });
+          }
         }
 
         originalSetter.call(this, value);
@@ -420,14 +490,17 @@
             timestamp: Date.now()
           });
         } else {
-          // Basic DOM event for non-injection outerHTML
-          logEvent({
-            type: 'dom',
-            operation: 'outerHTML',
-            targetSelector: targetSelector,
-            valueLength: htmlContent.length,
-            timestamp: Date.now()
-          });
+          // Basic DOM event for non-injection outerHTML (subject to filtering)
+          if (shouldLogDomEvent(null, 'outerHTML')) {
+            logEvent({
+              type: 'dom',
+              eventType: 'outerHTML',
+              operation: 'outerHTML',
+              targetSelector: targetSelector,
+              valueLength: htmlContent.length,
+              timestamp: Date.now()
+            });
+          }
         }
 
         originalOuterHTMLSetter.call(this, value);
@@ -462,13 +535,17 @@
           timestamp: Date.now()
         });
       } else {
-        logEvent({
-          type: 'dom',
-          operation: 'insertAdjacentHTML',
-          targetSelector: targetSelector,
-          valueLength: htmlContent.length,
-          timestamp: Date.now()
-        });
+        // Basic DOM event for non-injection insertAdjacentHTML (subject to filtering)
+        if (shouldLogDomEvent(null, 'insertAdjacentHTML')) {
+          logEvent({
+            type: 'dom',
+            eventType: 'insertAdjacentHTML',
+            operation: 'insertAdjacentHTML',
+            targetSelector: targetSelector,
+            valueLength: htmlContent.length,
+            timestamp: Date.now()
+          });
+        }
       }
 
       return originalInsertAdjacentHTML.call(this, position, html);

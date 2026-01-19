@@ -128,6 +128,67 @@ Configuration options:
 - `maxStackDepth`: Maximum stack trace depth for captured events (default: `20`)
 - `enableDeduplication`: Enable/disable event deduplication (default: `true`)
 
+**Event Filtering (P4.1) - Reduce Noise for Malware Triage:**
+
+Control which events are logged to reduce noise when analyzing sites for triage. Defaults are optimized to filter benign site noise while preserving malware-relevant signals.
+
+DOM event filtering (`eventFiltering.dom`):
+- `enableLoadEvents`: Log resource load events (images, scripts, iframes) (default: `false`)
+- `enableMouseEvents`: Log mouse movement and hover events (default: `false`)
+- `enablePageLifecycle`: Log page navigation lifecycle events (pageshow, pagehide, visibilitychange) (default: `false`)
+- `enableInteractionEvents`: Log user interaction event firings (click, keydown, submit, focus, blur) (default: `false`)
+  - Note: `addEventListener` registrations are ALWAYS logged (critical malware signal), regardless of this setting
+  - This setting only filters the individual event firings (noise from simulation/user)
+- `enableMutationEvents`: Log DOM mutations (appendChild, innerHTML, etc.) (default: `false`)
+  - Note: Script injections are always captured via `script_injection` events regardless of this setting
+
+Encoding event filtering (`eventFiltering.encoding`):
+- `enableAtobBtoa`: Log Base64 encoding/decoding (atob, btoa) (default: `false`)
+  - Base64 is ubiquitous on modern web (data URIs, API responses) - disable for triage
+- `enableFromCharCode`: Log character code conversion (String.fromCharCode) (default: `true`)
+  - More suspicious, commonly used in obfuscation
+- `enableURIEncoding`: Log URI encoding/decoding (encodeURI, decodeURIComponent, etc.) (default: `false`)
+
+Example configuration for aggressive noise filtering (recommended for triage):
+```json
+{
+  "eventFiltering": {
+    "dom": {
+      "enableLoadEvents": false,
+      "enableMouseEvents": false,
+      "enablePageLifecycle": false,
+      "enableInteractionEvents": false,
+      "enableMutationEvents": false
+    },
+    "encoding": {
+      "enableAtobBtoa": false,
+      "enableFromCharCode": true,
+      "enableURIEncoding": false
+    }
+  }
+}
+```
+
+Example configuration for comprehensive capture (no filtering):
+```json
+{
+  "eventFiltering": {
+    "dom": {
+      "enableLoadEvents": true,
+      "enableMouseEvents": true,
+      "enablePageLifecycle": true,
+      "enableInteractionEvents": true,
+      "enableMutationEvents": true
+    },
+    "encoding": {
+      "enableAtobBtoa": true,
+      "enableFromCharCode": true,
+      "enableURIEncoding": true
+    }
+  }
+}
+```
+
 Create a config file `my-config.json` and run:
 
 ```bash
