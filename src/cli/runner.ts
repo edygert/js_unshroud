@@ -496,7 +496,7 @@ async function simulateRandomClick(page: Page): Promise<void> {
         }
       }
     }
-  } catch (error) {
+  } catch {
     // Element may have been removed, ignore
   }
 }
@@ -563,6 +563,7 @@ async function simulateFormInteraction(page: Page): Promise<void> {
     const formFields = await page.$$eval('input:not([type="hidden"]), textarea, select', (elements) => {
       return elements
         .map((el, idx) => {
+          // eslint-disable-next-line no-undef
           const style = window.getComputedStyle(el);
           const rect = el.getBoundingClientRect();
           const isVisible =
@@ -626,7 +627,7 @@ async function simulateFormInteraction(page: Page): Promise<void> {
       await page.keyboard.press('Tab');
       await new Promise<void>(r => setTimeout(() => r(), rand(300, 800)));
     }
-  } catch (error) {
+  } catch {
     // Form may have changed during interaction, ignore
   }
 }
@@ -657,7 +658,7 @@ async function simulateFormSubmission(page: Page): Promise<void> {
       // Wait for potential navigation/XHR
       await new Promise<void>(r => setTimeout(() => r(), rand(500, 1500)));
     }
-  } catch (error) {
+  } catch {
     // Form may have been submitted and page navigated, ignore
   }
 }
@@ -698,7 +699,7 @@ async function simulateAutofillTrigger(page: Page): Promise<void> {
         input.dispatchEvent(new Event('input', { bubbles: true }));
       });
     });
-  } catch (error) {
+  } catch {
     // Password fields may not exist, ignore
   }
 }
@@ -746,7 +747,7 @@ async function detectAndSimulateCheckoutBehavior(page: Page): Promise<boolean> {
     }
 
     return false;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -765,9 +766,9 @@ async function simulateBehavior(page: Page, config: InstrumentationConfig, durat
     return;
   }
 
-  const viewport = page.viewportSize() || { width: 1280, height: 720 };
+  const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
   const startTime = Date.now();
-  const intensity = config.behaviorSimulationIntensity || 'medium';
+  const intensity = config.behaviorSimulationIntensity ?? 'medium';
   const enableForms = config.enableFormInteraction !== false; // Default true
   const enableCheckout = config.enableCheckoutSimulation !== false; // Default true
   const enableTimeDelayed = config.enableTimeDelayedBehavior !== false; // Default true

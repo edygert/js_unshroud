@@ -27,6 +27,12 @@ declare global {
     __js_unshroud_session_id?: string;
     __js_unshroud_blob_map?: any;
     __test_log_event?: (event: string) => void;
+    chrome?: {
+      runtime?: object;
+      loadTimes?: () => object;
+      csi?: () => object;
+      app?: object;
+    };
   }
 }
 
@@ -4184,27 +4190,29 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.goto(`file://${__dirname}/fixtures/time-delay-test.html`);
 
       // Simulate continuous interaction over 60 seconds
-      const interactionInterval = setInterval(async () => {
-        try {
-          // Mouse movement
-          await page.mouse.move(
-            Math.random() * 1280,
-            Math.random() * 720,
-            { steps: 10 }
-          );
+      const interactionInterval = setInterval(() => {
+        void (async () => {
+          try {
+            // Mouse movement
+            await page.mouse.move(
+              Math.random() * 1280,
+              Math.random() * 720,
+              { steps: 10 }
+            );
 
-          // Occasional scroll
-          if (Math.random() < 0.3) {
-            await page.mouse.wheel(0, 100);
-          }
+            // Occasional scroll
+            if (Math.random() < 0.3) {
+              await page.mouse.wheel(0, 100);
+            }
 
-          // Occasional click
-          if (Math.random() < 0.2) {
-            await page.mouse.click(500, 500);
+            // Occasional click
+            if (Math.random() < 0.2) {
+              await page.mouse.click(500, 500);
+            }
+          } catch {
+            // Ignore errors during interaction
           }
-        } catch (e) {
-          // Ignore errors during interaction
-        }
+        })();
       }, 2000); // Every 2 seconds
 
       // Wait for the malware to activate (60 seconds + buffer)
@@ -4253,7 +4261,7 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
 
           return {
             id: el.id,
-            name: (el as HTMLInputElement).name,
+            name: el.name,
             isVisible
           };
         });
@@ -4342,7 +4350,7 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
       await page.close();
     });
 
-    test('checkout page URL detection should work correctly', async () => {
+    test('checkout page URL detection should work correctly', () => {
       const testUrls = [
         { url: 'https://example.com/checkout', expected: true },
         { url: 'https://example.com/payment', expected: true },
