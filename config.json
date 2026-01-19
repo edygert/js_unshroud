@@ -1,26 +1,59 @@
 {
+  "_comment": "js_unshroud Configuration - All available options with defaults",
+
   "enableConsole": true,
   "enableNetwork": true,
   "enableStorage": true,
   "enableWebSocket": true,
   "enableTimer": false,
   "enableError": true,
-  "enableDOM": true,
-  "enableFingerprinting": true,
-  "enableObjectTracking": true,
-  "enableHeadlessMitigation": true,
-  "enableServiceWorker": true,
+  "enableDOM": false,
+  "enableFingerprinting": false,
+  "enableObjectTracking": false,
+  "enableHeadlessMitigation": false,
+  "enableServiceWorker": false,
   "enableCodeExecution": true,
   "enableEncoding": true,
+  "enableCryptoJS": true,
+  "enableEventHandlers": false,
+  "enableBlobTracking": false,
+  "enableURLExecution": false,
+  "enableWorkers": false,
+  "enableModules": false,
+  "enableIframes": false,
+
   "dedupeWindowMs": 100,
   "maxPayloadSize": 2051,
   "maxStackDepth": 20,
   "enableDeduplication": true,
+
   "monitoringTimeoutSeconds": 15,
+
+  "enableBehaviorSimulation": false,
+  "behaviorSimulationIntensity": "medium",
+  "enableFormInteraction": true,
+  "enableCheckoutSimulation": true,
+  "enableTimeDelayedBehavior": true,
+
   "outputMode": "file",
   "udpLogging": {
     "enabled": false,
     "host": "127.0.0.1",
     "port": 514
+  },
+
+  "eventFiltering": {
+    "dom": {
+      "enableLoadEvents": false,
+      "enableMouseEvents": false,
+      "enablePageLifecycle": false,
+      "enableInteractionEvents": false,
+      "enableMutationEvents": false
+    },
+    "encoding": {
+      "enableAtobBtoa": false,
+      "enableFromCharCode": true,
+      "enableURIEncoding": false
+    }
   }
 }
