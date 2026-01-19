@@ -91,6 +91,87 @@ bun run dev --url https://example.com --out events.jsonl --config config.json
 ./dist/js_unshroud --url https://example.com --out events.jsonl --config config.json
 ```
 
+## CLI Commands
+
+js_unshroud has three main subcommands: **run** (capture), **analyze** (format), and **query** (filter).
+
+### run (Default Command)
+
+Captures JavaScript behavior and outputs JSONL events file.
+
+```bash
+js_unshroud [run] --url <url> --out <output.jsonl> [--config <config.json>]
+```
+
+**Implementation:** `src/cli/runner.ts:parseArgs()`, `src/cli/runner.ts:runMonitoring()`
+
+### analyze
+
+Post-capture analysis that formats events as timeline or statistics.
+
+```bash
+js_unshroud analyze --input <events.jsonl> [--format text|json|stats] [--output <file>]
+```
+
+**Implementation:** `src/cli/analyze.ts`
+- Always loads ALL events from JSONL file
+- Formats using TimelineFormatter
+- No filtering capability (use query for filtering)
+
+### query (New in P5)
+
+Targeted filtering of events using QueryEngine, enabling malware analysts to quickly find specific patterns.
+
+```bash
+js_unshroud query --input <events.jsonl> [FILTERS] [--format jsonl|count] [--output <file>]
+```
+
+**Implementation:** `src/cli/query.ts`
+
+**Key Functions:**
+- `parseQueryArgs()`: Parse CLI arguments (slice(3) - skip 'node', 'runner.ts', 'query')
+- `validateArgs()`: Validate file existence, format, and regex patterns
+- `buildQueryFilter()`: Convert QueryArgs to QueryFilter object
+  - Handles comma-separated types (e.g., `network,console`)
+  - Converts urlRegex string to RegExp
+- `queryEvents()`: Execute query using QueryEngine
+  - Uses `queryEventsStream()` for memory-efficient streaming (jsonl format)
+  - Uses `countEvents()` for fast counting (count format)
+- `runQuery()`: Main entry point
+
+**Filter Options:**
+- `--type <types>`: Comma-separated event types
+- `--method <method>`: HTTP method (network events only)
+- `--url <url>`: Exact URL match (network events only)
+- `--url-regex <pattern>`: Regex URL match (network events only)
+- `--status <code>`: HTTP status code (network events only)
+- `--level <level>`: Console level (console events only)
+- `--storage-type <type>`: localStorage or sessionStorage (storage events only)
+- `--operation <op>`: set, get, remove, clear (storage events only)
+- `--correlation-id <id>`: Match correlation ID
+
+**Output Formats:**
+- `jsonl` (default): One JSON per line, streamable, pipeline-friendly
+- `count`: Print count only (fast reconnaissance)
+
+**Architecture Notes:**
+- Streams events via QueryEngine.queryEventsStream() for memory efficiency
+- Can handle large files (10k-100k+ events) without memory issues
+- Outputs valid JSONL for piping to other tools or analyze command
+- No buffering required for jsonl format (streams as events match)
+
+**Common Pitfalls:**
+- Regex escaping in shell: Always quote regex patterns (e.g., `--url-regex "api\.example\.com"`)
+- Type-specific filters: Network filters (method, url, status) only apply to network events
+  - Solution: Always combine with `--type network` when using network filters
+- Empty output: If no events match, outputs empty string (not error)
+
+**Testing:** `tests/query.test.ts` - 92.63% coverage
+- Argument parsing tests
+- Filter building tests
+- QueryEngine integration tests
+- Large file streaming tests
+
 ## Configuration System
 
 Configuration is loaded via `loadInstrumentationConfig()` in `runner.ts`. User can provide JSON file via `--config` flag. All options have defaults.

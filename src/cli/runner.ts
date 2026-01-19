@@ -66,6 +66,7 @@ function parseArgs(): Args {
     console.error('Usage:');
     console.error('  Capture: js_unshroud [run] --url <url> --out <output.jsonl> [--config <config.json>]');
     console.error('  Analyze: js_unshroud analyze --input <events.jsonl> [--format text|json|stats] [--output <file>]');
+    console.error('  Query:   js_unshroud query --input <events.jsonl> [FILTERS] [--format jsonl|count] [--output <file>]');
     process.exit(1);
   }
 
@@ -1038,6 +1039,9 @@ async function main() {
   if (subcommand === 'analyze') {
     const { runAnalyze } = await import('./analyze.ts');
     await runAnalyze();
+  } else if (subcommand === 'query') {
+    const { runQuery } = await import('./query.ts');
+    await runQuery();
   } else {
     // Support both direct flags and optional "run" subcommand
     if (subcommand === 'run') {

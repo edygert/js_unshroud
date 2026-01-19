@@ -121,6 +121,127 @@ js_unshroud --url https://example.com --out events.jsonl && \
 
 The analyzer supports all 24 event types captured by the tool, including code execution, network requests, cryptographic operations, and advanced attack patterns.
 
+## Querying Events
+
+The `query` subcommand enables targeted filtering of captured events, allowing malware analysts to quickly find specific patterns without loading entire event logs into memory.
+
+### Usage
+
+```bash
+js_unshroud query --input <events.jsonl> [FILTERS] [OPTIONS]
+```
+
+### Query Command Options
+
+**Required:**
+- `--input <file>`: Path to JSONL events file
+
+**Filter Options:**
+- `--type <types>`: Event types (comma-separated, e.g., `network,console,code_execution`)
+- `--method <method>`: HTTP method for network events (GET, POST, etc.)
+- `--url <url>`: Exact URL match for network events
+- `--url-regex <pattern>`: Regex URL match for network events (e.g., `api\.evil\.com`)
+- `--status <code>`: HTTP status code for network events
+- `--level <level>`: Console level for console events (log, warn, error, info, debug)
+- `--storage-type <type>`: Storage type for storage events (localStorage, sessionStorage)
+- `--operation <op>`: Storage operation (set, get, remove, clear)
+- `--correlation-id <id>`: Match events with specific correlation ID
+
+**Output Options:**
+- `--format <jsonl|count>`: Output format (default: `jsonl`)
+  - `jsonl`: One JSON event per line (pipeline-friendly, streamable)
+  - `count`: Print only the count of matching events (fast reconnaissance)
+- `--output <file>`: Write to file instead of stdout (default: stdout)
+
+### Examples
+
+```bash
+# Find all network requests
+js_unshroud query --input events.jsonl --type network
+
+# Find POST requests to suspicious domains
+js_unshroud query --input events.jsonl --type network --method POST --url-regex "\\.ru$"
+
+# Count code execution events (fast)
+js_unshroud query --input events.jsonl --type code_execution --format count
+
+# Find localStorage operations
+js_unshroud query --input events.jsonl --type storage --storage-type localStorage --operation set
+
+# Find console errors
+js_unshroud query --input events.jsonl --type console --level error
+
+# Query and save to file
+js_unshroud query --input events.jsonl --type network --method POST --output suspicious.jsonl
+
+# Pipeline: query → analyze
+js_unshroud query --input events.jsonl --type code_execution | \
+  js_unshroud analyze --input - --format stats
+
+# Multi-type query
+js_unshroud query --input events.jsonl --type "network,storage,code_execution"
+
+# Combine multiple filters
+js_unshroud query --input events.jsonl \
+  --type network \
+  --method GET \
+  --url-regex "api\.example\.com" \
+  --status 200
+```
+
+### Query vs Analyze
+
+| Feature | query | analyze |
+|---------|-------|---------|
+| **Purpose** | Filter/search specific events | Format events as timeline/stats |
+| **Filtering** | Full QueryFilter support | No filtering (loads all events) |
+| **Output** | Raw events (JSONL) or count | Timeline text/JSON or stats summary |
+| **Use Case** | "Show me X events" | "Summarize what happened" |
+| **Memory** | Streams (low memory) | Buffers all events |
+| **Pipeline** | Output can pipe to analyze | End of pipeline |
+
+**Workflow:** `capture → query (filter) → analyze (format)`
+
+### Malware Analysis Workflows
+
+**Triage Workflow:**
+```bash
+# 1. Quick reconnaissance - count suspicious event types
+js_unshroud query --input malware.jsonl --type code_execution --format count
+js_unshroud query --input malware.jsonl --type cryptojs --format count
+
+# 2. Extract suspicious events
+js_unshroud query --input malware.jsonl --type code_execution --output suspicious.jsonl
+
+# 3. Analyze the filtered subset
+js_unshroud analyze --input suspicious.jsonl --format text
+```
+
+**Network Exfiltration Investigation:**
+```bash
+# Find all POST requests (potential data exfiltration)
+js_unshroud query --input malware.jsonl --type network --method POST
+
+# Find requests to foreign TLDs
+js_unshroud query --input malware.jsonl --type network --url-regex "\\.ru$|\\.cn$"
+
+# Count suspicious network activity
+js_unshroud query --input malware.jsonl --type network --method POST --format count
+```
+
+**Obfuscation Analysis:**
+```bash
+# Find Base64 encoding operations
+js_unshroud query --input malware.jsonl --type encoding
+
+# Find CryptoJS decryption operations
+js_unshroud query --input malware.jsonl --type cryptojs --operation decrypt
+
+# Combine with analyze for timeline
+js_unshroud query --input malware.jsonl --type "code_execution,encoding,cryptojs" | \
+  js_unshroud analyze --input - --format text
+```
+
 ### Configuration
 
 You can optionally provide a configuration file to control what instrumentation is enabled:
