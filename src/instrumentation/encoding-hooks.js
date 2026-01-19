@@ -319,5 +319,5 @@
     window.escape = wrappedEscape;
   }
 
-  console.log('[JS Unshroud] Encoding hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Encoding hooks loaded');
 })();

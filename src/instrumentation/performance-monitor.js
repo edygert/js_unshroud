@@ -235,5 +235,5 @@
     window.__js_unshroud_config = { ...window.__js_unshroud_config, ...newConfig };
   };
 
-  console.log('[JS Unshroud] Performance monitor loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Performance monitor loaded');
 })();

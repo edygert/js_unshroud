@@ -361,6 +361,9 @@ export interface InstrumentationConfig {
   outputMode?: 'file' | 'udp' | 'both';  // Default: 'file'
   udpLogging?: UDPLoggingConfig;
 
+  // Debug configuration
+  debug?: boolean;  // Enable console output for debugging (default: false)
+
   // Event filtering configuration (P4.1) - Reduce noise during malware triage
   eventFiltering?: EventFilteringConfig;
 }

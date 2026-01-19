@@ -354,7 +354,10 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger);
+    // Mock logger
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
 
     expect(addInitScript).toHaveBeenCalledTimes(6); // bridge + bootstrap + network + storage + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
@@ -398,7 +401,10 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger);
+    // Mock logger
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
 
     expect(addInitScript).toHaveBeenCalledTimes(5); // bridge + bootstrap + storage + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
@@ -442,8 +448,11 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
+    // Mock logger
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
     // Should rethrow the error
-    await expect(injectInstrumentation(page, config, 'test-session', mockEventLogger)).rejects.toThrow('Injection failed');
+    await expect(injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger)).rejects.toThrow('Injection failed');
   });
 
   test('should handle minimal config with only bootstrap', async () => {
@@ -482,7 +491,10 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger);
+    // Mock logger
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
 
     expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
@@ -512,21 +524,17 @@ describe('Cleanup Operations', () => {
       close: eventLoggerClose
     } as any;
 
-    // Capture console.log output
-    const originalLog = console.log;
-    const logOutput: string[] = [];
-    console.log = (message: string) => logOutput.push(message);
+    // Mock logger
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
-    await performCleanup(browser, eventLogger);
-
-    console.log = originalLog;
+    await performCleanup(browser, eventLogger, mockLogger);
 
     expect(pageClose).toHaveBeenCalled();
     expect(contextClose).toHaveBeenCalled();
     expect(browserClose).toHaveBeenCalled();
     expect(eventLoggerClose).toHaveBeenCalled();
-    expect(logOutput).toContain('Starting cleanup...');
-    expect(logOutput).toContain('Cleanup completed.');
+    expect(mockLogger.log).toHaveBeenCalledWith('Starting cleanup...');
+    expect(mockLogger.log).toHaveBeenCalledWith('Cleanup completed.');
   });
 
   test('should handle cleanup errors gracefully', async () => {
@@ -544,8 +552,11 @@ describe('Cleanup Operations', () => {
       close: vi.fn().mockRejectedValue(new Error('Event logger close error'))
     } as any;
 
+    // Mock logger
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
     // Should complete without throwing
-    await performCleanup(browser, eventLogger);
+    await performCleanup(browser, eventLogger, mockLogger);
     // Test passes if no exception is thrown above
   });
 });
@@ -652,7 +663,8 @@ describe('CDPSessionManager Tests', () => {
       await cdpManager.flushPendingEvents();
       await cdpManager.disconnect();
     } finally {
-      await performCleanup(browser, eventLogger);
+      const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+      await performCleanup(browser, eventLogger, mockLogger);
     }
   }, 15000);
 });
@@ -702,8 +714,11 @@ describe('End-to-End Integration Tests', () => {
       // Initialize CDP session
       await cdpManager.initialize(page);
 
+      // Mock logger
+      const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
       // Inject instrumentation scripts
-      await injectInstrumentation(page, config, sessionConfig.id, eventLogger);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockLogger);
 
       // Navigate to test page
       await page.goto(sessionConfig.url, {
@@ -739,7 +754,8 @@ describe('End-to-End Integration Tests', () => {
       expect(networkEvents.length).toBeGreaterThan(0);
 
     } finally {
-      await performCleanup(browser, eventLogger);
+      const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+      await performCleanup(browser, eventLogger, mockLogger);
     }
   }, 30000); // Increase timeout for end-to-end test
 
@@ -756,18 +772,19 @@ describe('End-to-End Integration Tests', () => {
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
     try {
       const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
       await cdpManager.initialize(page);
-      await injectInstrumentation(page, config, sessionConfig.id, eventLogger);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockLogger);
 
       // This should fail with navigation error
-       
+
       await expect(page.goto(sessionConfig.url, { timeout: 5000 })).rejects.toThrow();
 
     } finally {
-      await performCleanup(browser, eventLogger);
+      await performCleanup(browser, eventLogger, mockLogger);
     }
   }, 10000);
 
@@ -814,6 +831,7 @@ describe('End-to-End Integration Tests', () => {
     const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
+    const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
     try {
       const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
@@ -824,10 +842,10 @@ describe('End-to-End Integration Tests', () => {
 
       const config = loadInstrumentationConfig();
 
-      await expect(injectInstrumentation(page, config, sessionConfig.id, eventLogger)).rejects.toThrow('Script injection failed');
+      await expect(injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockLogger)).rejects.toThrow('Script injection failed');
 
     } finally {
-      await performCleanup(browser, eventLogger);
+      await performCleanup(browser, eventLogger, mockLogger);
     }
   }, 10000);
 });

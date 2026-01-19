@@ -183,5 +183,5 @@
     });
   }
 
-  console.log('[JS Unshroud] Event handler hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Event handler hooks loaded');
 })();

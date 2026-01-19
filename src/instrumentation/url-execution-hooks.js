@@ -179,5 +179,5 @@
     }
   }
 
-  console.log('[JS Unshroud] URL execution hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] URL execution hooks loaded');
 })();

@@ -168,7 +168,7 @@
     } catch (e) {
       // AsyncFunction wrapping failed, continue without it
       if (window.__js_unshroud_debug) {
-        console.warn('[JS Unshroud] Failed to wrap AsyncFunction:', e.message);
+        window.__js_unshroud_debug('[JS Unshroud] Failed to wrap AsyncFunction:', e.message);
       }
     }
   }
@@ -187,7 +187,7 @@
     } catch (e) {
       // GeneratorFunction wrapping failed, continue without it
       if (window.__js_unshroud_debug) {
-        console.warn('[JS Unshroud] Failed to wrap GeneratorFunction:', e.message);
+        window.__js_unshroud_debug('[JS Unshroud] Failed to wrap GeneratorFunction:', e.message);
       }
     }
   }
@@ -228,5 +228,5 @@
     };
   }
 
-  console.log('[JS Unshroud] Code execution hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Code execution hooks loaded');
 })();

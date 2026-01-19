@@ -102,7 +102,7 @@
         }
       } catch (error) {
         // Don't break appendChild if logging fails
-        console.warn('[JS Unshroud] Error tracking module script:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking module script:', error);
       }
 
       return result;
@@ -129,7 +129,7 @@
         }
       } catch (error) {
         // Don't break insertBefore if logging fails
-        console.warn('[JS Unshroud] Error tracking module script:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking module script:', error);
       }
 
       return result;
@@ -156,12 +156,12 @@
         }
       } catch (error) {
         // Don't break replaceChild if logging fails
-        console.warn('[JS Unshroud] Error tracking module script:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking module script:', error);
       }
 
       return result;
     };
   }
 
-  console.log('[JS Unshroud] Module hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Module hooks loaded');
 })();

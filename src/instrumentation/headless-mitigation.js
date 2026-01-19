@@ -53,7 +53,7 @@
       }
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.webdriver:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.webdriver:', e.message);
   }
 
   // 2. Hardware concurrency - Headless browsers often have unrealistic values
@@ -74,7 +74,7 @@
       }
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.hardwareConcurrency:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.hardwareConcurrency:', e.message);
   }
 
   // 3. Device memory - Similar headless detection vector
@@ -95,7 +95,7 @@
       }
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.deviceMemory:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.deviceMemory:', e.message);
   }
 
   // 4. Plugins - Headless browsers often have no plugins
@@ -138,7 +138,7 @@
       }
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.plugins:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.plugins:', e.message);
   }
 
   // 5. Permissions API - Mitigate "denied" permissions that indicate headless
@@ -182,7 +182,7 @@
       };
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override permissions.query:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override permissions.query:', e.message);
   }
 
   // 6. Canvas fingerprinting mitigation (basic entropy injection)
@@ -250,7 +250,7 @@
     };
 
   } catch (e) {
-    console.warn('[JS Unshroud] Could not apply canvas mitigations:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not apply canvas mitigations:', e.message);
   }
 
   // 7. CSS media queries - Some headless detection uses CSS
@@ -276,7 +276,7 @@
       return result;
     };
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override matchMedia:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override matchMedia:', e.message);
   }
 
   // 8. WebGL renderer override
@@ -319,7 +319,7 @@
       };
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not apply WebGL mitigations:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not apply WebGL mitigations:', e.message);
   }
 
 
@@ -358,7 +358,7 @@
       }
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override AudioContext:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override AudioContext:', e.message);
   }
 
   // 2. Inject noise into OfflineAudioContext rendering
@@ -392,7 +392,7 @@
       };
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not apply OfflineAudioContext mitigations:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not apply OfflineAudioContext mitigations:', e.message);
   }
 
 
@@ -465,7 +465,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override document.fonts:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override document.fonts:', e.message);
   }
 
 
@@ -488,7 +488,7 @@
     window.webkitRTCPeerConnection = window.RTCPeerConnection;
     window.mozRTCPeerConnection = window.RTCPeerConnection;
   } catch (e) {
-    console.warn('[JS Unshroud] Could not block RTCPeerConnection:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not block RTCPeerConnection:', e.message);
   }
 
   // 2. Block getUserMedia and enumerateDevices
@@ -520,7 +520,7 @@
       };
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not block mediaDevices:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not block mediaDevices:', e.message);
   }
 
 
@@ -564,7 +564,7 @@
       }
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override screen properties:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override screen properties:', e.message);
   }
 
   // 2. Spoof devicePixelRatio
@@ -574,7 +574,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override devicePixelRatio:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override devicePixelRatio:', e.message);
   }
 
   // 3. Spoof window dimensions
@@ -599,7 +599,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override window dimensions:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override window dimensions:', e.message);
   }
 
 
@@ -624,7 +624,7 @@
       return spoofedOffset;
     };
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override getTimezoneOffset:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override getTimezoneOffset:', e.message);
   }
 
   // 2. Override Intl.DateTimeFormat resolvedOptions
@@ -655,7 +655,7 @@
 
     Intl.DateTimeFormat.prototype = OriginalDateTimeFormat.prototype;
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override Intl.DateTimeFormat:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override Intl.DateTimeFormat:', e.message);
   }
 
 
@@ -682,7 +682,7 @@
       delete navigator.battery;
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not block Battery API:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not block Battery API:', e.message);
   }
 
 
@@ -730,7 +730,7 @@
       });
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not inject window.chrome:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not inject window.chrome:', e.message);
   }
 
   // 2. navigator.languages - Headless often has empty or single entry
@@ -749,7 +749,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.languages:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.languages:', e.message);
   }
 
   // 3. navigator.mimeTypes - Should match fake plugins
@@ -797,7 +797,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.mimeTypes:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.mimeTypes:', e.message);
   }
 
   // 4. navigator.vendor - Should be "Google Inc." for Chrome
@@ -816,7 +816,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.vendor:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.vendor:', e.message);
   }
 
   // 5. navigator.maxTouchPoints - Desktop should be 0
@@ -835,7 +835,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.maxTouchPoints:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.maxTouchPoints:', e.message);
   }
 
   // 6. navigator.pdfViewerEnabled - Should be true for Chrome
@@ -854,7 +854,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.pdfViewerEnabled:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.pdfViewerEnabled:', e.message);
   }
 
   // 7. navigator.cookieEnabled - Should be true
@@ -873,7 +873,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.cookieEnabled:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.cookieEnabled:', e.message);
   }
 
   // 8. navigator.userAgent - Override with realistic Chrome user agent
@@ -893,7 +893,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.userAgent:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.userAgent:', e.message);
   }
 
   // 9. navigator.language - Should match first entry in languages
@@ -912,7 +912,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.language:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.language:', e.message);
   }
 
   // 10. navigator.platform - Should be realistic for OS
@@ -931,7 +931,7 @@
       configurable: true
     });
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override navigator.platform:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.platform:', e.message);
   }
 
   // 11. Notification.permission - Should be 'default' or 'granted'
@@ -953,9 +953,9 @@
       });
     }
   } catch (e) {
-    console.warn('[JS Unshroud] Could not override Notification.permission:', e.message);
+    window.__js_unshroud_debug('[JS Unshroud] Could not override Notification.permission:', e.message);
   }
 
 
-  console.log('[JS Unshroud] Headless mitigation hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Headless mitigation hooks loaded');
 })();

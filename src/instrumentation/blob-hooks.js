@@ -106,7 +106,7 @@
         }
       } catch (error) {
         // Log error but don't break blob creation
-        console.warn('[JS Unshroud] Error tracking blob:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking blob:', error);
       }
 
       return blob;
@@ -183,7 +183,7 @@
           }
         }
       } catch (error) {
-        console.warn('[JS Unshroud] Error tracking blob URL:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking blob URL:', error);
       }
 
       return blobUrl;
@@ -208,7 +208,7 @@
           delete window.__js_unshroud_blob_map[blobUrl];
         }
       } catch (error) {
-        console.warn('[JS Unshroud] Error tracking blob URL revocation:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking blob URL revocation:', error);
       }
 
       return originalRevokeObjectURL.call(this, blobUrl);
@@ -234,5 +234,5 @@
     }
   }, 5 * 60 * 1000);
 
-  console.log('[JS Unshroud] Blob hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Blob hooks loaded');
 })();

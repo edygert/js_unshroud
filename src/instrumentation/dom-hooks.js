@@ -733,5 +733,5 @@
     };
   }
 
-  console.log('[JS Unshroud] DOM hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] DOM hooks loaded');
 })();

@@ -379,5 +379,5 @@
     window.SharedWorker.prototype = OriginalSharedWorker.prototype;
   }
 
-  console.log('[JS Unshroud] Worker hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Worker hooks loaded');
 })();

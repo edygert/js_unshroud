@@ -111,6 +111,8 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
       host: '127.0.0.1',
       port: 514  // Default syslog port
     },
+    // Debug configuration
+    debug: false,  // Suppress console output unless explicitly enabled
     // Event filtering configuration (P4.1) - Reduce noise during malware triage
     eventFiltering: {
       dom: {
@@ -143,8 +145,38 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
     const userConfig = JSON.parse(configContent) as Partial<InstrumentationConfig>;
     return { ...defaultConfig, ...userConfig };
   } catch {
+    // Always show config loading warnings, even when debug is disabled
     console.warn(`Failed to load config from ${configPath}, using defaults`);
     return defaultConfig;
+  }
+}
+
+/**
+ * Conditional logger that only outputs when debug mode is enabled
+ */
+class Logger {
+  constructor(private readonly config: InstrumentationConfig) {}
+
+  log(message: string): void {
+    if (this.config.debug) {
+      console.log(message);
+    }
+  }
+
+  warn(message: string): void {
+    if (this.config.debug) {
+      console.warn(message);
+    }
+  }
+
+  error(message: string, error?: unknown): void {
+    if (this.config.debug) {
+      if (error) {
+        console.error(message, error);
+      } else {
+        console.error(message);
+      }
+    }
   }
 }
 
@@ -231,7 +263,8 @@ async function injectInstrumentation(
   page: Page,
   config: InstrumentationConfig,
   sessionId: string,
-  eventLogger: EventLogger
+  eventLogger: EventLogger,
+  logger: Logger
 ): Promise<{
   bootstrap: string;
   network: string | null;
@@ -255,10 +288,10 @@ async function injectInstrumentation(
       if (validateEvent(event)) {
         await eventLogger.logEvent(event);
       } else {
-        console.warn('[JS Unshroud] Invalid event received from instrumentation:', eventJson.substring(0, 200));
+        logger.warn('[JS Unshroud] Invalid event received from instrumentation:' + eventJson.substring(0, 200));
       }
     } catch (error) {
-      console.error('[JS Unshroud] Failed to parse instrumentation event:', error);
+      logger.error('[JS Unshroud] Failed to parse instrumentation event:', error);
     }
   });
 
@@ -293,7 +326,8 @@ async function injectInstrumentation(
         enableEventHandlers: config.enableEventHandlers,
         enableBlobTracking: config.enableBlobTracking,
         enableURLExecution: config.enableURLExecution,
-        eventFiltering: config.eventFiltering
+        eventFiltering: config.eventFiltering,
+        debug: config.debug || false
       })};
       window.__js_unshroud_session_id = '${sessionId}';
     `
@@ -392,8 +426,8 @@ async function injectInstrumentation(
   return scripts;
 }
 
-async function performCleanup(browser: Browser, eventLogger: EventLogger): Promise<void> {
-  console.log('Starting cleanup...');
+async function performCleanup(browser: Browser, eventLogger: EventLogger, logger: Logger): Promise<void> {
+  logger.log('Starting cleanup...');
 
   const cleanupPromises = [
     // Timeout wrapper for browser close
@@ -438,7 +472,7 @@ async function performCleanup(browser: Browser, eventLogger: EventLogger): Promi
 
   try {
     await Promise.allSettled(cleanupPromises);
-    console.log('Cleanup completed.');
+    logger.log('Cleanup completed.');
   } catch {
     // Some cleanup operations failed - cleanup is best-effort, no warning needed
   }
@@ -741,7 +775,7 @@ async function simulateAutofillTrigger(page: Page): Promise<void> {
  * Detect checkout page and simulate payment form interaction
  * Triggers Magecart/web skimmers that activate only on checkout pages
  */
-async function detectAndSimulateCheckoutBehavior(page: Page): Promise<boolean> {
+async function detectAndSimulateCheckoutBehavior(page: Page, logger: Logger): Promise<boolean> {
   try {
     const url = page.url();
 
@@ -749,7 +783,7 @@ async function detectAndSimulateCheckoutBehavior(page: Page): Promise<boolean> {
     const isCheckoutPage = /checkout|payment|cart|onepage|billing/i.test(url);
 
     if (isCheckoutPage) {
-      console.log('[JS Unshroud] Detected checkout page, simulating payment form interaction');
+      logger.log('[JS Unshroud] Detected checkout page, simulating payment form interaction');
 
       // More aggressive form interaction on checkout pages
       await simulateFormInteraction(page);
@@ -792,7 +826,7 @@ async function detectAndSimulateCheckoutBehavior(page: Page): Promise<boolean> {
  * Phase 3 (60s+): Full interaction (form filling, clicking, submitting)
  * This defeats time-bomb malware that waits before activating
  */
-async function simulateBehavior(page: Page, config: InstrumentationConfig, durationMs: number): Promise<void> {
+async function simulateBehavior(page: Page, config: InstrumentationConfig, durationMs: number, logger: Logger): Promise<void> {
   try {
     if (!config.enableBehaviorSimulation) {
       // No behavioral simulation, just wait
@@ -809,7 +843,7 @@ async function simulateBehavior(page: Page, config: InstrumentationConfig, durat
 
   if (enableTimeDelayed) {
     // Phase 1: Initial 30s - Minimal interaction (defeats 1-minute delay malware)
-    console.log('[JS Unshroud] Phase 1: Minimal interaction (0-30s)');
+    logger.log('[JS Unshroud] Phase 1: Minimal interaction (0-30s)');
     while (Date.now() - startTime < 30000 && Date.now() < startTime + durationMs) {
       await simulateMouseMovement(page, viewport);
 
@@ -823,7 +857,7 @@ async function simulateBehavior(page: Page, config: InstrumentationConfig, durat
     }
 
     // Phase 2: 30s-60s - Moderate interaction (reading page)
-    console.log('[JS Unshroud] Phase 2: Moderate interaction (30-60s)');
+    logger.log('[JS Unshroud] Phase 2: Moderate interaction (30-60s)');
     while (Date.now() - startTime < 60000 && Date.now() < startTime + durationMs) {
       await simulateMouseMovement(page, viewport);
       if (intensity !== 'low' && Math.random() < 0.3) await simulateScroll(page);
@@ -838,7 +872,7 @@ async function simulateBehavior(page: Page, config: InstrumentationConfig, durat
     }
 
     // Phase 3: 60s+ - Full interaction
-    console.log('[JS Unshroud] Phase 3: Full interaction (60s+)');
+    logger.log('[JS Unshroud] Phase 3: Full interaction (60s+)');
   }
 
   let lastFormInteraction = Date.now();
@@ -869,7 +903,7 @@ async function simulateBehavior(page: Page, config: InstrumentationConfig, durat
 
       // Checkout detection (high only, once)
       if (enableCheckout && !hasTriedCheckout && Date.now() - startTime > 5000) {
-        hasTriedCheckout = await detectAndSimulateCheckoutBehavior(page);
+        hasTriedCheckout = await detectAndSimulateCheckoutBehavior(page, logger);
       }
     }
 
@@ -893,7 +927,8 @@ async function simulateBehavior(page: Page, config: InstrumentationConfig, durat
 
 async function runMonitoring(args: Args): Promise<void> {
   const config = loadInstrumentationConfig(args.config);
-  console.log(`Monitoring ${args.url}, outputting to ${args.out}`);
+  const logger = new Logger(config);
+  logger.log(`Monitoring ${args.url}, outputting to ${args.out}`);
   const sessionConfig = createSessionConfig(args);
   const sessionId = sessionConfig.id;
 
@@ -955,10 +990,10 @@ async function runMonitoring(args: Args): Promise<void> {
       });
     }
 
-    await injectInstrumentation(page, config, sessionId, eventLogger);
+    await injectInstrumentation(page, config, sessionId, eventLogger, logger);
 
     // Navigate to the URL
-    console.log(`Navigating to ${args.url}...`);
+    logger.log(`Navigating to ${args.url}...`);
     await page.goto(args.url, {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.PAGE_NAVIGATION
@@ -972,26 +1007,26 @@ async function runMonitoring(args: Args): Promise<void> {
         timeout: TIMEOUTS.INSTRUMENTATION_LOAD
       });
     } catch {
-      console.log('Warning: Instrumentation load timeout (bootstrap may be disabled)');
+      logger.log('Warning: Instrumentation load timeout (bootstrap may be disabled)');
     }
 
     const monitoringDurationMs = config.monitoringTimeoutSeconds * 1000;
-    console.log(`Instrumentation loaded, monitoring for ${config.monitoringTimeoutSeconds} seconds...`);
+    logger.log(`Instrumentation loaded, monitoring for ${config.monitoringTimeoutSeconds} seconds...`);
 
     // Simulate human behavior if behavioral simulation is enabled
     // This defeats malware that gates execution behind interaction checks
-    await simulateBehavior(page, config, monitoringDurationMs);
+    await simulateBehavior(page, config, monitoringDurationMs, logger);
 
-    console.log('Monitoring completed.');
+    logger.log('Monitoring completed.');
 
   } catch (error) {
-    console.error('Error during monitoring:', error);
+    logger.error('Error during monitoring:', error);
     throw error; // Re-throw for main function to handle
   } finally {
     // Flush pending events before cleanup
     await cdpManager.flushPendingEvents();
     await cdpManager.disconnect();
-    await performCleanup(browser, eventLogger);
+    await performCleanup(browser, eventLogger, logger);
   }
 }
 

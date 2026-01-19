@@ -151,15 +151,15 @@
   // Public API for tracking objects
   window.__js_unshroud_trackObject = function(obj, label, options = {}) {
     if (!obj || typeof obj !== 'object') {
-      console.warn('[JS Unshroud] trackObject: first argument must be an object');
+      window.__js_unshroud_debug('[JS Unshroud] trackObject: first argument must be an object');
       return obj;
     }
 
     try {
-      console.log('[JS Unshroud] Tracking object:', label);
+      window.__js_unshroud_debug('[JS Unshroud] Tracking object:', label);
       return createTrackingProxy(obj, label, options);
     } catch (e) {
-      console.warn('[JS Unshroud] Failed to track object:', label, e);
+      window.__js_unshroud_debug('[JS Unshroud] Failed to track object:', label, e);
       return obj;
     }
   };
@@ -171,15 +171,15 @@
         const original = window[propertyName];
         if (original && typeof original === 'object') {
           window[propertyName] = createTrackingProxy(original, 'global.' + propertyName, options);
-          console.log('[JS Unshroud] Tracking global:', propertyName);
+          window.__js_unshroud_debug('[JS Unshroud] Tracking global:', propertyName);
         } else {
-          console.warn('[JS Unshroud] Global property is not an object:', propertyName);
+          window.__js_unshroud_debug('[JS Unshroud] Global property is not an object:', propertyName);
         }
       } catch (e) {
-        console.warn('[JS Unshroud] Failed to track global:', propertyName, e);
+        window.__js_unshroud_debug('[JS Unshroud] Failed to track global:', propertyName, e);
       }
     } else {
-      console.warn('[JS Unshroud] Global property not found:', propertyName);
+      window.__js_unshroud_debug('[JS Unshroud] Global property not found:', propertyName);
     }
   };
 
@@ -187,10 +187,10 @@
   window.__js_unshroud_untrackObject = function(proxy) {
     if (proxy && proxy.__js_unshroud_proxy_label) {
       // For now, we can't easily unwrap proxies, but we can mark them as untracked
-      console.log('[JS Unshroud] Untracking object:', proxy.__js_unshroud_proxy_label);
+      window.__js_unshroud_debug('[JS Unshroud] Untracking object:', proxy.__js_unshroud_proxy_label);
       // In a real implementation, you'd need to maintain a registry of original objects
     }
   };
 
-  console.log('[JS Unshroud] Object tracking loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Object tracking loaded');
 })();

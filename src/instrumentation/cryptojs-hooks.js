@@ -241,7 +241,7 @@
       });
     }
 
-    console.log('[JS Unshroud] CryptoJS hooks installed');
+    window.__js_unshroud_debug('[JS Unshroud] CryptoJS hooks installed');
   };
 
   // Option 1: Hook immediately if CryptoJS already exists
@@ -266,9 +266,9 @@
     // Property already exists and is not configurable
     // This is fine, we'll catch it via Option 1
     if (window.__js_unshroud_debug) {
-      console.warn('[JS Unshroud] Could not intercept CryptoJS assignment:', e.message);
+      window.__js_unshroud_debug('[JS Unshroud] Could not intercept CryptoJS assignment:', e.message);
     }
   }
 
-  console.log('[JS Unshroud] CryptoJS monitoring loaded');
+  window.__js_unshroud_debug('[JS Unshroud] CryptoJS monitoring loaded');
 })();

@@ -148,7 +148,7 @@
         }
       } catch (error) {
         // Don't break appendChild if logging fails
-        console.warn('[JS Unshroud] Error tracking iframe:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking iframe:', error);
       }
 
       return result;
@@ -191,7 +191,7 @@
         }
       } catch (error) {
         // Don't break insertBefore if logging fails
-        console.warn('[JS Unshroud] Error tracking iframe:', error);
+        window.__js_unshroud_debug('[JS Unshroud] Error tracking iframe:', error);
       }
 
       return result;
@@ -281,5 +281,5 @@
     });
   }
 
-  console.log('[JS Unshroud] Iframe hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Iframe hooks loaded');
 })();

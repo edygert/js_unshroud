@@ -29,6 +29,13 @@
     return window.__js_unshroud_session_id || 'unknown_session';
   };
 
+  // Conditional debug logger - only logs when debug mode is enabled
+  window.__js_unshroud_debug = function(message) {
+    if (window.__js_unshroud_config && window.__js_unshroud_config.debug) {
+      originalConsole.log(message);
+    }
+  };
+
   // Shared console interception logic
   const interceptConsole = function() {
     window.__js_unshroud_console_methods.forEach(function(method) {
@@ -50,7 +57,7 @@
         return original.apply(console, args);
       };
     });
-    console.log('[JS Unshroud] Console instrumentation activated');
+    window.__js_unshroud_debug('[JS Unshroud] Console instrumentation activated');
     // Mark as intercepted to avoid duplicate interception
     window.__js_unshroud_console_intercepted = true;
   };
@@ -125,5 +132,5 @@
   // Mark as loaded
   window.__js_unshroud_loaded = true;
 
-  originalConsole.log('[JS Unshroud] Bootstrap loaded successfully');
+  window.__js_unshroud_debug('[JS Unshroud] Bootstrap loaded successfully');
 })();

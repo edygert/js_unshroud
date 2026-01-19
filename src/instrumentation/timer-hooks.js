@@ -165,5 +165,5 @@
     };
   }
 
-  console.log('[JS Unshroud] Timer hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Timer hooks loaded');
 })();

@@ -77,7 +77,8 @@ You can optionally provide a configuration file to control what instrumentation 
     "enabled": false,
     "host": "127.0.0.1",
     "port": 514
-  }
+  },
+  "debug": false
 }
 ```
 
@@ -108,6 +109,7 @@ Configuration options:
   - `enabled`: Enable UDP logging (default: `false`)
   - `host`: UDP destination IP address (default: `'127.0.0.1'`)
   - `port`: UDP destination port (default: `514`)
+- `debug`: Enable console output for debugging (default: `false`). When disabled, the tool runs silently except for critical errors.
 
 **Monitoring Configuration:**
 - `monitoringTimeoutSeconds`: How long to monitor the page in seconds (default: `15`). Increase this for slow-loading malware samples that require more time to execute.

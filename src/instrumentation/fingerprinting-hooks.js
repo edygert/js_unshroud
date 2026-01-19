@@ -208,5 +208,5 @@
     }
   });
 
-  console.log('[JS Unshroud] Fingerprinting hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Fingerprinting hooks loaded');
 })();

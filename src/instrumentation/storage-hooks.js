@@ -109,7 +109,7 @@
     try {
       instrumentStorage(window.localStorage, 'localStorage');
     } catch (e) {
-      console.warn('[JS Unshroud] Failed to instrument localStorage:', e);
+      window.__js_unshroud_debug('[JS Unshroud] Failed to instrument localStorage:', e);
     }
   }
 
@@ -118,9 +118,9 @@
     try {
       instrumentStorage(window.sessionStorage, 'sessionStorage');
     } catch (e) {
-      console.warn('[JS Unshroud] Failed to instrument sessionStorage:', e);
+      window.__js_unshroud_debug('[JS Unshroud] Failed to instrument sessionStorage:', e);
     }
   }
 
-  console.log('[JS Unshroud] Storage hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Storage hooks loaded');
 })();

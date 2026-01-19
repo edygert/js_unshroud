@@ -227,7 +227,7 @@
           } catch (e) {
             // Log ignored properties in debug mode
             if (window.__js_unshroud_debug) {
-              console.debug('[JS Unshroud] Could not copy WebSocket property:', prop, e.message);
+              window.__js_unshroud_debug('[JS Unshroud] Could not copy WebSocket property:', prop, e.message);
             }
           }
         }
@@ -235,5 +235,5 @@
     });
   }
 
-  console.log('[JS Unshroud] Network hooks loaded');
+  window.__js_unshroud_debug('[JS Unshroud] Network hooks loaded');
 })();

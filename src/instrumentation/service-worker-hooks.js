@@ -195,5 +195,5 @@
     });
   }
 
-  console.log('[JS Unshroud] Service Worker instrumentation activated');
+  window.__js_unshroud_debug('[JS Unshroud] Service Worker instrumentation activated');
 })();
