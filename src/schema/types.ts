@@ -117,11 +117,9 @@ export interface PerformanceStatsEvent extends BaseEvent {
   totalEventsProcessed: number;
   eventsAccepted: number;
   eventsRejected: number;
-  eventsSampled: number;
   eventsRateLimited: number;
   eventsDeduplicated: number;
   acceptanceRate: string;
-  samplingRate: number;
   maxEventsPerSecond: number;
 }
 

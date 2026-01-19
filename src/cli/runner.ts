@@ -327,7 +327,7 @@ async function injectInstrumentation(
         enableBlobTracking: config.enableBlobTracking,
         enableURLExecution: config.enableURLExecution,
         eventFiltering: config.eventFiltering,
-        debug: config.debug || false
+        debug: config.debug ?? false
       })};
       window.__js_unshroud_session_id = '${sessionId}';
     `

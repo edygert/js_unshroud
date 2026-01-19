@@ -2,7 +2,31 @@ import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { QueryEngine, type QueryFilter } from '../src/analysis/QueryEngine.ts';
 import { TimelineFormatter, type TimeRange } from '../src/analysis/TimelineFormatter.ts';
 import { CorrelationEngine } from '../src/analysis/CorrelationEngine.ts';
-import type { MonitoringEvent, ConsoleEvent, NetworkEvent, StorageEvent, ErrorEvent, DomEvent, TimerEvent } from '../src/schema/types.ts';
+import type {
+  MonitoringEvent,
+  ConsoleEvent,
+  NetworkEvent,
+  StorageEvent,
+  ErrorEvent,
+  DomEvent,
+  TimerEvent,
+  WebSocketEvent,
+  FingerprintingEvent,
+  HeadlessMitigationEvent,
+  PerformanceStatsEvent,
+  PerformanceWarningEvent,
+  ServiceWorkerEvent,
+  CodeExecutionEvent,
+  EncodingEvent,
+  CryptoJSEvent,
+  ScriptInjectionEvent,
+  EventHandlerEvent,
+  BlobEvent,
+  URLExecutionEvent,
+  WorkerEvent,
+  ModuleEvent,
+  IframeEvent
+} from '../src/schema/types.ts';
 import { writeFileSync, unlinkSync } from 'fs';
 
 describe('Analysis Engine Tests', () => {
@@ -491,6 +515,645 @@ describe('Analysis Engine Tests', () => {
       const formatter = new TimelineFormatter([unknownEvent]);
       const timeline = formatter.formatTimeline();
       expect(timeline[0]?.summary).toBe('unknown event');
+    });
+
+    // Additional event type tests for coverage
+    test('should format websocket event summary', () => {
+      const wsEvent: WebSocketEvent = {
+        id: 'ws-test',
+        timestamp: 1640995200800,
+        sessionId: 'session-1',
+        type: 'websocket',
+        url: 'wss://example.com/socket',
+        event: 'open'
+      };
+      const formatter = new TimelineFormatter([wsEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('WebSocket: open wss://example.com/socket');
+    });
+
+    test('should format fingerprinting event summary', () => {
+      const fpEvent: FingerprintingEvent = {
+        id: 'fp-test',
+        timestamp: 1640995200900,
+        sessionId: 'session-1',
+        type: 'fingerprinting',
+        method: 'canvas',
+        operation: 'toDataURL'
+      };
+      const formatter = new TimelineFormatter([fpEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Fingerprinting: canvas.toDataURL');
+    });
+
+    test('should format headless_mitigation event summary', () => {
+      const hmEvent: HeadlessMitigationEvent = {
+        id: 'hm-test',
+        timestamp: 1640995201000,
+        sessionId: 'session-1',
+        type: 'headless_mitigation',
+        method: 'navigator',
+        operation: 'webdriver'
+      };
+      const formatter = new TimelineFormatter([hmEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Headless Mitigation: navigator.webdriver');
+    });
+
+    test('should format performance_stats event summary', () => {
+      const psEvent: PerformanceStatsEvent = {
+        id: 'ps-test',
+        timestamp: 1640995201100,
+        sessionId: 'session-1',
+        type: 'performance_stats',
+        method: 'performance_monitor',
+        operation: 'performance_monitoring',
+        uptime: 5000,
+        totalEventsProcessed: 100,
+        eventsAccepted: 95,
+        eventsRejected: 5,
+        eventsRateLimited: 0,
+        eventsDeduplicated: 10,
+        acceptanceRate: '95.00%',
+        maxEventsPerSecond: 50
+      };
+      const formatter = new TimelineFormatter([psEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Performance Stats: performance_monitoring');
+      expect(timeline[0]?.summary).toContain('uptime: 5000ms');
+    });
+
+    test('should format performance_warning event summary', () => {
+      const pwEvent: PerformanceWarningEvent = {
+        id: 'pw-test',
+        timestamp: 1640995201200,
+        sessionId: 'session-1',
+        type: 'performance_warning',
+        method: 'setTimeout',
+        operation: 'short_timeout_detected',
+        delay: 5,
+        warning: 'Timeout less than 10ms detected'
+      };
+      const formatter = new TimelineFormatter([pwEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Performance Warning: setTimeout - Timeout less than 10ms detected');
+    });
+
+    test('should format service_worker event summary', () => {
+      const swEvent: ServiceWorkerEvent = {
+        id: 'sw-test',
+        timestamp: 1640995201300,
+        sessionId: 'session-1',
+        type: 'service_worker',
+        eventType: 'register',
+        scriptUrl: '/service-worker.js',
+        scope: '/'
+      };
+      const formatter = new TimelineFormatter([swEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Service Worker: register');
+      expect(timeline[0]?.summary).toContain('/service-worker.js');
+    });
+
+    test('should format code_execution event summary', () => {
+      const codeEvent: CodeExecutionEvent = {
+        id: 'code-test',
+        timestamp: 1640995201400,
+        sessionId: 'session-1',
+        type: 'code_execution',
+        method: 'eval',
+        operation: 'execute',
+        code: 'console.log("malicious code"); alert("warning");',
+        codeLength: 48
+      };
+      const formatter = new TimelineFormatter([codeEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Code Execution: eval(console.log("malicious code");');
+    });
+
+    test('should format encoding event summary', () => {
+      const encEvent: EncodingEvent = {
+        id: 'enc-test',
+        timestamp: 1640995201500,
+        sessionId: 'session-1',
+        type: 'encoding',
+        method: 'atob',
+        operation: 'decode',
+        output: 'decoded string output',
+        outputLength: 20,
+        success: true
+      };
+      const formatter = new TimelineFormatter([encEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Encoding: atob.decode -> decoded string output...');
+    });
+
+    test('should format cryptojs event summary with algorithm', () => {
+      const cryptoEvent: CryptoJSEvent = {
+        id: 'crypto-test',
+        timestamp: 1640995201600,
+        sessionId: 'session-1',
+        type: 'cryptojs',
+        method: 'AES.decrypt',
+        operation: 'decrypt',
+        algorithm: 'AES',
+        key: 'secretkey123',
+        output: 'decrypted plaintext',
+        outputLength: 18,
+        success: true
+      };
+      const formatter = new TimelineFormatter([cryptoEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('CryptoJS: AES.decrypt.decrypt (AES)');
+      expect(timeline[0]?.summary).toContain('key=secretkey123');
+    });
+
+    test('should format cryptojs event summary with encoding', () => {
+      const cryptoEvent: CryptoJSEvent = {
+        id: 'crypto-enc-test',
+        timestamp: 1640995201700,
+        sessionId: 'session-1',
+        type: 'cryptojs',
+        method: 'enc.Base64.parse',
+        operation: 'parse',
+        encoding: 'Base64',
+        output: 'parsed data',
+        outputLength: 11,
+        success: true
+      };
+      const formatter = new TimelineFormatter([cryptoEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('CryptoJS: enc.Base64.parse.parse (Base64)');
+    });
+
+    test('should format script_injection event summary', () => {
+      const siEvent: ScriptInjectionEvent = {
+        id: 'si-test',
+        timestamp: 1640995201800,
+        sessionId: 'session-1',
+        type: 'script_injection',
+        method: 'innerHTML',
+        htmlContent: '<script>alert("xss")</script><div>content</div>',
+        htmlLength: 47,
+        containsScriptTag: true,
+        scriptTagCount: 1
+      };
+      const formatter = new TimelineFormatter([siEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Script Injection: innerHTML (<script>alert("xss")</script><div>content</div>...');
+    });
+
+    test('should format event_handler event summary', () => {
+      const ehEvent: EventHandlerEvent = {
+        id: 'eh-test',
+        timestamp: 1640995201900,
+        sessionId: 'session-1',
+        type: 'event_handler',
+        eventType: 'property_set',
+        handlerName: 'onclick',
+        handlerCode: 'function() { window.location = "http://evil.com"; }',
+        element: 'button#submit',
+        method: 'property_assignment'
+      };
+      const formatter = new TimelineFormatter([ehEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Event Handler: onclick on button#submit');
+    });
+
+    test('should format blob create event summary', () => {
+      const blobEvent: BlobEvent = {
+        id: 'blob-create-test',
+        timestamp: 1640995202000,
+        sessionId: 'session-1',
+        type: 'blob',
+        eventType: 'blob_create',
+        blobType: 'text/javascript',
+        blobSize: 1024
+      };
+      const formatter = new TimelineFormatter([blobEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Blob Create: text/javascript (1024 bytes)');
+    });
+
+    test('should format blob url create event summary', () => {
+      const blobEvent: BlobEvent = {
+        id: 'blob-url-test',
+        timestamp: 1640995202100,
+        sessionId: 'session-1',
+        type: 'blob',
+        eventType: 'blob_url_create',
+        blobUrl: 'blob:http://example.com/abc123',
+        blobType: 'application/javascript'
+      };
+      const formatter = new TimelineFormatter([blobEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Blob URL Create: blob:http://example.com/abc123 (application/javascript)');
+    });
+
+    test('should format blob url revoke event summary', () => {
+      const blobEvent: BlobEvent = {
+        id: 'blob-revoke-test',
+        timestamp: 1640995202200,
+        sessionId: 'session-1',
+        type: 'blob',
+        eventType: 'blob_url_revoke',
+        blobUrl: 'blob:http://example.com/abc123'
+      };
+      const formatter = new TimelineFormatter([blobEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Blob URL Revoke: blob:http://example.com/abc123');
+    });
+
+    test('should format url_execution event summary', () => {
+      const urlEvent: URLExecutionEvent = {
+        id: 'url-exec-test',
+        timestamp: 1640995202300,
+        sessionId: 'session-1',
+        type: 'url_execution',
+        eventType: 'location_href_set',
+        url: 'javascript:alert("xss")',
+        code: 'alert("xss")'
+      };
+      const formatter = new TimelineFormatter([urlEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('JavaScript URL: location_href_set (alert("xss")');
+    });
+
+    test('should format worker create event summary', () => {
+      const workerEvent: WorkerEvent = {
+        id: 'worker-create-test',
+        timestamp: 1640995202400,
+        sessionId: 'session-1',
+        type: 'worker',
+        eventType: 'worker_create',
+        workerType: 'Worker',
+        scriptURL: '/worker.js'
+      };
+      const formatter = new TimelineFormatter([workerEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Worker Create: Worker (/worker.js)');
+    });
+
+    test('should format worker postmessage event summary', () => {
+      const workerEvent: WorkerEvent = {
+        id: 'worker-msg-test',
+        timestamp: 1640995202500,
+        sessionId: 'session-1',
+        type: 'worker',
+        eventType: 'worker_postmessage',
+        workerType: 'Worker',
+        scriptURL: '/worker.js',
+        message: 'message data here',
+        direction: 'to_worker'
+      };
+      const formatter = new TimelineFormatter([workerEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Worker PostMessage: to_worker (message data here');
+    });
+
+    test('should format worker message event summary', () => {
+      const workerEvent: WorkerEvent = {
+        id: 'worker-msg2-test',
+        timestamp: 1640995202600,
+        sessionId: 'session-1',
+        type: 'worker',
+        eventType: 'worker_message',
+        workerType: 'Worker',
+        scriptURL: '/worker.js',
+        message: 'response from worker',
+        direction: 'from_worker'
+      };
+      const formatter = new TimelineFormatter([workerEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Worker Message: from_worker (response from worker');
+    });
+
+    test('should format worker error event summary', () => {
+      const workerEvent: WorkerEvent = {
+        id: 'worker-error-test',
+        timestamp: 1640995202700,
+        sessionId: 'session-1',
+        type: 'worker',
+        eventType: 'worker_error',
+        workerType: 'Worker',
+        scriptURL: '/worker.js',
+        error: 'Worker script failed to load'
+      };
+      const formatter = new TimelineFormatter([workerEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Worker Error: Worker script failed to load');
+    });
+
+    test('should format module inline event summary', () => {
+      const moduleEvent: ModuleEvent = {
+        id: 'module-inline-test',
+        timestamp: 1640995202800,
+        sessionId: 'session-1',
+        type: 'module',
+        eventType: 'module_script_inject',
+        isInline: true,
+        content: 'import { malware } from "./evil.js"; malware.run();'
+      };
+      const formatter = new TimelineFormatter([moduleEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Module Script Inject: inline (import { malware } from "./evil.js"; malware.run()');
+      expect(timeline[0]?.summary).toContain('...');
+    });
+
+    test('should format module external event summary', () => {
+      const moduleEvent: ModuleEvent = {
+        id: 'module-external-test',
+        timestamp: 1640995202900,
+        sessionId: 'session-1',
+        type: 'module',
+        eventType: 'module_script_inject',
+        isInline: false,
+        src: 'https://evil.com/malware.mjs'
+      };
+      const formatter = new TimelineFormatter([moduleEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Module Script Inject: https://evil.com/malware.mjs');
+    });
+
+    test('should format iframe create event summary', () => {
+      const iframeEvent: IframeEvent = {
+        id: 'iframe-create-test',
+        timestamp: 1640995203000,
+        sessionId: 'session-1',
+        type: 'iframe',
+        eventType: 'iframe_create',
+        element: 'iframe#malicious',
+        src: 'https://evil.com/phishing.html',
+        scriptCount: 3
+      };
+      const formatter = new TimelineFormatter([iframeEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Iframe Create: https://evil.com/phishing.html (3 scripts)');
+    });
+
+    test('should format iframe srcdoc event summary', () => {
+      const iframeEvent: IframeEvent = {
+        id: 'iframe-srcdoc-test',
+        timestamp: 1640995203100,
+        sessionId: 'session-1',
+        type: 'iframe',
+        eventType: 'iframe_srcdoc_set',
+        element: 'iframe#embedded',
+        scriptCount: 2
+      };
+      const formatter = new TimelineFormatter([iframeEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toBe('Iframe Srcdoc Set: iframe#embedded (2 scripts)');
+    });
+
+    test('should format iframe eval event summary', () => {
+      const iframeEvent: IframeEvent = {
+        id: 'iframe-eval-test',
+        timestamp: 1640995203200,
+        sessionId: 'session-1',
+        type: 'iframe',
+        eventType: 'iframe_eval',
+        element: 'iframe#sandbox',
+        code: 'window.parent.postMessage("stolen data", "*");'
+      };
+      const formatter = new TimelineFormatter([iframeEvent]);
+      const timeline = formatter.formatTimeline();
+      expect(timeline[0]?.summary).toContain('Iframe Eval: window.parent.postMessage("stolen data", "*");');
+    });
+
+    // Branch coverage tests
+    test('should format text with multiple simultaneous events showing individual bullets', () => {
+      const simultaneousEvents: MonitoringEvent[] = [
+        {
+          id: 'event1',
+          timestamp: 1640995203300,
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'First event',
+          args: []
+        } as ConsoleEvent,
+        {
+          id: 'event2',
+          timestamp: 1640995203300,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'POST',
+          url: 'https://api.example.com/data'
+        } as NetworkEvent,
+        {
+          id: 'event3',
+          timestamp: 1640995203300,
+          sessionId: 'session-1',
+          type: 'storage',
+          storageType: 'localStorage',
+          operation: 'set',
+          key: 'token'
+        } as StorageEvent
+      ];
+
+      const formatter = new TimelineFormatter(simultaneousEvents);
+      const text = formatter.formatAsText();
+
+      // Should indicate multiple events
+      expect(text).toContain('(3 events)');
+      // Should have individual bullet points for each event
+      expect(text).toMatch(/\s+-\s+/);
+      // Should contain summaries from all events
+      expect(text).toContain('console');
+      expect(text).toContain('network');
+      expect(text).toContain('storage');
+    });
+
+    // Edge case tests
+    test('should handle empty filtered timeline', () => {
+      const events: MonitoringEvent[] = [
+        {
+          id: 'event1',
+          timestamp: 1000,
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'Test',
+          args: []
+        } as ConsoleEvent
+      ];
+
+      const formatter = new TimelineFormatter(events);
+      const timeline = formatter.formatTimeline({ start: 2000, end: 3000 });
+
+      expect(timeline).toEqual([]);
+    });
+
+    test('should handle empty filtered timeline in text format', () => {
+      const events: MonitoringEvent[] = [
+        {
+          id: 'event1',
+          timestamp: 1000,
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'Test',
+          args: []
+        } as ConsoleEvent
+      ];
+
+      const formatter = new TimelineFormatter(events);
+      const text = formatter.formatAsText({ start: 2000, end: 3000 });
+
+      expect(text).toBe('No events found in the specified time range.');
+    });
+
+    test('should group events within 50ms tolerance', () => {
+      const events: MonitoringEvent[] = [
+        {
+          id: 'event1',
+          timestamp: 1000,
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'Event 1',
+          args: []
+        } as ConsoleEvent,
+        {
+          id: 'event2',
+          timestamp: 1049,  // Within 50ms - should group
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'Event 2',
+          args: []
+        } as ConsoleEvent,
+        {
+          id: 'event3',
+          timestamp: 1051,  // Outside 50ms - separate group
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'Event 3',
+          args: []
+        } as ConsoleEvent
+      ];
+
+      const formatter = new TimelineFormatter(events);
+      const timeline = formatter.formatTimeline();
+
+      // Should create 2 groups, not 3
+      expect(timeline.length).toBe(2);
+      // First group should have 2 events
+      expect(timeline[0]?.events.length).toBe(2);
+      // Second group should have 1 event
+      expect(timeline[1]?.events.length).toBe(1);
+    });
+
+    test('should handle events with missing optional fields', () => {
+      const event: NetworkEvent = {
+        id: 'minimal-net-event',
+        timestamp: 1640995203400,
+        sessionId: 'session-1',
+        type: 'network',
+        method: 'GET',
+        url: 'https://example.com'
+        // Missing: status, statusText, headers, duration, etc.
+      };
+
+      const formatter = new TimelineFormatter([event]);
+      const summary = formatter.formatTimeline()[0]?.summary;
+
+      // Should not crash and should produce a summary
+      expect(summary).toBeTruthy();
+      expect(summary).toContain('GET');
+      expect(summary).toContain('https://example.com');
+    });
+
+    test('should handle encoding event with missing message field in worker', () => {
+      const workerEvent: WorkerEvent = {
+        id: 'worker-no-msg',
+        timestamp: 1640995203500,
+        sessionId: 'session-1',
+        type: 'worker',
+        eventType: 'worker_postmessage',
+        workerType: 'Worker',
+        scriptURL: '/worker.js',
+        direction: 'to_worker'
+        // message field is missing
+      };
+
+      const formatter = new TimelineFormatter([workerEvent]);
+      const summary = formatter.formatTimeline()[0]?.summary;
+
+      // Should handle missing message gracefully
+      expect(summary).toBeTruthy();
+      expect(summary).toContain('Worker PostMessage');
+    });
+
+    test('should handle module event without content', () => {
+      const moduleEvent: ModuleEvent = {
+        id: 'module-no-content',
+        timestamp: 1640995203600,
+        sessionId: 'session-1',
+        type: 'module',
+        eventType: 'module_script_inject',
+        isInline: true
+        // content field is missing
+      };
+
+      const formatter = new TimelineFormatter([moduleEvent]);
+      const summary = formatter.formatTimeline()[0]?.summary;
+
+      // Should handle missing content gracefully
+      expect(summary).toBeTruthy();
+      expect(summary).toContain('Module Script Inject: inline');
+    });
+
+    test('should handle iframe create without src (inline srcdoc)', () => {
+      const iframeEvent: IframeEvent = {
+        id: 'iframe-no-src',
+        timestamp: 1640995203700,
+        sessionId: 'session-1',
+        type: 'iframe',
+        eventType: 'iframe_create',
+        element: 'iframe#inline',
+        scriptCount: 1
+        // src field is missing
+      };
+
+      const formatter = new TimelineFormatter([iframeEvent]);
+      const summary = formatter.formatTimeline()[0]?.summary;
+
+      // Should show 'inline srcdoc' when src is missing
+      expect(summary).toBeTruthy();
+      expect(summary).toContain('inline srcdoc');
+    });
+
+    test('should handle time grouping at exact 50ms boundary', () => {
+      const events: MonitoringEvent[] = [
+        {
+          id: 'event1',
+          timestamp: 1000,
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'Event 1',
+          args: []
+        } as ConsoleEvent,
+        {
+          id: 'event2',
+          timestamp: 1050,  // Exactly 50ms - should still group
+          sessionId: 'session-1',
+          type: 'console',
+          level: 'log',
+          message: 'Event 2',
+          args: []
+        } as ConsoleEvent
+      ];
+
+      const formatter = new TimelineFormatter(events);
+      const timeline = formatter.formatTimeline();
+
+      // Should group events at exactly 50ms boundary
+      expect(timeline.length).toBe(1);
+      expect(timeline[0]?.events.length).toBe(2);
     });
   });
 
