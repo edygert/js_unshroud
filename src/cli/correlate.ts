@@ -82,7 +82,7 @@ export function parseCorrelateArgs(): CorrelateArgs {
  * @param rulesFile - Optional explicit rules file path
  * @returns Resolved path to rules file
  */
-function resolveRulesFilePath(rulesFile?: string): string {
+export function resolveRulesFilePath(rulesFile?: string): string {
   // Priority:
   // 1. Explicit --rules-file path
   // 2. ./correlation_rules.json (current directory)
@@ -245,7 +245,7 @@ export function loadCustomRules(rulesFilePath: string): CorrelationRule[] {
  * @param event - Event to summarize
  * @returns Summary string
  */
-function formatEventSummary(event: MonitoringEvent): string {
+export function formatEventSummary(event: MonitoringEvent): string {
   // Type-specific summaries
   // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
   switch (event.type) {

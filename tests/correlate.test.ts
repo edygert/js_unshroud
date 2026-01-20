@@ -1,7 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { parseCorrelateArgs, validateArgs, loadCustomRules, correlateEvents } from '../src/cli/correlate.ts';
-import type { MonitoringEvent, NetworkEvent, StorageEvent, ErrorEvent } from '../src/schema/types.ts';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { parseCorrelateArgs, validateArgs, loadCustomRules, correlateEvents, formatEventSummary, resolveRulesFilePath, runCorrelate } from '../src/cli/correlate.ts';
+import type { MonitoringEvent, NetworkEvent, StorageEvent, ErrorEvent, ConsoleEvent, TimerEvent, CodeExecutionEvent, FingerprintingEvent } from '../src/schema/types.ts';
 import { writeFileSync, unlinkSync } from 'fs';
+import * as fs from 'fs';
 
 describe('Correlate Command Tests', () => {
   let originalArgv: string[];
@@ -81,6 +82,65 @@ describe('Correlate Command Tests', () => {
       expect(args.format).toBe('text');
       expect(args.output).toBe('out.txt');
     });
+
+    test('should exit with code 0 and print help on --help', () => {
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+      const mockLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      process.argv = ['node', 'runner.ts', 'correlate', '--help'];
+
+      parseCorrelateArgs();
+
+      expect(mockExit).toHaveBeenCalledWith(0);
+      expect(mockLog).toHaveBeenCalled();
+      // Verify help text contains usage information
+      const logCalls = mockLog.mock.calls.flat().join(' ');
+      expect(logCalls).toContain('Usage:');
+
+      mockExit.mockRestore();
+      mockLog.mockRestore();
+    });
+
+    test('should handle -h short flag', () => {
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+      const mockLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      process.argv = ['node', 'runner.ts', 'correlate', '-h'];
+
+      parseCorrelateArgs();
+
+      expect(mockExit).toHaveBeenCalledWith(0);
+      expect(mockLog).toHaveBeenCalled();
+
+      mockExit.mockRestore();
+      mockLog.mockRestore();
+    });
+
+    test('should exit with code 1 when --input missing', () => {
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+      const mockError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      process.argv = ['node', 'runner.ts', 'correlate', '--format', 'json'];
+
+      parseCorrelateArgs();
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining('--input'));
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining('required'));
+
+      mockExit.mockRestore();
+      mockError.mockRestore();
+    });
+
+    test('should handle invalid format values gracefully', () => {
+      process.argv = ['node', 'runner.ts', 'correlate', '--input', 'test.jsonl', '--format', 'invalid'];
+
+      const args = parseCorrelateArgs();
+
+      // Invalid format should be silently ignored (not set)
+      expect(args.format).toBeUndefined();
+      expect(args.input).toBe('test.jsonl');
+    });
   });
 
   describe('validateArgs', () => {
@@ -115,6 +175,46 @@ describe('Correlate Command Tests', () => {
 
       expect(() => validateArgs(argsText)).not.toThrow();
       expect(() => validateArgs(argsJson)).not.toThrow();
+    });
+  });
+
+  describe('resolveRulesFilePath', () => {
+    test('should use explicit rules file when provided', () => {
+      const customPath = '/custom/path/my_rules.json';
+      const result = resolveRulesFilePath(customPath);
+
+      // Should resolve to absolute path
+      expect(result).toContain('my_rules.json');
+      expect(result).toContain('/custom/path/');
+    });
+
+    test('should fallback to current directory', () => {
+      // Mock existsSync to return true for CWD path
+      const mockExists = vi.spyOn(fs, 'existsSync').mockImplementation((path: any) => {
+        const pathStr = path.toString();
+        return pathStr.includes(process.cwd()) && pathStr.endsWith('correlation_rules.json');
+      });
+
+      const result = resolveRulesFilePath();
+
+      expect(result).toContain('correlation_rules.json');
+      expect(result).toContain(process.cwd());
+
+      mockExists.mockRestore();
+    });
+
+    test('should fallback to project root when CWD file missing', () => {
+      // Mock existsSync to return false for CWD, forcing project root fallback
+      const mockExists = vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+      const result = resolveRulesFilePath();
+
+      // Should contain correlation_rules.json and point to project root
+      expect(result).toContain('correlation_rules.json');
+      // Result should be an absolute path
+      expect(result.startsWith('/')).toBe(true);
+
+      mockExists.mockRestore();
     });
   });
 
@@ -323,6 +423,115 @@ describe('Correlate Command Tests', () => {
       writeFileSync(tempRulesPath, JSON.stringify(invalidRules), 'utf-8');
 
       expect(() => loadCustomRules(tempRulesPath)).toThrow('must be a string');
+    });
+  });
+
+  describe('formatEventSummary', () => {
+    test('should format console events with level and message', () => {
+      const event: ConsoleEvent = {
+        id: 'evt_123',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'console',
+        level: 'error',
+        message: 'Test error message'
+      };
+
+      const result = formatEventSummary(event);
+      expect(result).toBe('[error] Test error message');
+    });
+
+    test('should format error events with message', () => {
+      const event: ErrorEvent = {
+        id: 'evt_789',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'error',
+        message: 'Something went wrong',
+        stack: 'Error stack trace'
+      };
+
+      const result = formatEventSummary(event);
+      expect(result).toBe('Something went wrong');
+    });
+
+    test('should format timer events with timer type', () => {
+      const event: TimerEvent = {
+        id: 'evt_timer',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'timer',
+        timerType: 'setTimeout',
+        operation: 'create',
+        delay: 1000
+      };
+
+      const result = formatEventSummary(event);
+      expect(result).toBe('setTimeout');
+    });
+
+    test('should format code execution events with truncated code preview', () => {
+      const longCode = 'a'.repeat(50); // 50 characters, should be truncated to 40
+      const event: CodeExecutionEvent = {
+        id: 'evt_code',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'code_execution',
+        method: 'eval',
+        operation: 'execute',
+        code: longCode,
+        codeLength: longCode.length
+      };
+
+      const result = formatEventSummary(event);
+      expect(result).toContain('eval("');
+      expect(result).toContain('...');
+      expect(result).toHaveLength('eval("'.length + 40 + '...")'.length);
+    });
+
+    test('should format code execution events without truncation for short code', () => {
+      const shortCode = 'console.log("test")';
+      const event: CodeExecutionEvent = {
+        id: 'evt_code',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'code_execution',
+        method: 'eval',
+        operation: 'execute',
+        code: shortCode,
+        codeLength: shortCode.length
+      };
+
+      const result = formatEventSummary(event);
+      expect(result).toBe(`eval("${shortCode}")`);
+      expect(result).not.toContain('...');
+    });
+
+    test('should format fingerprinting events with method name', () => {
+      const event: FingerprintingEvent = {
+        id: 'evt_fp',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'fingerprinting',
+        method: 'canvas.toDataURL',
+        operation: 'call'
+      };
+
+      const result = formatEventSummary(event);
+      expect(result).toBe('canvas.toDataURL()');
+    });
+
+    test('should fallback to event.id for unknown event types', () => {
+      // Create a mock event with an unknown type to test the default case
+      const event = {
+        id: 'evt_unknown',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'unknown_type'
+      } as unknown as MonitoringEvent;
+
+      const result = formatEventSummary(event);
+      expect(result).toBe('evt_unknown');
     });
   });
 
@@ -631,6 +840,92 @@ describe('Correlate Command Tests', () => {
 
       expect(output).toContain('Correlation Chains');
       expect(output).toContain('================================================================================');
+    });
+  });
+
+  describe('runCorrelate', () => {
+    test('should handle file write errors gracefully', async () => {
+      // Setup valid input and rules files first (before mocking)
+      const testRules = {
+        rules: [{
+          name: 'test-rule',
+          description: 'Test',
+          patterns: { type: 'sequence' as const, events: ['network'] }
+        }]
+      };
+
+      writeFileSync(tempFilePath, '', 'utf-8');
+      writeFileSync(tempRulesPath, JSON.stringify(testRules), 'utf-8');
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+      const mockError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Mock writeFileSync to throw only for output file (not for our setup above)
+      const originalWriteFileSync = fs.writeFileSync;
+      const mockWrite = vi.spyOn(fs, 'writeFileSync').mockImplementation((path: any, data: any, options?: any) => {
+        const pathStr = path.toString();
+        if (pathStr.includes('/invalid/path/')) {
+          throw new Error('EACCES: permission denied');
+        }
+        // For other paths, call original
+        return originalWriteFileSync(path, data, options);
+      });
+
+      // Mock process.argv to simulate command-line arguments
+      process.argv = ['node', 'runner.ts', 'correlate', '--input', tempFilePath, '--rules-file', tempRulesPath, '--output', '/invalid/path/output.txt'];
+
+      await runCorrelate();
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining('permission denied'));
+
+      mockWrite.mockRestore();
+      mockExit.mockRestore();
+      mockError.mockRestore();
+    });
+
+    test('should handle correlateEvents errors', async () => {
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+      const mockError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Setup input file but no rules file (will cause error)
+      writeFileSync(tempFilePath, '', 'utf-8');
+
+      // Mock process.argv with missing rules file
+      process.argv = ['node', 'runner.ts', 'correlate', '--input', tempFilePath, '--rules-file', '/nonexistent/rules.json'];
+
+      await runCorrelate();
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(mockError).toHaveBeenCalled();
+
+      mockExit.mockRestore();
+      mockError.mockRestore();
+    });
+
+    test('should output to stdout when no output file specified', async () => {
+      // Setup valid files
+      const testRules = {
+        rules: [{
+          name: 'test-rule',
+          description: 'Test',
+          patterns: { type: 'sequence' as const, events: ['network'] }
+        }]
+      };
+
+      writeFileSync(tempFilePath, '', 'utf-8');
+      writeFileSync(tempRulesPath, JSON.stringify(testRules), 'utf-8');
+
+      const mockLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      process.argv = ['node', 'runner.ts', 'correlate', '--input', tempFilePath, '--rules-file', tempRulesPath];
+
+      await runCorrelate();
+
+      // Should log output to stdout (console.log)
+      expect(mockLog).toHaveBeenCalled();
+
+      mockLog.mockRestore();
     });
   });
 
