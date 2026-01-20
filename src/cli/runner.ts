@@ -158,7 +158,7 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
 /**
  * Conditional logger that only outputs when debug mode is enabled
  */
-class Logger {
+export class Logger {
   constructor(private readonly config: InstrumentationConfig) {}
 
   log(message: string): void {
@@ -486,7 +486,7 @@ async function performCleanup(browser: Browser, eventLogger: EventLogger, logger
  * Generate spoofed user agent to mask headless browser indicators.
  * Uses Windows to appear as the most common desktop platform.
  */
-function generateSpoofedUserAgent(): string {
+export function generateSpoofedUserAgent(): string {
   return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36';
 }
 
@@ -494,7 +494,7 @@ function generateSpoofedUserAgent(): string {
  * Generate brand metadata for sec-ch-ua headers.
  * This controls what appears in the Client Hints headers.
  */
-function generateBrandMetadata(): Array<{ brand: string; version: string }> {
+export function generateBrandMetadata(): Array<{ brand: string; version: string }> {
   return [
     { brand: 'Chromium', version: '143' },
     { brand: 'Not A(Brand)', version: '24' },
@@ -507,7 +507,7 @@ function generateBrandMetadata(): Array<{ brand: string; version: string }> {
  * Note: User-Agent and sec-ch-ua are handled via CDP Emulation.setUserAgentOverride.
  * These headers serve as fallback for any subrequests.
  */
-function generateSpoofedHeaders(): Record<string, string> {
+export function generateSpoofedHeaders(): Record<string, string> {
   return {
     'Upgrade-Insecure-Requests': '1',
     'sec-ch-ua': '"Chromium";v="143", "Not A(Brand";v="24", "Google Chrome";v="143"',
@@ -526,7 +526,7 @@ function generateSpoofedHeaders(): Record<string, string> {
 /**
  * Generate random number between min and max
  */
-function rand(min: number, max: number): number {
+export function rand(min: number, max: number): number {
   return Math.random() * (max - min) + min;
 }
 
@@ -1082,8 +1082,5 @@ export {
   loadInstrumentationScripts,
   injectInstrumentation,
   performCleanup,
-  runMonitoring,
-  generateSpoofedUserAgent,
-  generateBrandMetadata,
-  generateSpoofedHeaders
+  runMonitoring
 };
