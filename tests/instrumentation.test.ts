@@ -52,6 +52,7 @@ const serviceWorkerHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
 const codeExecutionHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/code-execution-hooks.js'), 'utf-8');
 const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/encoding-hooks.js'), 'utf-8');
 const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/cryptojs-hooks.js'), 'utf-8');
+const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/clipboard-hooks.js'), 'utf-8');
 
   beforeAll(async () => {
     browser = await chromium.launch({ headless: true });
@@ -4371,6 +4372,446 @@ const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
         const isCheckout = /checkout|payment|cart|onepage|billing/i.test(url);
         expect(isCheckout).toBe(expected);
       }
+    });
+  });
+
+  describe('Clipboard Hooks Script (ClickFix Detection)', () => {
+    test('should intercept navigator.clipboard.writeText (modern ClickFix)', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: true,
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      // Simulate ClickFix attack with PowerShell payload
+      await page.evaluate(async () => {
+        const maliciousPayload = 'powershell -enc JABjAGwAaQBlAG4AdAAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0';
+        await navigator.clipboard.writeText(maliciousPayload);
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      expect(clipboardEvents.length).toBeGreaterThan(0);
+
+      const writeEvent = clipboardEvents.find((e: any) => e.operation === 'writeText');
+      expect(writeEvent).toBeDefined();
+      expect(writeEvent.method).toBe('navigator.clipboard.writeText');
+      expect(writeEvent.data).toContain('powershell');
+      expect(writeEvent.success).toBe(true);
+      expect(writeEvent.containsPowerShell).toBe(true);
+      expect(writeEvent.suspiciousPatterns).toContain('powershell');
+
+      await page.close();
+    });
+
+    test('should detect Base64-encoded patterns in clipboard writes', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: true,
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(async () => {
+        const base64Payload = 'powershell -encodedCommand JABMAG8AZwBnAGUAcgA=';
+        await navigator.clipboard.writeText(base64Payload);
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      const writeEvent = clipboardEvents.find((e: any) => e.operation === 'writeText');
+
+      expect(writeEvent).toBeDefined();
+      expect(writeEvent.isBase64Encoded).toBe(true);
+      expect(writeEvent.suspiciousPatterns).toContain('base64');
+      expect(writeEvent.suspiciousPatterns).toContain('powershell');
+
+      await page.close();
+    });
+
+    test('should detect MSHTA patterns in clipboard writes', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: true,
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(async () => {
+        const mshtaPayload = 'mshta vbscript:Execute("CreateObject(""WScript.Shell"")")';
+        await navigator.clipboard.writeText(mshtaPayload);
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      const writeEvent = clipboardEvents.find((e: any) => e.operation === 'writeText');
+
+      expect(writeEvent).toBeDefined();
+      expect(writeEvent.containsMSHTA).toBe(true);
+      expect(writeEvent.suspiciousPatterns).toContain('mshta');
+
+      await page.close();
+    });
+
+    test('should intercept document.execCommand copy (legacy ClickFix)', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: true,
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = 'cmd.exe /c rundll32 malware.dll';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      const execCommandEvent = clipboardEvents.find((e: any) =>
+        e.operation === 'execCommand' && e.command === 'copy'
+      );
+
+      expect(execCommandEvent).toBeDefined();
+      expect(execCommandEvent.method).toBe('document.execCommand');
+      expect(execCommandEvent.data).toContain('cmd.exe');
+      expect(execCommandEvent.suspiciousPatterns).toContain('run_dialog');
+
+      await page.close();
+    });
+
+    test('should NOT log clipboard writes when enableClipboard is false', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: false,  // Disabled
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(async () => {
+        await navigator.clipboard.writeText('test content');
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      expect(clipboardEvents.length).toBe(0);
+
+      await page.close();
+    });
+
+    test('should respect eventFiltering.clipboard.enableWriteOperations', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: true,
+          maxPayloadSize: 2051,
+          eventFiltering: {
+            clipboard: {
+              enableWriteOperations: false  // Filter writes
+            }
+          }
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(async () => {
+        await navigator.clipboard.writeText('filtered content');
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      expect(clipboardEvents.length).toBe(0);
+
+      await page.close();
+    });
+
+    test('should detect obfuscated patterns in clipboard writes', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: true,
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(async () => {
+        // Very long random string (likely obfuscated)
+        const obfuscated = 'a'.repeat(150) + 'b'.repeat(50);
+        await navigator.clipboard.writeText(obfuscated);
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      const writeEvent = clipboardEvents.find((e: any) => e.operation === 'writeText');
+
+      expect(writeEvent).toBeDefined();
+      expect(writeEvent.suspiciousPatterns).toContain('obfuscation');
+
+      await page.close();
+    });
+
+    test('should NOT detect patterns when clipboardPatternDetection is false', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: false,  // Pattern detection disabled
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+      await page.goto('about:blank');
+      await page.waitForTimeout(200);
+
+      await page.evaluate(async () => {
+        await navigator.clipboard.writeText('powershell -enc malicious');
+      });
+
+      await page.waitForTimeout(500);
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      const writeEvent = clipboardEvents.find((e: any) => e.operation === 'writeText');
+
+      expect(writeEvent).toBeDefined();
+      // When pattern detection is disabled, suspiciousPatterns should be undefined or empty
+      expect(writeEvent.suspiciousPatterns === undefined || writeEvent.suspiciousPatterns.length === 0).toBe(true);
+      expect(writeEvent.containsPowerShell).toBe(false);
+
+      await page.close();
+    });
+
+    test('should work with ClickFix test fixtures', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = {
+          enableClipboard: true,
+          clipboardPatternDetection: true,
+          maxPayloadSize: 2051
+        };
+        // Mock navigator.clipboard (needed for headless browser)
+        (navigator as any).clipboard = {
+          writeText: async (_text: string) => Promise.resolve(),
+          write: async (_data: any) => Promise.resolve(),
+          readText: async () => Promise.resolve(''),
+          read: async () => Promise.resolve([])
+        };
+      });
+
+      await page.addInitScript(clipboardHooksScript);
+
+      // Load the modern ClickFix test fixture
+      const fixturePath = 'file://' + join(process.cwd(), 'tests/fixtures/clickfix-modern.html');
+      await page.goto(fixturePath);
+      await page.waitForTimeout(2000);  // Wait for auto-trigger
+
+      const clipboardEvents = events.filter((e: any) => e.type === 'clipboard');
+      expect(clipboardEvents.length).toBeGreaterThan(0);
+
+      const writeEvent = clipboardEvents.find((e: any) =>
+        e.operation === 'writeText' && e.containsPowerShell === true
+      );
+
+      expect(writeEvent).toBeDefined();
+      expect(writeEvent.isBase64Encoded).toBe(true);
+
+      await page.close();
     });
   });
 });

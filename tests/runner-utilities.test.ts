@@ -81,6 +81,8 @@ describe('Runner Utility Functions', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: true,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,

@@ -223,6 +223,8 @@ describe('Instrumentation Script Loading', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: true,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -262,6 +264,8 @@ describe('Instrumentation Script Loading', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: true,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -300,6 +304,8 @@ describe('Instrumentation Script Loading', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: true,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -339,6 +345,8 @@ describe('Instrumentation Injection', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: true,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -359,7 +367,7 @@ describe('Instrumentation Injection', () => {
 
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(6); // bridge + bootstrap + network + storage + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(7); // bridge + bootstrap + network + storage + clipboard + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -387,6 +395,8 @@ describe('Instrumentation Injection', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: true,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -406,7 +416,7 @@ describe('Instrumentation Injection', () => {
 
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(5); // bridge + bootstrap + storage + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(6); // bridge + bootstrap + storage + clipboard + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -434,6 +444,8 @@ describe('Instrumentation Injection', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: true,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -477,6 +489,8 @@ describe('Instrumentation Injection', () => {
       enableWorkers: false,
       enableModules: false,
       enableIframes: false,
+      enableClipboard: false,
+      clipboardPatternDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -496,7 +510,7 @@ describe('Instrumentation Injection', () => {
 
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor (clipboard disabled)
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );

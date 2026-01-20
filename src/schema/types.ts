@@ -263,6 +263,26 @@ export interface IframeEvent extends BaseEvent {
   stackTrace?: string;
 }
 
+export interface ClipboardEvent extends BaseEvent {
+  type: 'clipboard';
+  operation: 'writeText' | 'write' | 'readText' | 'read' | 'execCommand';
+  method: 'navigator.clipboard.writeText' | 'navigator.clipboard.write' |
+          'navigator.clipboard.readText' | 'navigator.clipboard.read' |
+          'document.execCommand';
+  data?: string;              // Clipboard text content (truncated to maxPayloadSize)
+  dataLength: number;         // Original length
+  dataType?: string;          // MIME type for clipboard.write()
+  command?: string;           // execCommand command ('copy', 'cut', 'paste')
+  success: boolean;
+  error?: string;
+  stackTrace?: string;
+  // ClickFix Detection (Optional Enhancement)
+  suspiciousPatterns?: string[];  // Detected malicious patterns
+  containsPowerShell?: boolean;   // Contains PowerShell commands
+  containsMSHTA?: boolean;        // Contains MSHTA commands
+  isBase64Encoded?: boolean;      // Contains Base64 encoding
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -285,7 +305,8 @@ export type MonitoringEvent =
   | URLExecutionEvent
   | WorkerEvent
   | ModuleEvent
-  | IframeEvent;
+  | IframeEvent
+  | ClipboardEvent;
 
 export interface SessionConfig {
   id: string;
@@ -314,6 +335,11 @@ export interface EventFilteringConfig {
     enableFromCharCode?: boolean;       // Character code conversion
     enableURIEncoding?: boolean;        // URI encode/decode
   };
+  clipboard?: {
+    enableReadOperations?: boolean;    // Log clipboard reads (default: false)
+    enableWriteOperations?: boolean;   // Log clipboard writes (default: true)
+    enableEvents?: boolean;            // Log copy/paste/cut events (default: false)
+  };
 }
 
 export interface InstrumentationConfig {
@@ -337,6 +363,8 @@ export interface InstrumentationConfig {
   enableWorkers: boolean;       // Instruments Web Workers and SharedWorkers (creation and messaging)
   enableModules: boolean;       // Instruments ES module <script type="module"> injection
   enableIframes: boolean;       // Instruments iframe creation and srcdoc injection
+  enableClipboard: boolean;     // Instruments clipboard operations (writeText, execCommand, etc.) - CRITICAL for ClickFix detection
+  clipboardPatternDetection: boolean;  // Enable malicious pattern detection (PowerShell, MSHTA, Base64) in clipboard data
   dedupeWindowMs: number;       // Deduplication window in milliseconds
   maxPayloadSize: number;       // Maximum payload size in bytes
   maxStackDepth: number;        // Maximum stack trace depth

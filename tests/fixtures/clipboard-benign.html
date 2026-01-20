@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benign Clipboard Usage - Test Fixture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .code-block {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            position: relative;
+        }
+        .copy-btn {
+            background: #2196F3;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .copy-btn:hover {
+            background: #0b7dda;
+        }
+        .success-msg {
+            color: #4CAF50;
+            font-size: 14px;
+            margin-top: 10px;
+            display: none;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Code Snippet Sharing</h1>
+        <p>Click the buttons below to copy useful code snippets to your clipboard.</p>
+
+        <h3>JavaScript Function</h3>
+        <div class="code-block" id="snippet1">
+function greet(name) {
+    return `Hello, ${name}!`;
+}
+console.log(greet('World'));
+        </div>
+        <button class="copy-btn" onclick="copySnippet('snippet1', this)">Copy Code</button>
+        <div class="success-msg" id="msg1">✓ Copied to clipboard!</div>
+
+        <h3>Installation Command</h3>
+        <div class="code-block" id="snippet2">
+npm install express --save
+        </div>
+        <button class="copy-btn" onclick="copySnippet('snippet2', this)">Copy Command</button>
+        <div class="success-msg" id="msg2">✓ Copied to clipboard!</div>
+
+        <h3>Email Address</h3>
+        <div class="code-block" id="snippet3">
+support@example.com
+        </div>
+        <button class="copy-btn" onclick="copySnippet('snippet3', this)">Copy Email</button>
+        <div class="success-msg" id="msg3">✓ Copied to clipboard!</div>
+    </div>
+
+    <script>
+        // Legitimate clipboard usage - copy code snippets for users
+        async function copySnippet(elementId, button) {
+            try {
+                const element = document.getElementById(elementId);
+                const text = element.textContent.trim();
+
+                // Use modern Clipboard API for benign copy operation
+                await navigator.clipboard.writeText(text);
+
+                // Show success message
+                const msgId = elementId.replace('snippet', 'msg');
+                const msg = document.getElementById(msgId);
+                msg.style.display = 'block';
+
+                // Update button
+                const originalText = button.textContent;
+                button.textContent = '✓ Copied';
+                button.disabled = true;
+
+                console.log('[Benign Clipboard] Copied:', text.substring(0, 50));
+
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    msg.style.display = 'none';
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }, 2000);
+
+            } catch (err) {
+                console.error('[Benign Clipboard] Copy failed:', err);
+                alert('Failed to copy to clipboard. Please enable clipboard permissions.');
+            }
+        }
+
+        // Also test legacy API for benign usage
+        function copyWithLegacyAPI() {
+            const textarea = document.createElement('textarea');
+            textarea.value = 'Legacy API test content';
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+
+            try {
+                const success = document.execCommand('copy');
+                if (success) {
+                    console.log('[Benign Clipboard Legacy] Copy successful');
+                }
+            } catch (err) {
+                console.error('[Benign Clipboard Legacy] Copy failed:', err);
+            }
+
+            document.body.removeChild(textarea);
+        }
+
+        // Test legacy API on load
+        setTimeout(copyWithLegacyAPI, 500);
+    </script>
+</body>
+</html>

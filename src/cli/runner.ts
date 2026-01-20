@@ -96,6 +96,8 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
     enableWorkers: false,          // Instruments Web Workers and SharedWorkers (creation and messaging)
     enableModules: false,          // Instruments ES module <script type="module"> injection
     enableIframes: false,          // Instruments iframe creation and srcdoc injection
+    enableClipboard: true,         // CRITICAL: ClickFix detection - instruments clipboard operations (47% of 2025 attacks)
+    clipboardPatternDetection: true,  // Enable malicious pattern detection (PowerShell, MSHTA, Base64)
     dedupeWindowMs: 100,           // Short window to reduce noise from tight loops
     maxPayloadSize: 2051,         // Captures first 1024 + "..." + last 1024 chars for code/encoding output
     maxStackDepth: 20,
@@ -130,6 +132,11 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
         enableAtobBtoa: false,             // Filter Base64 encoding/decoding (ubiquitous on benign sites)
         enableFromCharCode: true,           // Keep fromCharCode (common obfuscation technique)
         enableURIEncoding: false            // Filter URI encoding (benign noise)
+      },
+      clipboard: {
+        enableReadOperations: false,        // Filter clipboard reads (rarely malicious)
+        enableWriteOperations: true,        // CRITICAL: Always log clipboard writes (ClickFix detection)
+        enableEvents: false                 // Filter copy/paste/cut DOM events (covered by writeText/execCommand)
       }
     }
   };
@@ -218,6 +225,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   worker: string | null;
   module: string | null;
   iframe: string | null;
+  clipboard: string | null;
   performanceMonitor: string;
 } {
   const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
@@ -238,6 +246,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   const workerScript = readFileSync('./src/instrumentation/worker-hooks.js', 'utf-8');
   const moduleScript = readFileSync('./src/instrumentation/module-hooks.js', 'utf-8');
   const iframeScript = readFileSync('./src/instrumentation/iframe-hooks.js', 'utf-8');
+  const clipboardScript = readFileSync('./src/instrumentation/clipboard-hooks.js', 'utf-8');
   const performanceMonitorScript = readFileSync('./src/instrumentation/performance-monitor.js', 'utf-8');
 
   return {
@@ -259,6 +268,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
     worker: config.enableWorkers ? workerScript : null,
     module: config.enableModules ? moduleScript : null,
     iframe: config.enableIframes ? iframeScript : null,
+    clipboard: config.enableClipboard ? clipboardScript : null,
     performanceMonitor: performanceMonitorScript // Always loaded for performance controls
   };
 }
@@ -330,6 +340,8 @@ async function injectInstrumentation(
         enableEventHandlers: config.enableEventHandlers,
         enableBlobTracking: config.enableBlobTracking,
         enableURLExecution: config.enableURLExecution,
+        enableClipboard: config.enableClipboard,
+        clipboardPatternDetection: config.clipboardPatternDetection,
         eventFiltering: config.eventFiltering,
         debug: config.debug ?? false
       })};
@@ -409,6 +421,11 @@ async function injectInstrumentation(
   // Inject iframe hooks after module hooks
   if (scripts.iframe) {
     await page.addInitScript({ content: scripts.iframe });
+  }
+
+  // Inject clipboard hooks for ClickFix detection (CRITICAL for 2025 attack landscape)
+  if (scripts.clipboard) {
+    await page.addInitScript({ content: scripts.clipboard });
   }
 
   if (scripts.fingerprinting) {

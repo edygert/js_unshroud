@@ -183,6 +183,12 @@ export class TimelineFormatter {
         }
       }
 
+      case 'clipboard': {
+        const clipEvent = event;
+        const suspiciousFlag = clipEvent.containsPowerShell || clipEvent.containsMSHTA ? ' [SUSPICIOUS]' : '';
+        return `Clipboard: ${clipEvent.method}.${clipEvent.operation} (${clipEvent.dataLength} bytes)${suspiciousFlag}`;
+      }
+
       default:
         return `${(event as BaseEvent).type} event`;
     }

