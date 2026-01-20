@@ -30,54 +30,17 @@ export class CorrelationEngine {
   private readonly queryEngine: QueryEngine;
   private readonly correlationRules: CorrelationRule[];
 
-  constructor(queryEngine: QueryEngine) {
+  constructor(queryEngine: QueryEngine, rules: CorrelationRule[]) {
     this.queryEngine = queryEngine;
-    this.correlationRules = this.buildDefaultRules();
+    this.correlationRules = rules;
   }
 
-  private buildDefaultRules(): CorrelationRule[] {
-    return [
-      {
-        name: 'storage-to-network',
-        patterns: {
-          type: 'sequence',
-          events: ['storage', 'network'],
-          maxTimeGap: 5000, // 5 seconds
-          correlationField: 'sessionId' // Correlate by session since storage might not have direct correlation to network
-        },
-        description: 'Local storage writes followed by network requests'
-      },
-      {
-        name: 'network-request-response',
-        patterns: {
-          type: 'group',
-          events: ['network', 'network'],
-          maxTimeGap: 10000, // 10 seconds for network round trip
-          correlationField: 'correlationId'
-        },
-        description: 'Network request-response pairs'
-      },
-      {
-        name: 'error-chains',
-        patterns: {
-          type: 'sequence',
-          events: ['network', 'error'],
-          maxTimeGap: 2000, // 2 seconds
-          correlationField: 'correlationId'
-        },
-        description: 'Network failures followed by error events'
-      },
-      {
-        name: 'timer-to-network',
-        patterns: {
-          type: 'sequence',
-          events: ['timer', 'network'],
-          maxTimeGap: 1000, // 1 second
-          correlationField: 'sessionId'
-        },
-        description: 'Timer executions followed by network activity'
-      }
-    ];
+  /**
+   * Get available correlation rule names
+   * @returns Array of rule names
+   */
+  public getAvailableRules(): string[] {
+    return this.correlationRules.map(r => r.name);
   }
 
   async findCorrelations(inputPath: string, ruleName?: string): Promise<CorrelationChain[]> {

@@ -93,7 +93,7 @@ bun run dev --url https://example.com --out events.jsonl --config config.json
 
 ## CLI Commands
 
-js_unshroud has three main subcommands: **run** (capture), **analyze** (format), and **query** (filter).
+js_unshroud has four main subcommands: **run** (capture), **analyze** (format), **query** (filter), and **correlate** (pattern detection).
 
 ### run (Default Command)
 
@@ -171,6 +171,54 @@ js_unshroud query --input <events.jsonl> [FILTERS] [--format jsonl|count] [--out
 - Filter building tests
 - QueryEngine integration tests
 - Large file streaming tests
+
+### correlate
+
+Post-capture correlation analysis using custom rules.
+
+```bash
+js_unshroud correlate --input <events.jsonl> [--rules-file <file>] [--rules <name1,name2,...>] [--format text|json] [--output <file>]
+```
+
+**Implementation:** `src/cli/correlate.ts`
+- Loads correlation rules from JSON file (default: `correlation_rules.json`)
+- Uses CorrelationEngine to find event patterns
+- Outputs text (human-readable) or json (machine-readable) format
+- No filtering capability (use query for pre-filtering events)
+
+**Key Functions:**
+- `parseCorrelateArgs()`: Parse CLI arguments (slice(3) - skip 'node', 'runner.ts', 'correlate')
+- `validateArgs()`: Validate file existence, format, and rules schema
+- `loadCustomRules()`: Load and validate rules from JSON file
+  - Validates rule schema (name, description, patterns)
+  - Validates pattern type (sequence/group), events array, maxTimeGap, correlationField
+- `correlateEvents()`: Execute correlation using CorrelationEngine
+  - Parses comma-delimited rules filter (like query.ts does for --type)
+  - Runs each specified rule and combines results
+  - Sorts combined results by start time
+- `runCorrelate()`: Main entry point
+
+**Rules File Format:**
+- JSON file with `"rules"` array
+- Each rule defines pattern type (sequence/group), event types, time gap, correlation field
+- Default rules file location: `./correlation_rules.json` or `<project-root>/correlation_rules.json`
+- Default rules: storage-to-network, network-request-response, error-chains, timer-to-network
+
+**Output Formats:**
+- `text` (default): Human-readable chain summaries with timestamps and event summaries
+- `json`: Structured JSON with full chain details (totalChains, chains array)
+
+**Architecture Notes:**
+- Streams events via QueryEngine.queryEventsStream() for memory efficiency
+- Supports multiple rule filtering via comma-delimited --rules flag
+- Rules validation happens at CLI layer before engine construction
+- No built-in rules in code - all rules loaded from correlation_rules.json
+
+**Testing:** `tests/correlate.test.ts` - Target 90%+ coverage
+- Argument parsing tests (all flags, error cases)
+- Rules file validation tests (JSON parsing, schema validation, error handling)
+- CorrelationEngine integration tests (single/multiple rules, filtering)
+- Output formatting tests (text and json, zero/single/multiple chains)
 
 ## Configuration System
 

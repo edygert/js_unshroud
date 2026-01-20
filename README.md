@@ -242,6 +242,121 @@ js_unshroud query --input malware.jsonl --type "code_execution,encoding,cryptojs
   js_unshroud analyze --input - --format text
 ```
 
+### Correlate Command
+
+Post-capture correlation analysis to find related event patterns using custom correlation rules.
+
+#### Usage
+
+```bash
+js_unshroud correlate --input <events.jsonl> [OPTIONS]
+```
+
+#### Required Options
+
+- `--input <file>`: Path to JSONL events file
+
+#### Optional Options
+
+- `--rules-file <file>`: Path to correlation rules JSON file
+  - Default: Checks `./correlation_rules.json`, then `<project-root>/correlation_rules.json`
+- `--rules <name1,name2,...>`: Apply only specified correlation rules (comma-delimited list, default: apply all rules)
+- `--format <text|json>`: Output format (default: `text`)
+  - `text`: Human-readable correlation chains with timestamps and event summaries
+  - `json`: Structured JSON output for programmatic consumption
+- `--output <file>`: Write to file instead of stdout (default: stdout)
+
+#### Correlation Rules
+
+Correlation rules define patterns to detect in event streams. The default rules file (`correlation_rules.json`) includes:
+
+- **storage-to-network**: Local storage writes followed by network requests (data exfiltration pattern)
+- **network-request-response**: Network request-response pairs (correlationId matching)
+- **error-chains**: Network failures followed by error events
+- **timer-to-network**: Timer executions followed by network activity (delayed beaconing)
+
+#### Custom Rules File Format
+
+Create a JSON file with this schema:
+
+```json
+{
+  "rules": [
+    {
+      "name": "crypto-to-network",
+      "description": "CryptoJS decryption followed by network exfiltration",
+      "patterns": {
+        "type": "sequence",
+        "events": ["cryptojs", "network"],
+        "maxTimeGap": 3000,
+        "correlationField": "sessionId"
+      }
+    }
+  ]
+}
+```
+
+**Rule Schema:**
+- `name` (string, required): Unique rule identifier
+- `description` (string, required): Human-readable explanation
+- `patterns` (object, required):
+  - `type` (string, required): Either `"sequence"` (events must occur in order) or `"group"` (events can occur in any order)
+  - `events` (array, required): Event types to correlate (e.g., `["storage", "network"]`)
+  - `maxTimeGap` (number, optional): Maximum time gap in milliseconds between events in the correlation
+  - `correlationField` (string, optional): Field to correlate by - `sessionId`, `correlationId`, or `url` (default: `sessionId`)
+
+#### Examples
+
+```bash
+# Find all correlations using default rules
+js_unshroud correlate --input events.jsonl
+
+# Use custom rules file
+js_unshroud correlate --input events.jsonl --rules-file my_rules.json
+
+# Find only storage-to-network correlations
+js_unshroud correlate --input events.jsonl --rules storage-to-network
+
+# Find multiple specific correlations
+js_unshroud correlate --input events.jsonl --rules storage-to-network,timer-to-network
+
+# Output as JSON and save to file
+js_unshroud correlate --input events.jsonl --format json --output chains.json
+
+# Combine custom rules with rule filter
+js_unshroud correlate --input events.jsonl --rules-file my_rules.json --rules crypto-to-network,eval-chain
+```
+
+#### Relationship to Other Commands
+
+The correlate command is a **parallel post-processing tool** alongside analyze and query:
+
+```
+capture (run) → events.jsonl
+                    ├─→ analyze: Format events as timeline or statistics
+                    ├─→ query: Filter events by criteria
+                    └─→ correlate: Find event correlation patterns
+```
+
+These commands operate on the same JSONL file but produce different outputs:
+- **analyze**: Timeline text/JSON, statistics
+- **query**: Filtered JSONL events (pipeable to analyze)
+- **correlate**: Correlation chains text/JSON (standalone analysis)
+
+#### Use Cases
+
+**Malware Analysis:**
+- Detect data exfiltration patterns (storage → network)
+- Find obfuscation chains (encoding → eval → network)
+- Identify delayed execution (timer → code_execution)
+- Track fingerprinting flows (fingerprinting → storage → network)
+
+**Behavioral Pattern Detection:**
+- Correlate error events with network failures
+- Find repeated API call patterns
+- Detect Service Worker lifecycle anomalies
+- Track multi-stage code execution chains
+
 ### Configuration
 
 You can optionally provide a configuration file to control what instrumentation is enabled:

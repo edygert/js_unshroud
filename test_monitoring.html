@@ -53,10 +53,11 @@
     </div>
 
     <script>
-        // Test XMLHttpRequest
+        // Test XMLHttpRequest - Use local file to avoid external network dependency
         console.log("=== XMLHttpRequest Tests ===");
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', 'https://httpbin.org/status/200');
+        // Use this same HTML file as the target to avoid external requests
+        xhr.open('GET', window.location.href);
         xhr.onreadystatechange = function() {
             if (this.readyState === 4) {
                 console.log("XMLHttpRequest completed with status:", this.status);
@@ -64,17 +65,31 @@
         };
         xhr.send();
 
-        // Test Fetch API
+        // Test Fetch API - Use data URL to avoid external network dependency
         console.log("=== Fetch API Tests ===");
-        fetch('https://httpbin.org/json')
-            .then(response => response.json())
-            .then(data => console.log("Fetch response received:", data.url))
-            .catch(error => console.log("Fetch error (expected):", error.message));
+        // Create a mock JSON response using data URL
+        const mockJsonUrl = 'data:application/json,' + encodeURIComponent(JSON.stringify({
+            slideshow: {
+                author: "Test Author",
+                date: "date of publication",
+                slides: [
+                    { title: "Test Slide 1", type: "all" },
+                    { title: "Test Slide 2", type: "all" }
+                ],
+                title: "Sample Slide Show"
+            }
+        }));
 
-        // Test WebSocket creation (will fail but should be logged)
+        fetch(mockJsonUrl)
+            .then(response => response.json())
+            .then(data => console.log("Fetch response received:", data.slideshow.title))
+            .catch(error => console.log("Fetch error:", error.message));
+
+        // Test WebSocket creation (will fail immediately - no external connection attempt)
         console.log("=== WebSocket Tests ===");
         try {
-            const ws = new WebSocket('ws://invalid.test.url:9999/test');
+            // Use localhost with invalid port - fails immediately without network delay
+            const ws = new WebSocket('ws://localhost:1/test');
             ws.onopen = () => console.log("WebSocket opened");
             ws.onmessage = (event) => console.log("WebSocket message:", event.data);
             ws.onerror = () => console.log("WebSocket error (expected)");

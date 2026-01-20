@@ -1,7 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { QueryEngine, type QueryFilter } from '../src/analysis/QueryEngine.ts';
 import { TimelineFormatter, type TimeRange } from '../src/analysis/TimelineFormatter.ts';
-import { CorrelationEngine } from '../src/analysis/CorrelationEngine.ts';
+import { CorrelationEngine, type CorrelationRule } from '../src/analysis/CorrelationEngine.ts';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import type {
   MonitoringEvent,
   ConsoleEvent,
@@ -1163,6 +1165,14 @@ describe('Analysis Engine Tests', () => {
     let tempFilePath: string;
     let correlationEngine: CorrelationEngine;
 
+    // Load default rules from correlation_rules.json for testing
+    const loadDefaultRules = (): CorrelationRule[] => {
+      const rulesPath = resolve(process.cwd(), 'correlation_rules.json');
+      const content = readFileSync(rulesPath, 'utf-8');
+      const parsed = JSON.parse(content) as { rules: CorrelationRule[] };
+      return parsed.rules;
+    };
+
     beforeEach(() => {
       // Create temp file with correlation test data
       tempFilePath = `/tmp/correlation-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
@@ -1176,10 +1186,12 @@ describe('Analysis Engine Tests', () => {
       }
     });
 
-    test('should initialize with default correlation rules', () => {
+    test('should initialize with correlation rules', () => {
       const queryEngine = new QueryEngine();
-      correlationEngine = new CorrelationEngine(queryEngine);
+      const rules = loadDefaultRules();
+      correlationEngine = new CorrelationEngine(queryEngine, rules);
       expect(correlationEngine).toBeDefined();
+      expect(correlationEngine.getAvailableRules()).toHaveLength(rules.length);
     });
 
     test('should find storage-to-network correlations', async () => {
@@ -1222,7 +1234,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       expect(correlations).toHaveLength(2);
@@ -1255,7 +1267,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-request-response');
 
       expect(correlations).toHaveLength(1);
@@ -1288,7 +1300,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'error-chains');
 
       expect(correlations).toHaveLength(1);
@@ -1320,7 +1332,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'timer-to-network');
 
       expect(correlations).toHaveLength(1);
@@ -1370,7 +1382,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath);
 
       expect(correlations.length).toBeGreaterThan(0);
@@ -1381,7 +1393,7 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should throw error for non-existent correlation rule', async () => {
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       await expect(correlationEngine.findCorrelations('/tmp/empty.jsonl', 'non-existent-rule'))
         .rejects.toThrow('Correlation rule \'non-existent-rule\' not found');
     });
@@ -1410,7 +1422,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       expect(correlations).toHaveLength(0); // Should not find correlation due to time gap
@@ -1456,7 +1468,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       expect(correlations).toHaveLength(2);
@@ -1505,7 +1517,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       expect(correlations).toHaveLength(2);
@@ -1536,7 +1548,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       expect(correlations).toHaveLength(1);
@@ -1570,7 +1582,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-request-response');
 
       expect(correlations).toHaveLength(1);
@@ -1602,7 +1614,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       expect(correlations).toHaveLength(1);
@@ -1625,7 +1637,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-request-response');
 
       expect(correlations).toHaveLength(0);
@@ -1672,7 +1684,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       // Should find two separate correlations (time gap caused chain restart)
@@ -1712,7 +1724,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       // Should find one correlation starting from storage-1 to network-2
@@ -1755,7 +1767,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-request-response');
 
       // Should find one group with first two events (third is separated by time gap)
@@ -1798,7 +1810,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-request-response');
 
       // Should find one group with all three events processed at stream end
@@ -1831,7 +1843,7 @@ describe('Analysis Engine Tests', () => {
 
       writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
 
-      correlationEngine = new CorrelationEngine(new QueryEngine());
+      correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
       const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-to-network');
 
       // Should find correlation based on sessionId as fallback

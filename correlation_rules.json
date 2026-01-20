@@ -1,0 +1,44 @@
+{
+  "rules": [
+    {
+      "name": "storage-to-network",
+      "description": "Local storage writes followed by network requests",
+      "patterns": {
+        "type": "sequence",
+        "events": ["storage", "network"],
+        "maxTimeGap": 5000,
+        "correlationField": "sessionId"
+      }
+    },
+    {
+      "name": "network-request-response",
+      "description": "Network request-response pairs",
+      "patterns": {
+        "type": "group",
+        "events": ["network", "network"],
+        "maxTimeGap": 10000,
+        "correlationField": "correlationId"
+      }
+    },
+    {
+      "name": "error-chains",
+      "description": "Network failures followed by error events",
+      "patterns": {
+        "type": "sequence",
+        "events": ["network", "error"],
+        "maxTimeGap": 2000,
+        "correlationField": "correlationId"
+      }
+    },
+    {
+      "name": "timer-to-network",
+      "description": "Timer executions followed by network activity",
+      "patterns": {
+        "type": "sequence",
+        "events": ["timer", "network"],
+        "maxTimeGap": 1000,
+        "correlationField": "sessionId"
+      }
+    }
+  ]
+}

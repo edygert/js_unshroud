@@ -64,9 +64,10 @@ function parseArgs(): Args {
 
   if (!url || !out) {
     console.error('Usage:');
-    console.error('  Capture: js_unshroud [run] --url <url> --out <output.jsonl> [--config <config.json>]');
-    console.error('  Analyze: js_unshroud analyze --input <events.jsonl> [--format text|json|stats] [--output <file>]');
-    console.error('  Query:   js_unshroud query --input <events.jsonl> [FILTERS] [--format jsonl|count] [--output <file>]');
+    console.error('  Run:       js_unshroud run --url <url> --out <output.jsonl> [--config <config.json>]');
+    console.error('  Analyze:   js_unshroud analyze --input <events.jsonl> [--format text|json|stats] [--output <file>]');
+    console.error('  Query:     js_unshroud query --input <events.jsonl> [FILTERS] [--format jsonl|count] [--output <file>]');
+    console.error('  Correlate: js_unshroud correlate --input <events.jsonl> [--rules-file <file>] [--rules <names>] [OPTIONS]');
     process.exit(1);
   }
 
@@ -1042,6 +1043,9 @@ async function main() {
   } else if (subcommand === 'query') {
     const { runQuery } = await import('./query.ts');
     await runQuery();
+  } else if (subcommand === 'correlate') {
+    const { runCorrelate } = await import('./correlate.ts');
+    await runCorrelate();
   } else {
     // Support both direct flags and optional "run" subcommand
     if (subcommand === 'run') {
