@@ -1,0 +1,9 @@
+curl -fsSL https://bun.com/install | bash
+. ~/.bashrc
+bun --version
+bun install
+npm install @playwright/test
+npx playwright install chromium
+bun test:coverage
+bun run build
+
