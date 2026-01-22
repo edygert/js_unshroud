@@ -9,13 +9,53 @@ A headless JavaScript monitoring and analysis tool that instruments web pages to
 
 ## Installation
 
-Clone the repository and install dependencies:
+### Complete Environment Setup
 
-```bash
-git clone <repository-url>
-cd js_unshroud
-bun install
-```
+Follow these steps to set up the complete development environment:
+
+1. **Install Bun runtime:**
+   ```bash
+   curl -fsSL https://bun.com/install | bash
+   ```
+
+2. **Reload your shell configuration:**
+   ```bash
+   . ~/.bashrc
+   ```
+
+3. **Verify Bun installation:**
+   ```bash
+   bun --version
+   ```
+
+4. **Clone the repository and install dependencies:**
+   ```bash
+   git clone <repository-url>
+   cd js_unshroud
+   bun install
+   ```
+
+5. **Install Playwright test dependencies:**
+   ```bash
+   npm install @playwright/test
+   ```
+
+6. **Install Chromium browser for Playwright:**
+   ```bash
+   npx playwright install chromium
+   ```
+
+7. **Verify installation by running tests:**
+   ```bash
+   bun test:coverage
+   ```
+
+8. **Build the standalone executable:**
+   ```bash
+   bun run build
+   ```
+
+After completing these steps, you'll have a fully functional development environment with the compiled binary at `dist/js_unshroud`.
 
 ## Building
 
