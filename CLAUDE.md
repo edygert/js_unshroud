@@ -226,6 +226,7 @@ Configuration is loaded via `loadInstrumentationConfig()` in `runner.ts`. User c
 
 Key configuration options:
 - `enableHeadlessMitigation`: Enables spoofing of HTTP headers, user-agent, navigator properties, and canvas fingerprinting entropy (critical for malware analysis)
+- `headlessMitigation`: **NEW** - Configuration object for customizing all spoofed values (user agent, screen dimensions, timezone, hardware specs, etc.). Supports 4 built-in profiles (windows-chrome, macos-safari, linux-firefox, android-chrome) with full override capability. See "Headless Detection Mitigation" section below for details.
 - `enableServiceWorker`: Service Worker instrumentation hooks
 - `enableFingerprinting`: Canvas/WebGL fingerprinting detection
 - `enableObjectTracking`: Proxy-based object monitoring
@@ -256,45 +257,104 @@ See README.md "Configuration" section for full list.
 
 **Solution**: When `enableHeadlessMitigation: true` in config:
 
-1. **HTTP Header Spoofing** (src/cli/runner.ts:277-343):
-   - Generate spoofed user-agent via `generateSpoofedUserAgent()`
-   - Generate spoofed headers via `generateSpoofedHeaders()` (sec-ch-ua, Accept, etc.)
-   - Call `CDPSessionManager.setUserAgentOverride()` BEFORE navigation (src/orchestrator/CDPSessionManager.ts:197-220)
-   - Uses `Emulation.setUserAgentOverride()` CDP call with userAgentMetadata support (VERIFIED WORKING)
+### Configurable Headless Mitigation (NEW)
+
+All spoofed values are fully configurable via the `headlessMitigation` config object. This allows analysts to customize browser fingerprints for different scenarios.
+
+**Architecture:**
+- **Profile System** (src/cli/headless-profiles.ts): 4 built-in profiles with realistic fingerprints
+  - `windows-chrome` (default): Windows 10 + Chrome 143
+  - `macos-safari`: macOS 14.2 + Safari 17.2
+  - `linux-firefox`: Linux + Firefox 122
+  - `android-chrome`: Android 14 + Chrome 143 (mobile)
+- **Resolution Logic**: `resolveHeadlessMitigationConfig()` merges user config with profile defaults (User Config → Profile → Default Profile)
+- **Deep Merge**: Supports partial overrides of nested objects (e.g., override just `hardware.deviceMemory` while keeping other values from profile)
+- **Validation** (src/cli/validation.ts): Validates ranges, consistency, and warns about suspicious combinations
+
+**Configurable Values:**
+- Top-level: `userAgent`, `platform`, `vendor`, `language`, `languages`, `profile`
+- `cdp`: CDP metadata (platform, platformVersion, architecture, bitness, mobile, brands)
+- `hardware`: CPU cores, RAM, touch points
+- `screen`: Width, height, availWidth, availHeight, colorDepth, pixelDepth
+- `window`: innerWidth, innerHeight, outerWidth, outerHeight, devicePixelRatio
+- `timezone`: Offset (minutes from UTC), name (IANA timezone)
+- `webgl`: Vendor, renderer strings
+- `audio`: Sample rate
+- `entropy`: Canvas noise level (0.0-1.0), audio noise amplitude (0.0-1.0)
+
+**Config Loading Flow** (runner.ts):
+1. Load user config from JSON or programmatic object
+2. If `enableHeadlessMitigation` is true, call `resolveHeadlessMitigationConfig(config.headlessMitigation)`
+3. Validate resolved config via `validateHeadlessMitigationConfig()` - log warnings, throw on errors
+4. Pass resolved config to spoofing functions and CDP setup
+5. Serialize config to `window.__js_unshroud_headless_config` before injecting headless-mitigation.js
+6. Browser-side code reads from `window.__js_unshroud_headless_config` with fallbacks to defaults
+
+**Example Configuration:**
+```json
+{
+  "enableHeadlessMitigation": true,
+  "headlessMitigation": {
+    "profile": "macos-safari",
+    "timezone": {
+      "offset": -480,
+      "name": "America/Los_Angeles"
+    }
+  }
+}
+```
+
+**Backward Compatibility:** If `headlessMitigation` is not specified, uses `windows-chrome` profile (current hardcoded values). No breaking changes.
+
+### Implementation Details
+
+1. **HTTP Header Spoofing** (src/cli/runner.ts):
+   - Generate spoofed user-agent via `generateSpoofedUserAgent(headlessConfig)` - now accepts config parameter
+   - Generate spoofed headers via `generateSpoofedHeaders(headlessConfig)` - builds from config values
+   - Call `CDPSessionManager.setUserAgentOverride(userAgent, platform, brands, headlessConfig)` BEFORE navigation
+   - Uses `Emulation.setUserAgentOverride()` CDP call with userAgentMetadata from config
    - Set `extraHTTPHeaders` via `page.setExtraHTTPHeaders()`
    - Launch Chromium with `--disable-blink-features=AutomationControlled` flag
 
 2. **JavaScript-Level Spoofing** (src/instrumentation/headless-mitigation.js):
 
-   **Navigator Properties:**
+   **Config Reading Pattern:**
+   ```javascript
+   const config = window.__js_unshroud_headless_config || {};
+   const value = config.path?.to?.value || DEFAULT_FALLBACK;
+   ```
+
+   **Navigator Properties (all configurable):**
    - Override `navigator.webdriver` to return `false`
-   - Override `navigator.hardwareConcurrency` to realistic value (8 cores)
-   - Override `navigator.deviceMemory` to realistic value (8GB)
+   - Override `navigator.hardwareConcurrency` to configurable value (default: 8 cores)
+   - Override `navigator.deviceMemory` to configurable value (default: 8GB)
    - Override `navigator.plugins` with fake Chrome PDF plugins
-   - Override `navigator.languages` to return `['en-US', 'en']`
-   - Override `navigator.language` to return `'en-US'`
-   - Override `navigator.platform` to return `'Win32'`
-   - Override `navigator.vendor` to return `'Google Inc.'`
-   - Override `navigator.maxTouchPoints` to return `0` (desktop)
+   - Override `navigator.languages` to configurable array (default: `['en-US', 'en']`)
+   - Override `navigator.language` to configurable string (default: `'en-US'`)
+   - Override `navigator.platform` to configurable string (default: `'Win32'`)
+   - Override `navigator.vendor` to configurable string (default: `'Google Inc.'`)
+   - Override `navigator.maxTouchPoints` to configurable value (default: `0` for desktop)
    - Override `navigator.pdfViewerEnabled` to return `true`
    - Override `navigator.cookieEnabled` to return `true`
-   - Override `navigator.userAgent` with realistic Chrome UA string
+   - Override `navigator.userAgent` with configurable UA string (default: Chrome 143)
    - Override `navigator.mimeTypes` with fake MIME types matching plugins
 
    **Browser Object Model (BOM):**
    - Inject `window.chrome` object with runtime, loadTimes(), csi(), app properties
    - Override `Notification.permission` to return `'default'`
 
-   **Fingerprinting Mitigation:**
+   **Fingerprinting Mitigation (all configurable):**
    - Override `navigator.permissions.query()` to always return 'granted'
-   - Inject entropy into `canvas.toDataURL()` and `canvas.getImageData()` (break exact fingerprinting hashes)
-   - Override WebGL `getParameter()` for vendor/renderer spoofing
-   - Spoof AudioContext sampleRate to 44.1kHz
-   - Inject noise into OfflineAudioContext rendering
+   - Inject configurable entropy into `canvas.toDataURL()` and `canvas.getImageData()` (default: 1% noise)
+   - Override WebGL `getParameter()` for configurable vendor/renderer spoofing (default: Google Inc. (Intel) / ANGLE Intel UHD)
+   - Spoof AudioContext sampleRate to configurable value (default: 44.1kHz)
+   - Inject configurable noise into OfflineAudioContext rendering (default: ±0.00005)
    - Spoof document.fonts API with fake Windows fonts
    - Block RTCPeerConnection and getUserMedia (WebRTC)
-   - Spoof screen dimensions to 1920x1080
-   - Override timezone to US Eastern (-300 minutes)
+   - Spoof screen dimensions to configurable values (default: 1920x1080)
+   - Spoof window dimensions to configurable values (default: 1280x720)
+   - Spoof devicePixelRatio to configurable value (default: 1.0)
+   - Override timezone to configurable offset and name (default: US Eastern -300 / America/New_York)
    - Block Battery API
    - Monitor `matchMedia()` calls for headless-specific queries
 

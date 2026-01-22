@@ -518,21 +518,128 @@ Performance metrics are automatically logged every 30 seconds, including total e
 
 ## Headless Browser Mitigation
 
-When `enableHeadlessMitigation` is enabled, js_unshroud applies countermeasures to appear more like a regular browser:
+When `enableHeadlessMitigation` is enabled, js_unshroud applies countermeasures to appear more like a regular browser.
 
-### Navigator Overrides
+### Configurable Headless Mitigation
+
+All headless mitigation spoofed values are fully configurable via the `headlessMitigation` configuration object. This allows you to customize browser fingerprints for specific analysis scenarios.
+
+**Built-in Profiles:**
+- `windows-chrome` (default) - Windows 10 desktop with Chrome 143
+- `macos-safari` - macOS with Safari 17.2
+- `linux-firefox` - Linux with Firefox 122
+- `android-chrome` - Android mobile with Chrome 143
+
+**Configuration Examples:**
+
+Using a profile:
+```json
+{
+  "enableHeadlessMitigation": true,
+  "headlessMitigation": {
+    "profile": "macos-safari"
+  }
+}
+```
+
+Profile with custom overrides:
+```json
+{
+  "enableHeadlessMitigation": true,
+  "headlessMitigation": {
+    "profile": "windows-chrome",
+    "timezone": {
+      "offset": -480,
+      "name": "America/Los_Angeles"
+    },
+    "hardware": {
+      "hardwareConcurrency": 16,
+      "deviceMemory": 32
+    }
+  }
+}
+```
+
+Full custom configuration (no profile):
+```json
+{
+  "enableHeadlessMitigation": true,
+  "headlessMitigation": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",
+    "platform": "Win32",
+    "vendor": "Google Inc.",
+    "language": "en-US",
+    "languages": ["en-US", "en"],
+    "hardware": {
+      "hardwareConcurrency": 8,
+      "deviceMemory": 8,
+      "maxTouchPoints": 0
+    },
+    "screen": {
+      "width": 1920,
+      "height": 1080,
+      "availWidth": 1920,
+      "availHeight": 1040,
+      "colorDepth": 24,
+      "pixelDepth": 24
+    },
+    "window": {
+      "innerWidth": 1280,
+      "innerHeight": 720,
+      "outerWidth": 1296,
+      "outerHeight": 825,
+      "devicePixelRatio": 1.0
+    },
+    "timezone": {
+      "offset": 300,
+      "name": "America/New_York"
+    },
+    "webgl": {
+      "vendor": "Google Inc. (Intel)",
+      "renderer": "ANGLE (Intel, Mesa Intel(R) UHD Graphics ...)"
+    },
+    "audio": {
+      "sampleRate": 44100
+    },
+    "entropy": {
+      "canvas": 0.01,
+      "audio": 0.0001
+    }
+  }
+}
+```
+
+**Configurable Values:**
+- `profile` - Profile name to use as base (optional)
+- `userAgent` - Full user agent string
+- `platform` - navigator.platform (Win32, MacIntel, Linux x86_64, etc.)
+- `vendor` - navigator.vendor (Google Inc., Apple Computer, Inc., etc.)
+- `language` - Primary language (en-US, de-DE, etc.)
+- `languages` - Language array (["en-US", "en"], etc.)
+- `cdp` - Chrome DevTools Protocol metadata (platform, architecture, bitness, brands)
+- `hardware` - Hardware specs (hardwareConcurrency, deviceMemory, maxTouchPoints)
+- `screen` - Screen dimensions (width, height, availWidth, availHeight, colorDepth, pixelDepth)
+- `window` - Window dimensions (innerWidth, innerHeight, outerWidth, outerHeight, devicePixelRatio)
+- `timezone` - Timezone info (offset in minutes, IANA name)
+- `webgl` - WebGL fingerprint (vendor, renderer)
+- `audio` - Audio context (sampleRate)
+- `entropy` - Fingerprint entropy levels (canvas noise 0.0-1.0, audio noise 0.0-1.0)
+
+If `headlessMitigation` is not specified, the `windows-chrome` profile is used by default.
+
+### Navigator Overrides (Configurable)
 - `navigator.webdriver` returns `false` instead of `true`
-- `navigator.hardwareConcurrency` returns realistic values (8 cores)
-- `navigator.deviceMemory` returns realistic values (8GB)
+- `navigator.hardwareConcurrency` returns realistic values (configurable, default: 8 cores)
+- `navigator.deviceMemory` returns realistic values (configurable, default: 8GB)
 - `navigator.plugins` provides fake Chrome PDF plugin entries
-- `navigator.languages` returns `['en-US', 'en']` instead of empty/single-entry array
-- `navigator.language` returns `'en-US'`
-- `navigator.platform` returns `'Win32'` for Windows desktop
-- `navigator.vendor` returns `'Google Inc.'` for Chrome branding
-- `navigator.maxTouchPoints` returns `0` for desktop (non-touch)
+- `navigator.languages` returns configurable language array (default: `['en-US', 'en']`)
+- `navigator.language` returns configurable primary language (default: `'en-US'`)
+- `navigator.platform` returns configurable platform (default: `'Win32'` for Windows desktop)
+- `navigator.vendor` returns configurable vendor (default: `'Google Inc.'` for Chrome branding)
+- `navigator.maxTouchPoints` returns configurable touch points (default: `0` for desktop)
 - `navigator.pdfViewerEnabled` returns `true` matching Chrome PDF support
 - `navigator.cookieEnabled` returns `true`
-- `navigator.userAgent` returns realistic Chrome user agent string (spoofs HeadlessChrome)
+- `navigator.userAgent` returns configurable realistic user agent string (default: Chrome 143)
 - `navigator.mimeTypes` provides fake MIME types matching plugin list (PDF, NaCl)
 
 ### Browser Object Model (BOM) Spoofing
@@ -546,15 +653,15 @@ When `enableHeadlessMitigation` is enabled, js_unshroud applies countermeasures 
 ### Permission Overrides
 Intercepts permission queries to return "granted" instead of denying common permissions that indicate headless operation.
 
-### Canvas Fingerprinting Mitigation
-Adds small random entropy to canvas `toDataURL()` and `getImageData()` outputs to break exact fingerprinting hashes.
+### Canvas Fingerprinting Mitigation (Configurable)
+Adds configurable random entropy to canvas `toDataURL()` and `getImageData()` outputs to break exact fingerprinting hashes (default: 1% noise level).
 
-### WebGL Override
-Overrides GPU vendor/renderer information to appear as typical desktop hardware.
+### WebGL Override (Configurable)
+Overrides GPU vendor/renderer information to configurable values (default: Google Inc. (Intel) / ANGLE Intel UHD Graphics).
 
-### Audio Fingerprinting Mitigation
-- Spoofs `AudioContext.sampleRate` to standard 44.1kHz
-- Injects imperceptible random noise (±0.00005) into `OfflineAudioContext` rendering to prevent exact audio fingerprinting
+### Audio Fingerprinting Mitigation (Configurable)
+- Spoofs `AudioContext.sampleRate` to configurable value (default: 44.1kHz)
+- Injects configurable imperceptible random noise into `OfflineAudioContext` rendering to prevent exact audio fingerprinting (default: ±0.00005)
 
 ### Font Fingerprinting Mitigation
 Returns a realistic minimal Windows font list (Arial, Times New Roman, Courier New, Verdana) via `document.fonts` API instead of exposing actual system fonts, preventing VM detection through Linux-specific font enumeration.
@@ -564,16 +671,16 @@ Returns a realistic minimal Windows font list (Arial, Times New Roman, Courier N
 - Blocks `navigator.mediaDevices.getUserMedia()` to prevent camera/microphone access
 - Blocks `navigator.mediaDevices.enumerateDevices()` to prevent device fingerprinting
 
-### Screen & Viewport Spoofing
-Spoofs screen and window dimensions to common desktop resolution:
-- `screen.width/height`: 1920x1080
-- `window.innerWidth/innerHeight`: 1280x720
-- `devicePixelRatio`: 1.0 (standard non-retina)
-- `screen.colorDepth`: 24-bit color
+### Screen & Viewport Spoofing (Configurable)
+Spoofs screen and window dimensions (all values configurable):
+- `screen.width/height`: Default 1920x1080
+- `window.innerWidth/innerHeight`: Default 1280x720
+- `devicePixelRatio`: Default 1.0 (standard non-retina)
+- `screen.colorDepth`: Default 24-bit color
 
-### Timezone Spoofing
-- Overrides `Date.prototype.getTimezoneOffset()` to return US Eastern Time (-300 minutes)
-- Overrides `Intl.DateTimeFormat().resolvedOptions().timeZone` to return "America/New_York"
+### Timezone Spoofing (Configurable)
+- Overrides `Date.prototype.getTimezoneOffset()` to return configurable offset (default: US Eastern Time, -300 minutes)
+- Overrides `Intl.DateTimeFormat().resolvedOptions().timeZone` to return configurable timezone name (default: "America/New_York")
 
 ### Battery API Blocking
 Blocks `navigator.getBattery()` API which is deprecated and indicates desktop vs mobile environment.

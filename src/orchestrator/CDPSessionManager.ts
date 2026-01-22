@@ -1,5 +1,5 @@
 import type { CDPSession, Page } from 'playwright-core';
-import type { NetworkEvent, ConsoleEvent, ErrorEvent } from '../schema/types.ts';
+import type { NetworkEvent, ConsoleEvent, ErrorEvent, HeadlessMitigationConfig } from '../schema/types.ts';
 import type { Protocol } from 'devtools-protocol';
 import type { EventLogger } from './EventLogger.ts';
 import { createEvent } from '../schema/events.ts';
@@ -197,7 +197,8 @@ export class CDPSessionManager {
   async setUserAgentOverride(
     userAgent: string,
     platform: string = 'Linux',
-    brands?: Array<{ brand: string; version: string }>
+    brands?: Array<{ brand: string; version: string }>,
+    config?: HeadlessMitigationConfig
   ): Promise<void> {
     if (!this.cdpSession) {
       console.warn('[JS Unshroud] Cannot set user agent override: CDP session not initialized');
@@ -209,22 +210,33 @@ export class CDPSessionManager {
       // The Emulation domain affects both network requests AND navigator API
       // Also need to set userAgentMetadata to control sec-ch-ua headers
 
+      // Use config values if available, otherwise use defaults
+      const platformValue = config?.cdp?.platform ?? platform;
+      const platformVersion = config?.cdp?.platformVersion ?? '10.0.0';
+      const architecture = config?.cdp?.architecture ?? 'x86';
+      const bitness = config?.cdp?.bitness ?? '64';
+      const mobile = config?.cdp?.mobile ?? false;
+
       const userAgentMetadata = brands ? {
         brands: brands,
         fullVersionList: brands,
-        platform: platform,
-        platformVersion: '10.0.0',
-        architecture: 'x86',
+        platform: platformValue,
+        platformVersion: platformVersion,
+        architecture: architecture,
         model: '',
-        mobile: false,
-        bitness: '64',
+        mobile: mobile,
+        bitness: bitness,
         wow64: false
       } : undefined;
 
+      // Build Accept-Language from config
+      const languages = config?.languages ?? ['en-US', 'en'];
+      const acceptLanguage = languages.join(',');
+
       await this.cdpSession.send('Emulation.setUserAgentOverride', {
         userAgent: userAgent,
-        acceptLanguage: 'en-US,en',
-        platform: platform,
+        acceptLanguage: acceptLanguage,
+        platform: platformValue,
         ...(userAgentMetadata && { userAgentMetadata })
       });
     } catch (error) {

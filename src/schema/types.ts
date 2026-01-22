@@ -342,6 +342,81 @@ export interface EventFilteringConfig {
   };
 }
 
+// Headless mitigation configuration for customizing browser fingerprints
+export interface HeadlessMitigationConfig {
+  // Profile reference (alternative to manual config)
+  profile?: 'windows-chrome' | 'macos-safari' | 'linux-firefox' | 'android-chrome';
+
+  // Browser Identity
+  userAgent?: string;                    // Full UA string
+  platform?: string;                     // Win32, MacIntel, Linux x86_64, etc.
+  vendor?: string;                       // Google Inc., Apple Computer, Inc.
+  language?: string;                     // Primary language (en-US)
+  languages?: string[];                  // Language array (["en-US", "en"])
+
+  // CDP-level overrides
+  cdp?: {
+    platform?: string;                   // Windows, macOS, Linux
+    platformVersion?: string;            // 10.0.0, 14.2.1, etc.
+    architecture?: string;               // x86, arm
+    bitness?: string;                    // 64, 32
+    mobile?: boolean;                    // false for desktop
+    brands?: Array<{                     // sec-ch-ua brand metadata
+      brand: string;
+      version: string;
+    }>;
+  };
+
+  // Hardware Spoofing
+  hardware?: {
+    hardwareConcurrency?: number;        // CPU cores (1-32)
+    deviceMemory?: number;               // RAM in GB (1-64)
+    maxTouchPoints?: number;             // 0 for desktop, 1-10 for touch
+  };
+
+  // Screen/Display Spoofing
+  screen?: {
+    width?: number;                      // Screen width (800-7680)
+    height?: number;                     // Screen height (600-4320)
+    availWidth?: number;                 // Available width (usually same as width)
+    availHeight?: number;                // Available height (usually height - 40 for taskbar)
+    colorDepth?: number;                 // 24, 30, 48
+    pixelDepth?: number;                 // Usually same as colorDepth
+  };
+
+  // Window Spoofing
+  window?: {
+    innerWidth?: number;                 // Viewport width (800-3840)
+    innerHeight?: number;                // Viewport height (600-2160)
+    outerWidth?: number;                 // Browser width (innerWidth + scrollbar)
+    outerHeight?: number;                // Browser height (innerHeight + chrome)
+    devicePixelRatio?: number;           // 1.0, 1.5, 2.0 (retina), 3.0
+  };
+
+  // Timezone Spoofing
+  timezone?: {
+    offset?: number;                     // Minutes from UTC (-720 to 840)
+    name?: string;                       // IANA timezone (America/New_York)
+  };
+
+  // WebGL Spoofing
+  webgl?: {
+    vendor?: string;                     // Google Inc. (Intel), etc.
+    renderer?: string;                   // ANGLE (...), etc.
+  };
+
+  // Audio Spoofing
+  audio?: {
+    sampleRate?: number;                 // 44100, 48000, 96000
+  };
+
+  // Fingerprint Entropy Levels (0.0 - 1.0)
+  entropy?: {
+    canvas?: number;                     // Canvas noise level (0.0 = none, 1.0 = max)
+    audio?: number;                      // Audio noise amplitude multiplier
+  };
+}
+
 export interface InstrumentationConfig {
   enableConsole: boolean;
   enableNetwork: boolean;
@@ -353,6 +428,7 @@ export interface InstrumentationConfig {
   enableFingerprinting: boolean;
   enableObjectTracking: boolean;
   enableHeadlessMitigation: boolean;
+  headlessMitigation?: HeadlessMitigationConfig;  // Configuration for headless mitigation spoofed values
   enableServiceWorker: boolean;
   enableCodeExecution: boolean; // Instruments eval(), Function(), setTimeout/setInterval string code
   enableEncoding: boolean;      // Instruments atob/btoa, fromCharCode, URI encoding/decoding

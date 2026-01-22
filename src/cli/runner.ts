@@ -4,8 +4,10 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { readFileSync } from 'fs';
 import { EventLogger } from '../orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../orchestrator/CDPSessionManager.ts';
-import type { SessionConfig, InstrumentationConfig } from '../schema/types.ts';
+import type { SessionConfig, InstrumentationConfig, HeadlessMitigationConfig } from '../schema/types.ts';
 import { validateEvent } from '../schema/events.ts';
+import { resolveHeadlessMitigationConfig } from './headless-profiles.ts';
+import { validateHeadlessMitigationConfig } from './validation.ts';
 
 // Declare setTimeout for linting purposes
 declare const setTimeout: (handler: () => void, timeout?: number) => number;
@@ -278,7 +280,8 @@ async function injectInstrumentation(
   config: InstrumentationConfig,
   sessionId: string,
   eventLogger: EventLogger,
-  logger: Logger
+  logger: Logger,
+  headlessConfig?: HeadlessMitigationConfig
 ): Promise<{
   bootstrap: string;
   network: string | null;
@@ -348,6 +351,13 @@ async function injectInstrumentation(
       window.__js_unshroud_session_id = '${sessionId}';
     `
   });
+
+  // Inject headless mitigation config if enabled
+  if (config.enableHeadlessMitigation && headlessConfig) {
+    await page.addInitScript({
+      content: `window.__js_unshroud_headless_config = ${JSON.stringify(headlessConfig)};`
+    });
+  }
 
   // CRITICAL: Inject performance monitor BEFORE timer hooks
   // Performance monitor wraps setTimeout/setInterval for performance warnings
@@ -501,18 +511,19 @@ async function performCleanup(browser: Browser, eventLogger: EventLogger, logger
 
 /**
  * Generate spoofed user agent to mask headless browser indicators.
- * Uses Windows to appear as the most common desktop platform.
+ * Returns user agent from config, or uses Windows Chrome default.
  */
-export function generateSpoofedUserAgent(): string {
-  return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36';
+export function generateSpoofedUserAgent(config: HeadlessMitigationConfig): string {
+  return config.userAgent ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36';
 }
 
 /**
  * Generate brand metadata for sec-ch-ua headers.
  * This controls what appears in the Client Hints headers.
+ * Returns brands from config, or uses Chromium 143 default.
  */
-export function generateBrandMetadata(): Array<{ brand: string; version: string }> {
-  return [
+export function generateBrandMetadata(config: HeadlessMitigationConfig): Array<{ brand: string; version: string }> {
+  return config.cdp?.brands ?? [
     { brand: 'Chromium', version: '143' },
     { brand: 'Not A(Brand)', version: '24' },
     { brand: 'Google Chrome', version: '143' }
@@ -524,14 +535,32 @@ export function generateBrandMetadata(): Array<{ brand: string; version: string 
  * Note: User-Agent and sec-ch-ua are handled via CDP Emulation.setUserAgentOverride.
  * These headers serve as fallback for any subrequests.
  */
-export function generateSpoofedHeaders(): Record<string, string> {
+export function generateSpoofedHeaders(config: HeadlessMitigationConfig): Record<string, string> {
+  // Build sec-ch-ua header from brands
+  const brands = config.cdp?.brands ?? [
+    { brand: 'Chromium', version: '143' },
+    { brand: 'Not A(Brand)', version: '24' },
+    { brand: 'Google Chrome', version: '143' }
+  ];
+  const secChUa = brands.map(b => `"${b.brand}";v="${b.version}"`).join(', ');
+
+  // Determine platform for sec-ch-ua-platform
+  const platform = config.cdp?.platform ?? 'Windows';
+
+  // Determine mobile flag
+  const mobile = config.cdp?.mobile ? '?1' : '?0';
+
+  // Build Accept-Language from config
+  const languages = config.languages ?? ['en-US', 'en'];
+  const acceptLanguage = languages.join(',') + (languages.length === 1 ? '' : ';q=0.9');
+
   return {
     'Upgrade-Insecure-Requests': '1',
-    'sec-ch-ua': '"Chromium";v="143", "Not A(Brand";v="24", "Google Chrome";v="143"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
+    'sec-ch-ua': secChUa,
+    'sec-ch-ua-mobile': mobile,
+    'sec-ch-ua-platform': `"${platform}"`,
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Language': acceptLanguage,
     'Accept-Encoding': 'gzip, deflate, br'
   };
 }
@@ -960,11 +989,27 @@ async function runMonitoring(args: Args): Promise<void> {
     config.udpLogging
   );
 
+  // Resolve and validate headless mitigation configuration
+  let headlessConfig: HeadlessMitigationConfig | undefined;
+  if (config.enableHeadlessMitigation) {
+    headlessConfig = resolveHeadlessMitigationConfig(config.headlessMitigation);
+
+    // Validate resolved config
+    const validation = validateHeadlessMitigationConfig(headlessConfig);
+    if (validation.warnings.length > 0) {
+      console.warn('[JS Unshroud] Headless mitigation config warnings:');
+      validation.warnings.forEach(w => console.warn(`  - ${w}`));
+    }
+    if (!validation.valid) {
+      throw new Error(`Invalid headless mitigation config: ${validation.errors.join(', ')}`);
+    }
+  }
+
   // Generate spoofed values for headless mitigation
-  const useHeadlessMitigation = config.enableHeadlessMitigation;
-  const spoofedUserAgent = useHeadlessMitigation ? generateSpoofedUserAgent() : '';
-  const spoofedHeaders = useHeadlessMitigation ? generateSpoofedHeaders() : {};
-  const brandMetadata = useHeadlessMitigation ? generateBrandMetadata() : undefined;
+  const useHeadlessMitigation = config.enableHeadlessMitigation && headlessConfig !== undefined;
+  const spoofedUserAgent = useHeadlessMitigation && headlessConfig ? generateSpoofedUserAgent(headlessConfig) : '';
+  const spoofedHeaders = useHeadlessMitigation && headlessConfig ? generateSpoofedHeaders(headlessConfig) : {};
+  const brandMetadata = useHeadlessMitigation && headlessConfig ? generateBrandMetadata(headlessConfig) : undefined;
   
   // Launch browser with headless mitigation settings
   const browser = await chromium.launch({ 
@@ -991,11 +1036,11 @@ async function runMonitoring(args: Args): Promise<void> {
     await cdpManager.initialize(page);
 
     // Apply header spoofing BEFORE navigation if headless mitigation is enabled
-    if (config.enableHeadlessMitigation) {
+    if (config.enableHeadlessMitigation && headlessConfig) {
       // Use CDP Emulation.setUserAgentOverride with brand metadata
       // This affects both network requests AND the navigator API
       // The userAgentMetadata parameter controls sec-ch-ua headers
-      await cdpManager.setUserAgentOverride(spoofedUserAgent, 'Windows', brandMetadata);
+      await cdpManager.setUserAgentOverride(spoofedUserAgent, 'Windows', brandMetadata, headlessConfig);
 
       // Apply additional headers for subrequests (fallback)
       await page.setExtraHTTPHeaders(spoofedHeaders);
@@ -1011,7 +1056,7 @@ async function runMonitoring(args: Args): Promise<void> {
       });
     }
 
-    await injectInstrumentation(page, config, sessionId, eventLogger, logger);
+    await injectInstrumentation(page, config, sessionId, eventLogger, logger, headlessConfig);
 
     // Navigate to the URL
     logger.log(`Navigating to ${args.url}...`);

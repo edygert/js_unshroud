@@ -25,6 +25,9 @@
     }
   };
 
+  // Read headless mitigation config from window object
+  // Config is injected by runner.ts before this script loads
+  const config = window.__js_unshroud_headless_config || {};
 
   // === CORE HEADLESS DETECTION MITIGATIONS ===
 
@@ -61,7 +64,7 @@
     const originalHardwareConcurrency = navigator.hardwareConcurrency;
     Object.defineProperty(window.navigator, 'hardwareConcurrency', {
       get: function() {
-        const overrideValue = 8; // Realistic value for modern systems
+        const overrideValue = config.hardware?.hardwareConcurrency || 8; // Realistic value for modern systems
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.hardwareConcurrency',
@@ -82,7 +85,7 @@
     const originalDeviceMemory = navigator.deviceMemory;
     Object.defineProperty(window.navigator, 'deviceMemory', {
       get: function() {
-        const overrideValue = 8; // Realistic value for modern systems
+        const overrideValue = config.hardware?.deviceMemory || 8; // Realistic value for modern systems
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.deviceMemory',
@@ -226,7 +229,7 @@
 
       // Add small noise to pixel data to break exact fingerprinting
       if (result && result.data && result.data.length > 0) {
-        const noiseLevel = 0.01; // 1% noise
+        const noiseLevel = config.entropy?.canvas || 0.01; // 1% noise (configurable)
         for (let i = 0; i < result.data.length; i += 4) { // Process RGBA pixels
           if (Math.random() < noiseLevel) {
             result.data[i] = Math.min(255, Math.max(0, result.data[i] + (Math.random() * 10 - 5)));     // R
@@ -290,7 +293,7 @@
 
         // Override GPU fingerprinting constants
         if (parameter === 37445) { // UNMASKED_VENDOR_WEBGL
-          const overrideValue = 'Google Inc. (Intel)';
+          const overrideValue = config.webgl?.vendor || 'Google Inc. (Intel)';
           logEvent({
             type: 'headless_mitigation',
             method: 'webgl.getParameter',
@@ -302,7 +305,7 @@
           });
           return overrideValue;
         } else if (parameter === 37446) { // UNMASKED_RENDERER_WEBGL
-          const overrideValue = 'ANGLE (Intel, Mesa Intel(R) UHD Graphics (CML GT2), Version 27.2.1 (Linux x64))';
+          const overrideValue = config.webgl?.renderer || 'ANGLE (Intel, Mesa Intel(R) UHD Graphics (CML GT2), Version 27.2.1 (Linux x64))';
           logEvent({
             type: 'headless_mitigation',
             method: 'webgl.getParameter',
@@ -340,10 +343,10 @@
               method: 'AudioContext.sampleRate',
               operation: 'audio_samplerate_spoofed',
               originalValue: 48000, // Actual value varies by system
-              newValue: 44100,
+              newValue: config.audio?.sampleRate || 44100,
               timestamp: Date.now()
             });
-            return 44100; // Standard audio CD quality
+            return config.audio?.sampleRate || 44100; // Standard audio CD quality (configurable)
           },
           configurable: false
         });
@@ -374,8 +377,9 @@
           for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
             const channelData = audioBuffer.getChannelData(channel);
             // Add noise to every 100th sample to minimize overhead
+            const audioNoiseAmplitude = config.entropy?.audio || 0.0001;
             for (let i = 0; i < channelData.length; i += 100) {
-              channelData[i] += (Math.random() - 0.5) * 0.0001; // ±0.00005 noise
+              channelData[i] += (Math.random() - 0.5) * audioNoiseAmplitude; // Configurable noise amplitude
             }
           }
 
@@ -526,8 +530,15 @@
 
   // === SCREEN/VIEWPORT FINGERPRINTING MITIGATION ===
 
-  // 1. Spoof screen dimensions to 1920x1080
+  // 1. Spoof screen dimensions (configurable)
   try {
+    const screenWidth = config.screen?.width || 1920;
+    const screenHeight = config.screen?.height || 1080;
+    const screenAvailWidth = config.screen?.availWidth || screenWidth;
+    const screenAvailHeight = config.screen?.availHeight || 1040;
+    const screenColorDepth = config.screen?.colorDepth || 24;
+    const screenPixelDepth = config.screen?.pixelDepth || screenColorDepth;
+
     Object.defineProperties(window.screen, {
       width: {
         get: function() {
@@ -535,31 +546,31 @@
             type: 'headless_mitigation',
             method: 'screen.width',
             operation: 'screen_dimension_spoofed',
-            newValue: 1920,
+            newValue: screenWidth,
             timestamp: Date.now()
           });
-          return 1920;
+          return screenWidth;
         },
         configurable: true
       },
       height: {
-        get: function() { return 1080; },
+        get: function() { return screenHeight; },
         configurable: true
       },
       availWidth: {
-        get: function() { return 1920; },
+        get: function() { return screenAvailWidth; },
         configurable: true
       },
       availHeight: {
-        get: function() { return 1040; }, // Account for taskbar
+        get: function() { return screenAvailHeight; },
         configurable: true
       },
       colorDepth: {
-        get: function() { return 24; },
+        get: function() { return screenColorDepth; },
         configurable: true
       },
       pixelDepth: {
-        get: function() { return 24; },
+        get: function() { return screenPixelDepth; },
         configurable: true
       }
     });
@@ -567,35 +578,41 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not override screen properties:', e.message);
   }
 
-  // 2. Spoof devicePixelRatio
+  // 2. Spoof devicePixelRatio (configurable)
   try {
+    const devicePixelRatio = config.window?.devicePixelRatio || 1.0;
     Object.defineProperty(window, 'devicePixelRatio', {
-      get: function() { return 1.0; }, // Standard non-retina
+      get: function() { return devicePixelRatio; },
       configurable: true
     });
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not override devicePixelRatio:', e.message);
   }
 
-  // 3. Spoof window dimensions
+  // 3. Spoof window dimensions (configurable)
   try {
+    const innerWidth = config.window?.innerWidth || 1280;
+    const innerHeight = config.window?.innerHeight || 720;
+    const outerWidth = config.window?.outerWidth || 1296;
+    const outerHeight = config.window?.outerHeight || 825;
+
     Object.defineProperty(window, 'innerWidth', {
-      get: function() { return 1280; },
+      get: function() { return innerWidth; },
       configurable: true
     });
 
     Object.defineProperty(window, 'innerHeight', {
-      get: function() { return 720; },
+      get: function() { return innerHeight; },
       configurable: true
     });
 
     Object.defineProperty(window, 'outerWidth', {
-      get: function() { return 1296; }, // Account for scrollbar
+      get: function() { return outerWidth; },
       configurable: true
     });
 
     Object.defineProperty(window, 'outerHeight', {
-      get: function() { return 825; }, // Account for browser chrome
+      get: function() { return outerHeight; },
       configurable: true
     });
   } catch (e) {
@@ -605,13 +622,12 @@
 
   // === TIMEZONE FINGERPRINTING MITIGATION ===
 
-  // 1. Override Date.prototype.getTimezoneOffset
+  // 1. Override Date.prototype.getTimezoneOffset (configurable)
   try {
     const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
+    const spoofedOffset = config.timezone?.offset || 300; // US Eastern Time (UTC-5, or -300 minutes)
 
     Date.prototype.getTimezoneOffset = function() {
-      const spoofedOffset = 300; // US Eastern Time (UTC-5, or -300 minutes)
-
       logEvent({
         type: 'headless_mitigation',
         method: 'Date.prototype.getTimezoneOffset',
@@ -637,13 +653,14 @@
 
       formatter.resolvedOptions = function() {
         const options = originalResolvedOptions.call(this);
-        options.timeZone = 'America/New_York'; // Match getTimezoneOffset offset
+        const timeZoneName = config.timezone?.name || 'America/New_York';
+        options.timeZone = timeZoneName;
 
         logEvent({
           type: 'headless_mitigation',
           method: 'Intl.DateTimeFormat.resolvedOptions',
           operation: 'timezone_spoofed',
-          newValue: 'America/New_York',
+          newValue: timeZoneName,
           timestamp: Date.now()
         });
 
@@ -733,18 +750,19 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not inject window.chrome:', e.message);
   }
 
-  // 2. navigator.languages - Headless often has empty or single entry
+  // 2. navigator.languages - Headless often has empty or single entry (configurable)
   try {
+    const languagesValue = config.languages || ['en-US', 'en'];
     Object.defineProperty(navigator, 'languages', {
       get: function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.languages',
           operation: 'value_override',
-          newValue: ['en-US', 'en'],
+          newValue: languagesValue,
           timestamp: Date.now()
         });
-        return ['en-US', 'en'];
+        return languagesValue;
       },
       configurable: true
     });
@@ -800,18 +818,19 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.mimeTypes:', e.message);
   }
 
-  // 4. navigator.vendor - Should be "Google Inc." for Chrome
+  // 4. navigator.vendor - Should be "Google Inc." for Chrome (configurable)
   try {
+    const vendorValue = config.vendor || 'Google Inc.';
     Object.defineProperty(navigator, 'vendor', {
       get: function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.vendor',
           operation: 'value_override',
-          newValue: 'Google Inc.',
+          newValue: vendorValue,
           timestamp: Date.now()
         });
-        return 'Google Inc.';
+        return vendorValue;
       },
       configurable: true
     });
@@ -819,18 +838,19 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.vendor:', e.message);
   }
 
-  // 5. navigator.maxTouchPoints - Desktop should be 0
+  // 5. navigator.maxTouchPoints - Desktop should be 0 (configurable)
   try {
+    const maxTouchPointsValue = config.hardware?.maxTouchPoints ?? 0;
     Object.defineProperty(navigator, 'maxTouchPoints', {
       get: function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.maxTouchPoints',
           operation: 'value_override',
-          newValue: 0,
+          newValue: maxTouchPointsValue,
           timestamp: Date.now()
         });
-        return 0;
+        return maxTouchPointsValue;
       },
       configurable: true
     });
@@ -876,9 +896,9 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.cookieEnabled:', e.message);
   }
 
-  // 8. navigator.userAgent - Override with realistic Chrome user agent
+  // 8. navigator.userAgent - Override with realistic Chrome user agent (configurable)
   try {
-    const spoofedUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    const spoofedUserAgent = config.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
     Object.defineProperty(navigator, 'userAgent', {
       get: function() {
         logEvent({
@@ -896,18 +916,19 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.userAgent:', e.message);
   }
 
-  // 9. navigator.language - Should match first entry in languages
+  // 9. navigator.language - Should match first entry in languages (configurable)
   try {
+    const languageValue = config.language || 'en-US';
     Object.defineProperty(navigator, 'language', {
       get: function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.language',
           operation: 'value_override',
-          newValue: 'en-US',
+          newValue: languageValue,
           timestamp: Date.now()
         });
-        return 'en-US';
+        return languageValue;
       },
       configurable: true
     });
@@ -915,18 +936,19 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.language:', e.message);
   }
 
-  // 10. navigator.platform - Should be realistic for OS
+  // 10. navigator.platform - Should be realistic for OS (configurable)
   try {
+    const platformValue = config.platform || 'Win32';
     Object.defineProperty(navigator, 'platform', {
       get: function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.platform',
           operation: 'value_override',
-          newValue: 'Win32',
+          newValue: platformValue,
           timestamp: Date.now()
         });
-        return 'Win32';
+        return platformValue;
       },
       configurable: true
     });

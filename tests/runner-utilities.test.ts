@@ -6,12 +6,15 @@ import {
   Logger,
   rand
 } from '../src/cli/runner.ts';
-import type { InstrumentationConfig } from '../src/schema/types.ts';
+import type { InstrumentationConfig, HeadlessMitigationConfig } from '../src/schema/types.ts';
+import { HEADLESS_MITIGATION_PROFILES } from '../src/cli/headless-profiles.ts';
+
+const testConfig: HeadlessMitigationConfig = HEADLESS_MITIGATION_PROFILES['windows-chrome']!;
 
 describe('Runner Utility Functions', () => {
   describe('generateSpoofedUserAgent', () => {
     test('should return valid spoofed user agent', () => {
-      const ua = generateSpoofedUserAgent();
+      const ua = generateSpoofedUserAgent(testConfig);
 
       expect(ua).toMatch(/Mozilla.*Windows.*Chrome/);
       expect(ua.length).toBeGreaterThan(50);
@@ -20,8 +23,8 @@ describe('Runner Utility Functions', () => {
     });
 
     test('should return consistent user agent on multiple calls', () => {
-      const ua1 = generateSpoofedUserAgent();
-      const ua2 = generateSpoofedUserAgent();
+      const ua1 = generateSpoofedUserAgent(testConfig);
+      const ua2 = generateSpoofedUserAgent(testConfig);
 
       expect(ua1).toBe(ua2);
     });
@@ -29,7 +32,7 @@ describe('Runner Utility Functions', () => {
 
   describe('generateBrandMetadata', () => {
     test('should return valid brand metadata array', () => {
-      const brands = generateBrandMetadata();
+      const brands = generateBrandMetadata(testConfig);
 
       expect(Array.isArray(brands)).toBe(true);
       expect(brands).toHaveLength(3);
@@ -41,7 +44,7 @@ describe('Runner Utility Functions', () => {
 
   describe('generateSpoofedHeaders', () => {
     test('should return valid spoofed headers object', () => {
-      const headers = generateSpoofedHeaders();
+      const headers = generateSpoofedHeaders(testConfig);
 
       expect(headers['Upgrade-Insecure-Requests']).toBe('1');
       expect(headers['sec-ch-ua-mobile']).toBe('?0');
@@ -52,7 +55,7 @@ describe('Runner Utility Functions', () => {
     });
 
     test('should have exactly 7 header fields', () => {
-      const headers = generateSpoofedHeaders();
+      const headers = generateSpoofedHeaders(testConfig);
 
       expect(Object.keys(headers)).toHaveLength(7);
     });
