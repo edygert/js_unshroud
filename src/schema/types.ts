@@ -292,6 +292,22 @@ export interface DebuggerEvent extends BaseEvent {
   scriptId?: string;          // CDP script ID
 }
 
+export interface DownloadEvent extends BaseEvent {
+  type: 'download';
+  eventType: 'download_attribute_set' | 'download_href_set' | 'download_click' | 'window_open_download';
+  downloadId: string;         // Correlation ID for download chain
+  filename?: string;          // Filename from download attribute
+  href?: string;              // Anchor href (blob: or data: URL)
+  url?: string;               // For window.open() downloads
+  isBlobUrl: boolean;         // Is href/url a blob: URL?
+  isDataUrl: boolean;         // Is href/url a data: URL?
+  target?: string;            // window.open() target
+  blobType?: string;          // MIME type from blob map
+  blobSize?: number;          // Size in bytes from blob map
+  blobContent?: string;       // Resolved blob content (truncated to 1KB)
+  artifactPath?: string;      // Path to saved artifact file (populated by ArtifactCollector)
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -316,7 +332,8 @@ export type MonitoringEvent =
   | ModuleEvent
   | IframeEvent
   | ClipboardEvent
-  | DebuggerEvent;
+  | DebuggerEvent
+  | DownloadEvent;
 
 export interface SessionConfig {
   id: string;
@@ -452,6 +469,7 @@ export interface InstrumentationConfig {
   enableClipboard: boolean;     // Instruments clipboard operations (writeText, execCommand, etc.) - CRITICAL for ClickFix detection
   clipboardPatternDetection: boolean;  // Enable malicious pattern detection (PowerShell, MSHTA, Base64) in clipboard data
   enableDebuggerDetection: boolean;  // Detects debugger statements via CDP (anti-analysis technique detection)
+  enableDownloadDetection: boolean;  // Detects file downloads via blob/data URLs and anchor elements (default: true)
   dedupeWindowMs: number;       // Deduplication window in milliseconds
   maxPayloadSize: number;       // Maximum payload size in bytes
   maxStackDepth: number;        // Maximum stack trace depth
@@ -479,4 +497,18 @@ export interface InstrumentationConfig {
 
   // Event filtering configuration (P4.1) - Reduce noise during malware triage
   eventFiltering?: EventFilteringConfig;
+
+  // Artifact collection configuration - Save artifacts to filesystem
+  enableArtifactCollection?: boolean;     // Enable artifact saving (default: false, opt-in)
+  artifactDirectory?: string;             // Base directory for artifacts (default: './artifacts')
+  artifactTypes?: {
+    downloads?: boolean;                  // Save downloaded files (default: true)
+    codeExecution?: boolean;              // Save eval/Function code (default: true)
+    encoding?: boolean;                   // Save atob/btoa output (default: true)
+    cryptojs?: boolean;                   // Save decrypted plaintext (default: true)
+    clipboard?: boolean;                  // Save clipboard payloads (default: true)
+    workers?: boolean;                    // Save worker scripts (default: true)
+    iframes?: boolean;                    // Save iframe srcdoc (default: true)
+  };
+  maxArtifactSize?: number;               // Max artifact size in bytes (default: 10MB)
 }
