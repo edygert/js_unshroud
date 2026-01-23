@@ -25,7 +25,8 @@ const EVENT_TYPES = [
   'worker',
   'module',
   'iframe',
-  'clipboard'
+  'clipboard',
+  'debugger'
 ] as const satisfies readonly MonitoringEvent['type'][];
 
 function isValidEventType(type: string): type is MonitoringEvent['type'] {

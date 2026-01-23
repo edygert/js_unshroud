@@ -283,6 +283,15 @@ export interface ClipboardEvent extends BaseEvent {
   isBase64Encoded?: boolean;      // Contains Base64 encoding
 }
 
+export interface DebuggerEvent extends BaseEvent {
+  type: 'debugger';
+  reason: string;             // Pause reason (e.g., 'debugCommand', 'other')
+  url?: string;               // Script URL where debugger was hit
+  lineNumber?: number;        // Line number of debugger statement
+  columnNumber?: number;      // Column number of debugger statement
+  scriptId?: string;          // CDP script ID
+}
+
 export type MonitoringEvent =
   | ConsoleEvent
   | NetworkEvent
@@ -306,7 +315,8 @@ export type MonitoringEvent =
   | WorkerEvent
   | ModuleEvent
   | IframeEvent
-  | ClipboardEvent;
+  | ClipboardEvent
+  | DebuggerEvent;
 
 export interface SessionConfig {
   id: string;
@@ -441,6 +451,7 @@ export interface InstrumentationConfig {
   enableIframes: boolean;       // Instruments iframe creation and srcdoc injection
   enableClipboard: boolean;     // Instruments clipboard operations (writeText, execCommand, etc.) - CRITICAL for ClickFix detection
   clipboardPatternDetection: boolean;  // Enable malicious pattern detection (PowerShell, MSHTA, Base64) in clipboard data
+  enableDebuggerDetection: boolean;  // Detects debugger statements via CDP (anti-analysis technique detection)
   dedupeWindowMs: number;       // Deduplication window in milliseconds
   maxPayloadSize: number;       // Maximum payload size in bytes
   maxStackDepth: number;        // Maximum stack trace depth

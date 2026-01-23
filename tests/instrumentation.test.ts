@@ -4814,4 +4814,91 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       await page.close();
     });
   });
+
+  describe('Debugger Detection (CDP-based)', () => {
+    test('should detect debugger statements via CDP', async () => {
+      const page = await browser.newPage();
+
+      // Get CDP session
+      const cdpSession = await page.context().newCDPSession(page);
+
+      // Enable Debugger domain
+      await cdpSession.send('Debugger.enable', {});
+
+      // Set up event listener for debugger.paused
+      const debuggerEvents: any[] = [];
+      cdpSession.on('Debugger.paused', async (params: any) => {
+        const location = params.callFrames[0];
+        debuggerEvents.push({
+          type: 'debugger',
+          reason: params.reason,
+          url: location?.url,
+          lineNumber: location?.location.lineNumber,
+          columnNumber: location?.location.columnNumber,
+          scriptId: location?.location.scriptId
+        });
+
+        // Resume execution
+        await cdpSession.send('Debugger.resume', {});
+      });
+
+      // Navigate to test page with debugger statements
+      const fixturePath = 'file://' + join(process.cwd(), 'tests/fixtures/debugger.html');
+      await page.goto(fixturePath);
+
+      // Wait for execution to complete
+      await page.waitForTimeout(1000);
+
+      // Verify debugger statements were detected
+      expect(debuggerEvents.length).toBeGreaterThanOrEqual(4); // At least 4 debugger statements in fixture
+
+      // Verify first debugger event
+      const firstDebugger = debuggerEvents[0];
+      expect(firstDebugger.type).toBe('debugger');
+      expect(firstDebugger.reason).toBeDefined(); // Can be 'debugCommand' or 'other'
+      expect(firstDebugger.lineNumber).toBeGreaterThanOrEqual(0);
+      expect(firstDebugger.columnNumber).toBeGreaterThanOrEqual(0);
+
+      await cdpSession.detach();
+      await page.close();
+    });
+
+    test('should auto-resume after debugger statement', async () => {
+      const page = await browser.newPage();
+
+      // Get CDP session
+      const cdpSession = await page.context().newCDPSession(page);
+
+      // Enable Debugger domain
+      await cdpSession.send('Debugger.enable', {});
+
+      let pauseCount = 0;
+      let resumeCount = 0;
+
+      // Track pauses and auto-resume
+      cdpSession.on('Debugger.paused', async () => {
+        pauseCount++;
+        await cdpSession.send('Debugger.resume', {});
+        resumeCount++;
+      });
+
+      // Navigate to test page
+      const fixturePath = 'file://' + join(process.cwd(), 'tests/fixtures/debugger.html');
+      await page.goto(fixturePath);
+
+      // Wait for execution
+      await page.waitForTimeout(1000);
+
+      // Verify we auto-resumed all pauses
+      expect(pauseCount).toBeGreaterThan(0);
+      expect(resumeCount).toBe(pauseCount);
+
+      // Verify page executed completely (output div should have content)
+      const outputText = await page.textContent('#output');
+      expect(outputText).toBe('analysis bypassed');
+
+      await cdpSession.detach();
+      await page.close();
+    });
+  });
 });

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debugger Detection Test</title>
+</head>
+<body>
+  <h1>Debugger Detection Test</h1>
+  <div id="output"></div>
+
+  <script>
+    // Test 1: Simple debugger statement
+    console.log('Before debugger');
+    debugger;
+    console.log('After debugger');
+
+    // Test 2: Debugger in function
+    function checkAnalysis() {
+      console.log('Function called');
+      debugger; // Anti-analysis technique
+      return 'analysis bypassed';
+    }
+
+    // Test 3: Debugger in try-catch (common anti-analysis pattern)
+    try {
+      debugger;
+      console.log('Debugger executed in try block');
+    } catch (e) {
+      console.log('Debugger caught:', e);
+    }
+
+    // Test 4: Multiple debugger statements
+    for (let i = 0; i < 3; i++) {
+      if (i === 1) {
+        debugger; // Only trigger on second iteration
+      }
+    }
+
+    // Call the function
+    const result = checkAnalysis();
+    document.getElementById('output').textContent = result;
+
+    console.log('All debugger statements completed');
+  </script>
+</body>
+</html>

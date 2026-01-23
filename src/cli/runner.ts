@@ -100,6 +100,7 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
     enableIframes: false,          // Instruments iframe creation and srcdoc injection
     enableClipboard: true,         // CRITICAL: ClickFix detection - instruments clipboard operations (47% of 2025 attacks)
     clipboardPatternDetection: true,  // Enable malicious pattern detection (PowerShell, MSHTA, Base64)
+    enableDebuggerDetection: true, // Detects debugger statements via CDP - common anti-analysis technique
     dedupeWindowMs: 100,           // Short window to reduce noise from tight loops
     maxPayloadSize: 2051,         // Captures first 1024 + "..." + last 1024 chars for code/encoding output
     maxStackDepth: 20,
@@ -1030,7 +1031,7 @@ async function runMonitoring(args: Args): Promise<void> {
   const page = await context.newPage();
 
   // Initialize CDP session manager
-  const cdpManager = new CDPSessionManager(page, eventLogger, sessionId);
+  const cdpManager = new CDPSessionManager(page, eventLogger, sessionId, config.enableDebuggerDetection);
 
   try {
     await cdpManager.initialize(page);

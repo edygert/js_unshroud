@@ -413,6 +413,7 @@ You can optionally provide a configuration file to control what instrumentation 
   "enableCodeExecution": true,
   "enableEncoding": true,
   "enableCryptoJS": true,
+  "enableDebuggerDetection": true,
   "monitoringTimeoutSeconds": 15,
   "outputMode": "file",
   "udpLogging": {
@@ -441,6 +442,7 @@ Configuration options:
 - `enableCodeExecution`: Capture eval(), Function(), and dynamic code execution (default: `true`)
 - `enableEncoding`: Capture atob/btoa, fromCharCode, URI encoding/decoding (default: `true`)
 - `enableCryptoJS`: Capture CryptoJS library encryption/decryption (AES, DES, TripleDES, RC4, Rabbit) (default: `true`)
+- `enableDebuggerDetection`: Detect and automatically resume from `debugger;` statements - common anti-analysis technique (default: `true`)
 - `enableWorkers`: Capture Web Worker and SharedWorker creation, messaging, and errors (default: `false`)
 - `enableModules`: Capture ES module script injection via `<script type="module">` (default: `false`)
 - `enableIframes`: Capture iframe creation, srcdoc injection, and embedded scripts (default: `false`)
@@ -1111,6 +1113,23 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 ```
 
 Note: For `decrypt` operations, `output` contains the decrypted plaintext. For `encrypt` operations, `output` contains the cleartext input (not the encrypted result). This allows analysts to see what data is being encrypted without storing large encrypted payloads.
+
+**Debugger Events (Anti-Analysis Detection):**
+```json
+{
+  "id": "evt_1234567890_009",
+  "timestamp": 1640995200750,
+  "sessionId": "session_1640995200_abc123",
+  "type": "debugger",
+  "reason": "other",
+  "url": "https://example.com/malware.js",
+  "lineNumber": 42,
+  "columnNumber": 4,
+  "scriptId": "123"
+}
+```
+
+Note: Malicious JavaScript often uses `debugger;` statements to detect analysis tools. When enabled, js_unshroud automatically detects and resumes from debugger statements, allowing execution to continue normally while logging the anti-analysis attempt.
 
 **Web Worker Events:**
 ```json

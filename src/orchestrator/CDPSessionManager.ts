@@ -1,5 +1,5 @@
 import type { CDPSession, Page } from 'playwright-core';
-import type { NetworkEvent, ConsoleEvent, ErrorEvent, HeadlessMitigationConfig } from '../schema/types.ts';
+import type { NetworkEvent, ConsoleEvent, ErrorEvent, HeadlessMitigationConfig, DebuggerEvent } from '../schema/types.ts';
 import type { Protocol } from 'devtools-protocol';
 import type { EventLogger } from './EventLogger.ts';
 import { createEvent } from '../schema/events.ts';
@@ -12,10 +12,12 @@ export class CDPSessionManager {
   private pendingLogEvents: Promise<void>[] = [];
   private readonly networkCorrelationMap: Map<string, string> = new Map(); // requestId -> correlationId
   private readonly networkRequestMap: Map<string, { method: string; url: string }> = new Map(); // requestId -> request details
+  private readonly enableDebuggerDetection: boolean;
 
-  constructor(_page: Page, eventLogger: EventLogger, sessionId: string) {
+  constructor(_page: Page, eventLogger: EventLogger, sessionId: string, enableDebuggerDetection: boolean = false) {
     this.eventLogger = eventLogger;
     this.sessionId = sessionId;
+    this.enableDebuggerDetection = enableDebuggerDetection;
   }
 
   async initialize(page: Page): Promise<void> {
@@ -28,11 +30,21 @@ export class CDPSessionManager {
     await this.cdpSession.send('Console.enable', {});
     await this.cdpSession.send('Page.enable', {});
 
+    // Enable Debugger domain if debugger detection is enabled
+    if (this.enableDebuggerDetection) {
+      await this.cdpSession.send('Debugger.enable', {});
+    }
+
     // Set up event listeners
     this.setupNetworkListeners();
     this.setupConsoleListeners();
     this.setupRuntimeListeners();
     this.setupPageListeners();
+
+    // Set up debugger listeners if enabled
+    if (this.enableDebuggerDetection) {
+      this.setupDebuggerListeners();
+    }
   }
 
   private setupNetworkListeners(): void {
@@ -171,6 +183,38 @@ export class CDPSessionManager {
     // Page.frameNavigated
     this.cdpSession.on('Page.frameNavigated', (params: Protocol.Page.FrameNavigatedEvent) => {
       this.frameIds.set(params.frame.id, params.frame.url || (params.frame.name ?? 'unknown'));
+    });
+  }
+
+  private setupDebuggerListeners(): void {
+    if (!this.cdpSession) return;
+
+    // Debugger.paused - triggered when debugger statement is hit
+    this.cdpSession.on('Debugger.paused', async (params: Protocol.Debugger.PausedEvent) => {
+      // Log the debugger statement detection
+      const location = params.callFrames[0];
+      const event: Omit<DebuggerEvent, 'id' | 'timestamp' | 'sessionId' | 'frameId'> = {
+        type: 'debugger',
+        reason: params.reason,
+        ...(location?.url && { url: location.url }),
+        ...(location?.location.lineNumber !== undefined && { lineNumber: location.location.lineNumber }),
+        ...(location?.location.columnNumber !== undefined && { columnNumber: location.location.columnNumber }),
+        ...(location?.location.scriptId && { scriptId: location.location.scriptId })
+      };
+
+      const promise = this.eventLogger.logEvent(createEvent<DebuggerEvent>(
+        this.sessionId,
+        undefined,
+        event
+      ));
+      this.queueLogEvent(promise);
+
+      // Immediately resume execution to avoid blocking the page
+      try {
+        await this.cdpSession?.send('Debugger.resume', {});
+      } catch (error) {
+        console.warn('[JS Unshroud] Failed to resume after debugger statement:', error);
+      }
     });
   }
 
