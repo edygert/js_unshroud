@@ -39,7 +39,7 @@
   // Log CryptoJS event AFTER execution
   const logCryptoJSEvent = function(method, operation, algorithm, encoding, key, output, outputLength, success, error) {
     if (typeof window.__js_unshroud_log === 'function') {
-      window.__js_unshroud_log(JSON.stringify({
+      const event = {
         id: generateEventId(),
         sessionId: getSessionId(),
         timestamp: Date.now(),
@@ -53,7 +53,22 @@
         outputLength: outputLength,
         success: success,
         error: error
-      }));
+      };
+
+      window.__js_unshroud_log(JSON.stringify(event));
+
+      // Save artifact if artifact collection is enabled and operation succeeded (decrypt only)
+      if (success && operation === 'decrypt' && window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+        if (typeof window.__js_unshroud_save_artifact === 'function') {
+          window.__js_unshroud_save_artifact({
+            event: event,
+            type: 'cryptojs',
+            content: output || '',  // Full decrypted plaintext, not truncated
+            extension: 'txt',
+            mimeType: 'text/plain'
+          });
+        }
+      }
     }
   };
 

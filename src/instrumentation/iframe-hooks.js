@@ -88,7 +88,7 @@
   // Log iframe event
   const logIframeEvent = function(eventType, src, srcdoc, scriptCount, scripts, code, element) {
     if (typeof window.__js_unshroud_log === 'function') {
-      window.__js_unshroud_log(JSON.stringify({
+      const event = {
         id: generateEventId(),
         sessionId: getSessionId(),
         timestamp: Date.now(),
@@ -101,7 +101,22 @@
         code: code,
         element: element,
         stackTrace: getStackTrace()
-      }));
+      };
+
+      window.__js_unshroud_log(JSON.stringify(event));
+
+      // Save artifact if artifact collection is enabled and we have srcdoc content
+      if (srcdoc && window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+        if (typeof window.__js_unshroud_save_artifact === 'function') {
+          window.__js_unshroud_save_artifact({
+            event: event,
+            type: 'iframe',
+            content: srcdoc,  // Full srcdoc HTML, not truncated
+            extension: 'html',
+            mimeType: 'text/html'
+          });
+        }
+      }
     }
   };
 

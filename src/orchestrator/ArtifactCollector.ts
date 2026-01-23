@@ -95,7 +95,7 @@ export class ArtifactCollector {
         worker: 'workers',
         iframe: 'iframes'
       };
-      const subdir = subdirMap[artifactData.type] || artifactData.type;
+      const subdir = subdirMap[artifactData.type] ?? artifactData.type;
       const artifactPath = join(this.sessionDir, subdir, filename);
 
       // Write artifact content
@@ -112,7 +112,7 @@ export class ArtifactCollector {
         originalSize: contentSize,
         savedSize: contentSize,
         truncated: false,
-        mimeType: artifactData.mimeType || 'application/octet-stream',
+        mimeType: artifactData.mimeType ?? 'application/octet-stream',
         eventData: event
       };
       await writeFile(metaPath, JSON.stringify(metadata, null, 2));
@@ -133,8 +133,8 @@ export class ArtifactCollector {
   ): Promise<string | null> {
     if (!this.config.types.downloads) return null;
 
-    const extension = this.getExtensionFromFilename(downloadEvent.filename) || 'bin';
-    const mimeType = downloadEvent.blobType || 'application/octet-stream';
+    const extension = this.getExtensionFromFilename(downloadEvent.filename) ?? 'bin';
+    const mimeType = downloadEvent.blobType ?? 'application/octet-stream';
 
     return this.saveArtifact(downloadEvent, {
       type: 'download',

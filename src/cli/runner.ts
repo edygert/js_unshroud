@@ -4,7 +4,8 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { readFileSync } from 'fs';
 import { EventLogger } from '../orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../orchestrator/CDPSessionManager.ts';
-import type { SessionConfig, InstrumentationConfig, HeadlessMitigationConfig } from '../schema/types.ts';
+import { ArtifactCollector, type ArtifactConfig } from '../orchestrator/ArtifactCollector.ts';
+import type { SessionConfig, InstrumentationConfig, HeadlessMitigationConfig, MonitoringEvent } from '../schema/types.ts';
 import { validateEvent } from '../schema/events.ts';
 import { resolveHeadlessMitigationConfig } from './headless-profiles.ts';
 import { validateHeadlessMitigationConfig } from './validation.ts';
@@ -101,6 +102,7 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
     enableClipboard: true,         // CRITICAL: ClickFix detection - instruments clipboard operations (47% of 2025 attacks)
     clipboardPatternDetection: true,  // Enable malicious pattern detection (PowerShell, MSHTA, Base64)
     enableDebuggerDetection: true, // Detects debugger statements via CDP - common anti-analysis technique
+    enableDownloadDetection: true, // Detects file downloads via blob/data URLs and anchor elements
     dedupeWindowMs: 100,           // Short window to reduce noise from tight loops
     maxPayloadSize: 2051,         // Captures first 1024 + "..." + last 1024 chars for code/encoding output
     maxStackDepth: 20,
@@ -120,6 +122,19 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
       host: '127.0.0.1',
       port: 514  // Default syslog port
     },
+    // Artifact collection configuration (opt-in, disabled by default)
+    enableArtifactCollection: false,
+    artifactDirectory: './artifacts',
+    artifactTypes: {
+      downloads: true,
+      codeExecution: true,
+      encoding: true,
+      cryptojs: true,
+      clipboard: true,
+      workers: true,
+      iframes: true
+    },
+    maxArtifactSize: 10 * 1024 * 1024,  // 10MB default
     // Debug configuration
     debug: false,  // Suppress console output unless explicitly enabled
     // Event filtering configuration (P4.1) - Reduce noise during malware triage
@@ -229,6 +244,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   module: string | null;
   iframe: string | null;
   clipboard: string | null;
+  download: string | null;
   performanceMonitor: string;
 } {
   const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
@@ -250,6 +266,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   const moduleScript = readFileSync('./src/instrumentation/module-hooks.js', 'utf-8');
   const iframeScript = readFileSync('./src/instrumentation/iframe-hooks.js', 'utf-8');
   const clipboardScript = readFileSync('./src/instrumentation/clipboard-hooks.js', 'utf-8');
+  const downloadScript = readFileSync('./src/instrumentation/download-hooks.js', 'utf-8');
   const performanceMonitorScript = readFileSync('./src/instrumentation/performance-monitor.js', 'utf-8');
 
   return {
@@ -272,6 +289,7 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
     module: config.enableModules ? moduleScript : null,
     iframe: config.enableIframes ? iframeScript : null,
     clipboard: config.enableClipboard ? clipboardScript : null,
+    download: config.enableDownloadDetection ? downloadScript : null,
     performanceMonitor: performanceMonitorScript // Always loaded for performance controls
   };
 }
@@ -281,6 +299,7 @@ async function injectInstrumentation(
   config: InstrumentationConfig,
   sessionId: string,
   eventLogger: EventLogger,
+  artifactCollector: ArtifactCollector,
   logger: Logger,
   headlessConfig?: HeadlessMitigationConfig
 ): Promise<{
@@ -294,6 +313,16 @@ async function injectInstrumentation(
   headlessMitigation: string | null;
   serviceWorker: string | null;
   codeExecution: string | null;
+  encoding: string | null;
+  cryptojs: string | null;
+  eventHandler: string | null;
+  blobTracking: string | null;
+  urlExecution: string | null;
+  worker: string | null;
+  module: string | null;
+  iframe: string | null;
+  clipboard: string | null;
+  download: string | null;
   performanceMonitor: string;
 }> {
   const scripts = loadInstrumentationScripts(config);
@@ -313,6 +342,33 @@ async function injectInstrumentation(
     }
   });
 
+  // Set up artifact saving bridge (if artifact collection is enabled)
+  await page.exposeFunction('__playwright_save_artifact', async (artifactJson: string) => {
+    try {
+      const artifact = JSON.parse(artifactJson) as {
+        event: MonitoringEvent;
+        type: string;
+        content: string;
+        extension: string;
+        mimeType?: string;
+      };
+      const artifactPath = await artifactCollector.saveArtifact(artifact.event, {
+        type: artifact.type,
+        content: artifact.content,
+        extension: artifact.extension,
+        mimeType: artifact.mimeType
+      });
+
+      // If artifact was saved, update event with path and log it
+      if (artifactPath) {
+        const updatedEvent = { ...artifact.event, artifactPath };
+        await eventLogger.logEvent(updatedEvent);
+      }
+    } catch (error) {
+      logger.error('[JS Unshroud] Failed to save artifact:', error);
+    }
+  });
+
   // Install bridge connector BEFORE bootstrap loads
   // This overrides the silent no-op in bootstrap.js with a working implementation
   await page.addInitScript({
@@ -321,6 +377,13 @@ async function injectInstrumentation(
         if (window.__playwright_log_event) {
           window.__playwright_log_event(data).catch(function(err) {
             // Error handler - can't use console.log here due to recursion
+          });
+        }
+      };
+      window.__js_unshroud_save_artifact = function(artifactData) {
+        if (window.__playwright_save_artifact) {
+          window.__playwright_save_artifact(JSON.stringify(artifactData)).catch(function(err) {
+            // Error handler - silent failure
           });
         }
       };
@@ -346,6 +409,8 @@ async function injectInstrumentation(
         enableURLExecution: config.enableURLExecution,
         enableClipboard: config.enableClipboard,
         clipboardPatternDetection: config.clipboardPatternDetection,
+        enableDownloadDetection: config.enableDownloadDetection,
+        enableArtifactCollection: config.enableArtifactCollection ?? false,
         eventFiltering: config.eventFiltering,
         debug: config.debug ?? false
       })};
@@ -401,6 +466,12 @@ async function injectInstrumentation(
   // DOM hooks may need to look up blob content when analyzing blob: URLs
   if (scripts.blobTracking) {
     await page.addInitScript({ content: scripts.blobTracking });
+  }
+
+  // Inject download hooks AFTER blob tracking
+  // Download hooks need access to blob map for content resolution
+  if (scripts.download) {
+    await page.addInitScript({ content: scripts.download });
   }
 
   if (scripts.dom) {
@@ -990,6 +1061,27 @@ async function runMonitoring(args: Args): Promise<void> {
     config.udpLogging
   );
 
+  // Initialize artifact collector if enabled
+  const artifactConfig: ArtifactConfig = {
+    enabled: config.enableArtifactCollection ?? false,
+    baseDirectory: config.artifactDirectory ?? './artifacts',
+    types: {
+      downloads: config.artifactTypes?.downloads ?? true,
+      codeExecution: config.artifactTypes?.codeExecution ?? true,
+      encoding: config.artifactTypes?.encoding ?? true,
+      cryptojs: config.artifactTypes?.cryptojs ?? true,
+      clipboard: config.artifactTypes?.clipboard ?? true,
+      workers: config.artifactTypes?.workers ?? true,
+      iframes: config.artifactTypes?.iframes ?? true
+    },
+    maxArtifactSize: config.maxArtifactSize ?? (10 * 1024 * 1024) // 10MB default
+  };
+  const artifactCollector = new ArtifactCollector(sessionConfig, artifactConfig);
+  if (artifactConfig.enabled) {
+    await artifactCollector.initialize();
+    logger.log(`Artifact collection enabled: ${artifactCollector.getSessionDirectory()}`);
+  }
+
   // Resolve and validate headless mitigation configuration
   let headlessConfig: HeadlessMitigationConfig | undefined;
   if (config.enableHeadlessMitigation) {
@@ -1057,7 +1149,7 @@ async function runMonitoring(args: Args): Promise<void> {
       });
     }
 
-    await injectInstrumentation(page, config, sessionId, eventLogger, logger, headlessConfig);
+    await injectInstrumentation(page, config, sessionId, eventLogger, artifactCollector, logger, headlessConfig);
 
     // Navigate to the URL
     logger.log(`Navigating to ${args.url}...`);

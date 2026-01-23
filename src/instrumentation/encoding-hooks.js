@@ -86,7 +86,7 @@
     }
 
     if (typeof window.__js_unshroud_log === 'function') {
-      window.__js_unshroud_log(JSON.stringify({
+      const event = {
         id: generateEventId(),
         sessionId: getSessionId(),
         timestamp: Date.now(),
@@ -97,7 +97,22 @@
         outputLength: outputLength,
         success: success,
         error: error
-      }));
+      };
+
+      window.__js_unshroud_log(JSON.stringify(event));
+
+      // Save artifact if artifact collection is enabled and operation succeeded
+      if (success && window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+        if (typeof window.__js_unshroud_save_artifact === 'function') {
+          window.__js_unshroud_save_artifact({
+            event: event,
+            type: 'encoding',
+            content: output || '',  // Full output, not truncated
+            extension: 'txt',
+            mimeType: 'text/plain'
+          });
+        }
+      }
     }
   };
 

@@ -189,6 +189,24 @@ export class TimelineFormatter {
         return `Clipboard: ${clipEvent.method}.${clipEvent.operation} (${clipEvent.dataLength} bytes)${suspiciousFlag}`;
       }
 
+      case 'debugger': {
+        const debugEvent = event;
+        return `Debugger Statement: ${debugEvent.scriptUrl ?? 'inline'} line ${debugEvent.lineNumber ?? '?'}`;
+      }
+
+      case 'download': {
+        const downloadEvent = event;
+        if (downloadEvent.eventType === 'download_click') {
+          return `Download Click: ${downloadEvent.filename ?? 'unnamed'} (${downloadEvent.blobSize ?? 0} bytes)`;
+        } else if (downloadEvent.eventType === 'window_open_download') {
+          return `Window Open Download: ${downloadEvent.url.slice(0, 50)}... (${downloadEvent.blobSize ?? 0} bytes)`;
+        } else if (downloadEvent.eventType === 'download_attribute_set') {
+          return `Download Attribute Set: ${downloadEvent.filename}`;
+        } else {
+          return `Download Href Set: ${downloadEvent.href?.slice(0, 50) ?? ''}...`;
+        }
+      }
+
       default:
         return `${(event as BaseEvent).type} event`;
     }

@@ -69,7 +69,7 @@
         return;
       }
 
-      window.__js_unshroud_log(JSON.stringify({
+      const event = {
         id: generateEventId(),
         sessionId: getSessionId(),
         timestamp: Date.now(),
@@ -80,7 +80,22 @@
         codeLength: codeStr.length,
         codeHash: hashCode(codeStr),
         args: args
-      }));
+      };
+
+      window.__js_unshroud_log(JSON.stringify(event));
+
+      // Save artifact if artifact collection is enabled
+      if (window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+        if (typeof window.__js_unshroud_save_artifact === 'function') {
+          window.__js_unshroud_save_artifact({
+            event: event,
+            type: 'code_execution',
+            content: codeStr,  // Full code, not truncated
+            extension: 'js',
+            mimeType: 'application/javascript'
+          });
+        }
+      }
     }
   };
 

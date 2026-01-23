@@ -162,7 +162,7 @@
         const textStr = String(text);
         const patterns = detectSuspiciousPatterns(textStr);
 
-        logEvent({
+        const event = {
           type: 'clipboard',
           operation: operation,
           method: 'navigator.clipboard.writeText',
@@ -171,7 +171,22 @@
           success: true, // Will update on error
           stackTrace: getStackTrace(),
           ...patterns
-        });
+        };
+
+        logEvent(event);
+
+        // Save artifact if artifact collection is enabled
+        if (window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+          if (typeof window.__js_unshroud_save_artifact === 'function') {
+            window.__js_unshroud_save_artifact({
+              event: event,
+              type: 'clipboard',
+              content: textStr,  // Full clipboard text, not truncated
+              extension: 'txt',
+              mimeType: 'text/plain'
+            });
+          }
+        }
       }
 
       // Call original and handle promise

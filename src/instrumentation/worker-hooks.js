@@ -31,10 +31,21 @@
     return undefined;
   };
 
+  // Helper function to get full blob content (not truncated)
+  const getFullBlobContent = function(url) {
+    if (url && url.startsWith('blob:') && window.__js_unshroud_blob_map) {
+      const blobInfo = window.__js_unshroud_blob_map[url];
+      if (blobInfo && blobInfo.content) {
+        return String(blobInfo.content);
+      }
+    }
+    return undefined;
+  };
+
   // Log worker event
   const logWorkerEvent = function(eventType, workerType, scriptURL, message, direction, error, blobContent) {
     if (typeof window.__js_unshroud_log === 'function') {
-      window.__js_unshroud_log(JSON.stringify({
+      const event = {
         id: generateEventId(),
         sessionId: getSessionId(),
         timestamp: Date.now(),
@@ -47,7 +58,25 @@
         direction: direction,
         error: error,
         stackTrace: getStackTrace()
-      }));
+      };
+
+      window.__js_unshroud_log(JSON.stringify(event));
+
+      // Save artifact if artifact collection is enabled and this is worker creation with blob content
+      if (eventType === 'worker_create' && scriptURL && window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+        if (typeof window.__js_unshroud_save_artifact === 'function') {
+          const fullBlobContent = getFullBlobContent(scriptURL);
+          if (fullBlobContent) {
+            window.__js_unshroud_save_artifact({
+              event: event,
+              type: 'worker',
+              content: fullBlobContent,  // Full worker script, not truncated
+              extension: 'js',
+              mimeType: 'application/javascript'
+            });
+          }
+        }
+      }
     }
   };
 

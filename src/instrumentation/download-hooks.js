@@ -26,16 +26,16 @@
     return window.__js_unshroud_session_id || 'unknown_session';
   };
 
-  // Get stack trace
-  const getStackTrace = function() {
-    try {
-      const err = new Error();
-      const stack = err.stack || '';
-      return stack.split('\n').slice(2, 10).join('\n');
-    } catch {
-      return '';
-    }
-  };
+  // Get stack trace (currently unused but kept for potential debugging needs)
+  // const getStackTrace = function() {
+  //   try {
+  //     const err = new Error();
+  //     const stack = err.stack || '';
+  //     return stack.split('\n').slice(2, 10).join('\n');
+  //   } catch {
+  //     return '';
+  //   }
+  // };
 
   // Log event
   const logEvent = function(event) {
@@ -64,6 +64,7 @@
     window.__js_unshroud_download_map.set(anchor, downloadInfo);
 
     // Track download attribute setter
+    /* global HTMLAnchorElement */
     const originalDownloadDescriptor = Object.getOwnPropertyDescriptor(HTMLAnchorElement.prototype, 'download');
     if (originalDownloadDescriptor) {
       try {
@@ -173,7 +174,7 @@
             }
           }
 
-          logEvent({
+          const event = {
             type: 'download',
             eventType: 'download_click',
             downloadId: info.downloadId,
@@ -184,7 +185,24 @@
             blobType: info.blobType,
             blobSize: info.blobSize,
             blobContent: info.blobContent ? String(info.blobContent).substring(0, 1024) : null
-          });
+          };
+
+          logEvent(event);
+
+          // Save artifact if artifact collection is enabled and we have blob content
+          if (info.blobContent && window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+            if (typeof window.__js_unshroud_save_artifact === 'function') {
+              // Determine file extension from filename or use 'bin' as default
+              const extension = info.filename ? info.filename.split('.').pop() || 'bin' : 'bin';
+              window.__js_unshroud_save_artifact({
+                event: event,
+                type: 'download',
+                content: String(info.blobContent),  // Full blob content, not truncated
+                extension: extension,
+                mimeType: info.blobType || 'application/octet-stream'
+              });
+            }
+          }
         }
 
         return originalClick.apply(this, arguments);
@@ -217,7 +235,7 @@
   }
 
   // 3. Instrument window.open for blob/data URLs
-  window.open = function(url, target, features) {
+  window.open = function(url, target, _features) {
     if (url && (typeof url === 'string') && (url.startsWith('blob:') || url.startsWith('data:'))) {
       const downloadId = 'download_windowopen_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
@@ -235,7 +253,7 @@
         }
       }
 
-      logEvent({
+      const event = {
         type: 'download',
         eventType: 'window_open_download',
         downloadId: downloadId,
@@ -246,7 +264,22 @@
         blobType: blobType,
         blobSize: blobSize,
         blobContent: blobContent ? String(blobContent).substring(0, 1024) : null
-      });
+      };
+
+      logEvent(event);
+
+      // Save artifact if artifact collection is enabled and we have blob content
+      if (blobContent && window.__js_unshroud_config && window.__js_unshroud_config.enableArtifactCollection) {
+        if (typeof window.__js_unshroud_save_artifact === 'function') {
+          window.__js_unshroud_save_artifact({
+            event: event,
+            type: 'download',
+            content: String(blobContent),  // Full blob content, not truncated
+            extension: 'bin',
+            mimeType: blobType || 'application/octet-stream'
+          });
+        }
+      }
     }
 
     return originalWindowOpen.apply(this, arguments);
@@ -259,7 +292,7 @@
         window.open[key] = originalWindowOpen[key];
       }
     });
-  } catch (e) {
+  } catch {
     // Ignore if we can't copy properties
   }
 
