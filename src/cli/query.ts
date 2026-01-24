@@ -4,7 +4,7 @@ import { existsSync, writeFileSync } from 'fs';
 interface QueryArgs {
   input: string;
   // Filter params
-  type?: string;
+  eventType?: string;
   method?: string;
   url?: string;
   urlRegex?: string;
@@ -32,7 +32,7 @@ export function parseQueryArgs(): QueryArgs {
   }
 
   let input: string | undefined;
-  let type: string | undefined;
+  let eventType: string | undefined;
   let method: string | undefined;
   let url: string | undefined;
   let urlRegex: string | undefined;
@@ -52,7 +52,7 @@ export function parseQueryArgs(): QueryArgs {
       input = nextArg;
       i++;
     } else if (arg === '--type' && nextArg) {
-      type = nextArg;
+      eventType = nextArg;
       i++;
     } else if (arg === '--method' && nextArg) {
       method = nextArg;
@@ -102,7 +102,7 @@ export function parseQueryArgs(): QueryArgs {
   }
 
   const result: QueryArgs = { input };
-  if (type) result.type = type;
+  if (eventType) result.eventType = eventType;
   if (method) result.method = method;
   if (url) result.url = url;
   if (urlRegex) result.urlRegex = urlRegex;
@@ -155,8 +155,8 @@ export function buildQueryFilter(args: QueryArgs): QueryFilter {
   const filter: QueryFilter = {};
 
   // Handle comma-separated types
-  if (args.type) {
-    filter.type = args.type;
+  if (args.eventType) {
+    filter.eventType = args.eventType;
   }
 
   // Network filters

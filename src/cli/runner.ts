@@ -356,7 +356,7 @@ async function injectInstrumentation(
         type: artifact.type,
         content: artifact.content,
         extension: artifact.extension,
-        mimeType: artifact.mimeType
+        ...(artifact.mimeType !== undefined && { mimeType: artifact.mimeType })
       });
 
       // If artifact was saved, update event with path and log it

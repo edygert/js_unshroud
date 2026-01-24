@@ -226,6 +226,7 @@ describe('Instrumentation Script Loading', () => {
       enableClipboard: true,
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
+      enableDownloadDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -268,6 +269,7 @@ describe('Instrumentation Script Loading', () => {
       enableClipboard: true,
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
+      enableDownloadDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -309,6 +311,7 @@ describe('Instrumentation Script Loading', () => {
       enableClipboard: true,
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
+      enableDownloadDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -351,6 +354,7 @@ describe('Instrumentation Injection', () => {
       enableClipboard: true,
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
+      enableDownloadDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -366,12 +370,15 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
+    // Mock artifactCollector
+    const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
+
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(7); // bridge + bootstrap + network + storage + clipboard + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(8); // bridge + bootstrap + network + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -402,6 +409,7 @@ describe('Instrumentation Injection', () => {
       enableClipboard: true,
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
+      enableDownloadDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -416,12 +424,15 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
+    // Mock artifactCollector
+    const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
+
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(6); // bridge + bootstrap + storage + clipboard + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(7); // bridge + bootstrap + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -452,6 +463,7 @@ describe('Instrumentation Injection', () => {
       enableClipboard: true,
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
+      enableDownloadDetection: true,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -466,11 +478,14 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
+    // Mock artifactCollector
+    const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
+
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
     // Should rethrow the error
-    await expect(injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger)).rejects.toThrow('Injection failed');
+    await expect(injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger)).rejects.toThrow('Injection failed');
   });
 
   test('should handle minimal config with only bootstrap', async () => {
@@ -498,6 +513,7 @@ describe('Instrumentation Injection', () => {
       enableClipboard: false,
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
+      enableDownloadDetection: false,
       dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
@@ -512,10 +528,13 @@ describe('Instrumentation Injection', () => {
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
 
+    // Mock artifactCollector
+    const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
+
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockLogger);
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
 
     expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor (clipboard disabled)
     expect(addInitScript).toHaveBeenCalledWith(
@@ -738,8 +757,11 @@ describe('End-to-End Integration Tests', () => {
       // Mock logger
       const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
+      // Mock artifactCollector
+      const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
+
       // Inject instrumentation scripts
-      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockLogger);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger);
 
       // Navigate to test page
       await page.goto(sessionConfig.url, {
@@ -794,11 +816,12 @@ describe('End-to-End Integration Tests', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+    const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
 
     try {
       const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
       await cdpManager.initialize(page);
-      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockLogger);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger);
 
       // This should fail with navigation error
 
@@ -853,6 +876,7 @@ describe('End-to-End Integration Tests', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+    const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
 
     try {
       const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
@@ -863,7 +887,7 @@ describe('End-to-End Integration Tests', () => {
 
       const config = loadInstrumentationConfig();
 
-      await expect(injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockLogger)).rejects.toThrow('Script injection failed');
+      await expect(injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger)).rejects.toThrow('Script injection failed');
 
     } finally {
       await performCleanup(browser, eventLogger, mockLogger);

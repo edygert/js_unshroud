@@ -4827,19 +4827,21 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
 
       // Set up event listener for debugger.paused
       const debuggerEvents: any[] = [];
-      cdpSession.on('Debugger.paused', async (params: any) => {
-        const location = params.callFrames[0];
-        debuggerEvents.push({
-          type: 'debugger',
-          reason: params.reason,
-          url: location?.url,
-          lineNumber: location?.location.lineNumber,
-          columnNumber: location?.location.columnNumber,
-          scriptId: location?.location.scriptId
-        });
+      cdpSession.on('Debugger.paused', (params: any) => {
+        void (async () => {
+          const location = params.callFrames[0];
+          debuggerEvents.push({
+            type: 'debugger',
+            reason: params.reason,
+            url: location?.url,
+            lineNumber: location?.location.lineNumber,
+            columnNumber: location?.location.columnNumber,
+            scriptId: location?.location.scriptId
+          });
 
-        // Resume execution
-        await cdpSession.send('Debugger.resume', {});
+          // Resume execution
+          await cdpSession.send('Debugger.resume', {});
+        })();
       });
 
       // Navigate to test page with debugger statements
@@ -4876,10 +4878,12 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       let resumeCount = 0;
 
       // Track pauses and auto-resume
-      cdpSession.on('Debugger.paused', async () => {
-        pauseCount++;
-        await cdpSession.send('Debugger.resume', {});
-        resumeCount++;
+      cdpSession.on('Debugger.paused', () => {
+        void (async () => {
+          pauseCount++;
+          await cdpSession.send('Debugger.resume', {});
+          resumeCount++;
+        })();
       });
 
       // Navigate to test page

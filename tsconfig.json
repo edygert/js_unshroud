@@ -28,5 +28,10 @@
     "noPropertyAccessFromIndexSignature": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "samples"
+  ]
 }

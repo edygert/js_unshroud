@@ -247,7 +247,6 @@ export function loadCustomRules(rulesFilePath: string): CorrelationRule[] {
  */
 export function formatEventSummary(event: MonitoringEvent): string {
   // Type-specific summaries
-  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
   switch (event.type) {
     case 'network':
       return `${(event).method || 'REQUEST'} ${(event).url || '(no URL)'}`;
@@ -265,8 +264,44 @@ export function formatEventSummary(event: MonitoringEvent): string {
     }
     case 'fingerprinting':
       return `${(event).method}()`;
-    default:
-      return event.id;
+    case 'websocket':
+      return `WebSocket ${(event).event}: ${(event).url}`;
+    case 'dom':
+      return `DOM ${(event).eventType}${(event).target ? ` on ${(event).target}` : ''}`;
+    case 'headless_mitigation':
+      return `${(event).method} ${(event).operation}`;
+    case 'performance_stats':
+      return `Performance: ${(event).totalEventsProcessed} events (${(event).eventsAccepted} accepted)`;
+    case 'performance_warning':
+      return `${(event).method}(${(event).delay}ms): ${(event).warning}`;
+    case 'service_worker':
+      return `ServiceWorker ${(event).eventType}${(event).scriptUrl ? `: ${(event).scriptUrl}` : ''}`;
+    case 'encoding': {
+      const outputPreview = (event).output ? (event).output.substring(0, 40) : '';
+      return `${(event).method}("${outputPreview}${outputPreview.length >= 40 ? '...' : ''}")`;
+    }
+    case 'cryptojs':
+      return `CryptoJS.${(event).method}(${(event).algorithm ?? (event).encoding ?? ''})`;
+    case 'script_injection':
+      return `${(event).method}${(event).scriptSrc ? `: ${(event).scriptSrc}` : (event).htmlLength ? ` (${(event).htmlLength} bytes)` : ''}`;
+    case 'event_handler':
+      return `${(event).element}.${(event).handlerName} = function(...)`;
+    case 'blob':
+      return `Blob ${(event).eventType}${(event).blobUrl ? `: ${(event).blobUrl}` : ''}`;
+    case 'url_execution':
+      return `${(event).eventType}: javascript:${(event).code.substring(0, 40)}...`;
+    case 'worker':
+      return `${(event).workerType} ${(event).eventType}: ${(event).scriptURL}`;
+    case 'module':
+      return `ES Module ${(event).isInline ? 'inline' : (event).src ?? '(no src)'}`;
+    case 'iframe':
+      return `iframe ${(event).eventType}${(event).src ? `: ${(event).src}` : ''}`;
+    case 'clipboard':
+      return `${(event).method}: ${(event).data?.substring(0, 40) ?? '(no data)'}${((event).data?.length ?? 0) > 40 ? '...' : ''}`;
+    case 'debugger':
+      return `debugger at ${(event).url ?? 'inline'}:${(event).lineNumber ?? '?'}`;
+    case 'download':
+      return `Download ${(event).eventType}: ${(event).filename ?? (event).url ?? (event).href ?? '(no filename)'}`;
   }
 }
 

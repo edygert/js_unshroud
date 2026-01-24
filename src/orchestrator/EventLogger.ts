@@ -135,6 +135,11 @@ export class EventLogger {
   }
 
   async close(): Promise<void> {
+    // If already closed, return early to prevent double-close
+    if (this.closed) {
+      return;
+    }
+
     // Mark as closed to prevent new events from being logged
     this.closed = true;
 
@@ -146,7 +151,7 @@ export class EventLogger {
     }) + '\n';
 
     // Close file stream
-    if (this.writeStream) {
+    if (this.writeStream && !this.writeStream.destroyed && !this.writeStream.closed) {
       await new Promise<void>((resolve, reject) => {
         // Log session end to file
         this.writeStream!.write(sessionEnd);

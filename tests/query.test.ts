@@ -79,13 +79,13 @@ describe('Query Command Tests', () => {
     test('should parse --type flag', () => {
       process.argv = ['node', 'runner.ts', 'query', '--input', tempFilePath, '--type', 'network'];
       const args = parseQueryArgs();
-      expect(args.type).toBe('network');
+      expect(args.eventType).toBe('network');
     });
 
     test('should parse comma-separated types', () => {
       process.argv = ['node', 'runner.ts', 'query', '--input', tempFilePath, '--type', 'network,console'];
       const args = parseQueryArgs();
-      expect(args.type).toBe('network,console');
+      expect(args.eventType).toBe('network,console');
     });
 
     test('should parse --method flag', () => {
@@ -158,7 +158,7 @@ describe('Query Command Tests', () => {
         '--format', 'count'
       ];
       const args = parseQueryArgs();
-      expect(args.type).toBe('network');
+      expect(args.eventType).toBe('network');
       expect(args.method).toBe('POST');
       expect(args.status).toBe(200);
       expect(args.format).toBe('count');
@@ -273,15 +273,15 @@ describe('Query Command Tests', () => {
 
   describe('buildQueryFilter', () => {
     test('should build filter with type', () => {
-      const args = { input: tempFilePath, type: 'network' };
+      const args = { input: tempFilePath, eventType: 'network' };
       const filter = buildQueryFilter(args);
-      expect(filter.type).toBe('network');
+      expect(filter.eventType).toBe('network');
     });
 
     test('should build filter with comma-separated types', () => {
-      const args = { input: tempFilePath, type: 'network,console' };
+      const args = { input: tempFilePath, eventType: 'network,console' };
       const filter = buildQueryFilter(args);
-      expect(filter.type).toBe('network,console');
+      expect(filter.eventType).toBe('network,console');
     });
 
     test('should build filter with method', () => {
@@ -336,12 +336,12 @@ describe('Query Command Tests', () => {
     test('should build filter with multiple criteria', () => {
       const args = {
         input: tempFilePath,
-        type: 'network',
+        eventType: 'network',
         method: 'POST',
         status: 200
       };
       const filter = buildQueryFilter(args);
-      expect(filter.type).toBe('network');
+      expect(filter.eventType).toBe('network');
       expect(filter.method).toBe('POST');
       expect(filter.status).toBe(200);
     });
@@ -363,7 +363,7 @@ describe('Query Command Tests', () => {
     });
 
     test('should query events by type', async () => {
-      const args = { input: tempFilePath, type: 'network' };
+      const args = { input: tempFilePath, eventType:'network' };
       const output = await queryEvents(args);
       const lines = output.split('\n');
       expect(lines).toHaveLength(2);
@@ -372,7 +372,7 @@ describe('Query Command Tests', () => {
     });
 
     test('should query events by method', async () => {
-      const args = { input: tempFilePath, type: 'network', method: 'POST' };
+      const args = { input: tempFilePath, eventType:'network', method: 'POST' };
       const output = await queryEvents(args);
       const lines = output.split('\n');
       expect(lines).toHaveLength(1);
@@ -381,7 +381,7 @@ describe('Query Command Tests', () => {
     });
 
     test('should query events by url regex', async () => {
-      const args = { input: tempFilePath, type: 'network', urlRegex: 'login' };
+      const args = { input: tempFilePath, eventType:'network', urlRegex: 'login' };
       const output = await queryEvents(args);
       const lines = output.split('\n');
       expect(lines).toHaveLength(1);
@@ -390,7 +390,7 @@ describe('Query Command Tests', () => {
     });
 
     test('should query events by status', async () => {
-      const args = { input: tempFilePath, type: 'network', status: 200 };
+      const args = { input: tempFilePath, eventType:'network', status: 200 };
       const output = await queryEvents(args);
       const lines = output.split('\n');
       expect(lines).toHaveLength(1);
@@ -399,19 +399,19 @@ describe('Query Command Tests', () => {
     });
 
     test('should return count format', async () => {
-      const args = { input: tempFilePath, type: 'network', format: 'count' as const };
+      const args = { input: tempFilePath, eventType:'network', format: 'count' as const };
       const output = await queryEvents(args);
       expect(output).toBe('2');
     });
 
     test('should return 0 count when no events match', async () => {
-      const args = { input: tempFilePath, type: 'nonexistent', format: 'count' as const };
+      const args = { input: tempFilePath, eventType:'nonexistent', format: 'count' as const };
       const output = await queryEvents(args);
       expect(output).toBe('0');
     });
 
     test('should query events by storage type', async () => {
-      const args = { input: tempFilePath, type: 'storage', storageType: 'localStorage' as const };
+      const args = { input: tempFilePath, eventType:'storage', storageType: 'localStorage' as const };
       const output = await queryEvents(args);
       const lines = output.split('\n');
       expect(lines).toHaveLength(1);
@@ -429,13 +429,13 @@ describe('Query Command Tests', () => {
     });
 
     test('should handle empty result set', async () => {
-      const args = { input: tempFilePath, type: 'error' };
+      const args = { input: tempFilePath, eventType:'error' };
       const output = await queryEvents(args);
       expect(output).toBe('');
     });
 
     test('should output valid JSONL format', async () => {
-      const args = { input: tempFilePath, type: 'network' };
+      const args = { input: tempFilePath, eventType:'network' };
       const output = await queryEvents(args);
       const lines = output.split('\n');
 
@@ -448,7 +448,7 @@ describe('Query Command Tests', () => {
     test('should combine multiple filters correctly', async () => {
       const args = {
         input: tempFilePath,
-        type: 'network',
+        eventType: 'network',
         method: 'GET'
       };
       const output = await queryEvents(args);
@@ -477,7 +477,7 @@ describe('Query Command Tests', () => {
       writeFileSync(largeTempFile, largeEvents.map(e => JSON.stringify(e)).join('\n'));
 
       try {
-        const args = { input: largeTempFile, type: 'console', format: 'count' as const };
+        const args = { input: largeTempFile, eventType: 'console', format: 'count' as const };
         const output = await queryEvents(args);
         expect(output).toBe('1000');
       } finally {

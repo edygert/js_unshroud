@@ -3,7 +3,7 @@ import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 
 export interface QueryFilter {
-  type?: string;
+  eventType?: string;
   method?: string;
   url?: string | RegExp;
   status?: number;
@@ -40,8 +40,8 @@ export class QueryEngine {
 
   private matchesFilter(event: MonitoringEvent, filter: QueryFilter): boolean {
     // Type filter (supports comma-separated types)
-    if (filter.type) {
-      const allowedTypes = filter.type.split(',').map(t => t.trim());
+    if (filter.eventType) {
+      const allowedTypes = filter.eventType.split(',').map(t => t.trim());
       if (!allowedTypes.includes(event.type)) {
         return false;
       }

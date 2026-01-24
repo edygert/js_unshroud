@@ -191,7 +191,7 @@ export class TimelineFormatter {
 
       case 'debugger': {
         const debugEvent = event;
-        return `Debugger Statement: ${debugEvent.scriptUrl ?? 'inline'} line ${debugEvent.lineNumber ?? '?'}`;
+        return `Debugger Statement: ${debugEvent.url ?? 'inline'} line ${debugEvent.lineNumber ?? '?'}`;
       }
 
       case 'download': {
@@ -199,7 +199,7 @@ export class TimelineFormatter {
         if (downloadEvent.eventType === 'download_click') {
           return `Download Click: ${downloadEvent.filename ?? 'unnamed'} (${downloadEvent.blobSize ?? 0} bytes)`;
         } else if (downloadEvent.eventType === 'window_open_download') {
-          return `Window Open Download: ${downloadEvent.url.slice(0, 50)}... (${downloadEvent.blobSize ?? 0} bytes)`;
+          return `Window Open Download: ${downloadEvent.url?.slice(0, 50) ?? ''}... (${downloadEvent.blobSize ?? 0} bytes)`;
         } else if (downloadEvent.eventType === 'download_attribute_set') {
           return `Download Attribute Set: ${downloadEvent.filename}`;
         } else {

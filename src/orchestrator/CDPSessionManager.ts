@@ -190,7 +190,8 @@ export class CDPSessionManager {
     if (!this.cdpSession) return;
 
     // Debugger.paused - triggered when debugger statement is hit
-    this.cdpSession.on('Debugger.paused', async (params: Protocol.Debugger.PausedEvent) => {
+    this.cdpSession.on('Debugger.paused', (params: Protocol.Debugger.PausedEvent) => {
+      void (async () => {
       // Log the debugger statement detection
       const location = params.callFrames[0];
       const event: Omit<DebuggerEvent, 'id' | 'timestamp' | 'sessionId' | 'frameId'> = {
@@ -215,6 +216,7 @@ export class CDPSessionManager {
       } catch (error) {
         console.warn('[JS Unshroud] Failed to resume after debugger statement:', error);
       }
+      })();
     });
   }
 

@@ -166,7 +166,7 @@ export class ArtifactCollector {
   private getExtensionFromFilename(filename?: string): string | null {
     if (!filename) return null;
     const match = filename.match(/\.([^.]+)$/);
-    return match ? match[1] : null;
+    return match ? (match[1] ?? null) : null;
   }
 
   /**

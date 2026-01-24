@@ -562,19 +562,6 @@ describe('Correlate Command Tests', () => {
       const result = formatEventSummary(event);
       expect(result).toBe('canvas.toDataURL()');
     });
-
-    test('should fallback to event.id for unknown event types', () => {
-      // Create a mock event with an unknown type to test the default case
-      const event = {
-        id: 'evt_unknown',
-        sessionId: 'sess_456',
-        timestamp: Date.now(),
-        type: 'unknown_type'
-      } as unknown as MonitoringEvent;
-
-      const result = formatEventSummary(event);
-      expect(result).toBe('evt_unknown');
-    });
   });
 
   describe('correlateEvents', () => {

@@ -106,21 +106,21 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should filter by type', async () => {
-      const filter: QueryFilter = { type: 'network' };
+      const filter: QueryFilter = { eventType:'network' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(2);
       expect(results.every(event => event.type === 'network')).toBe(true);
     });
 
     test('should filter by type console', async () => {
-      const filter: QueryFilter = { type: 'console' };
+      const filter: QueryFilter = { eventType:'console' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(1);
       expect(results[0]?.type).toBe('console');
     });
 
     test('should filter network events by method', async () => {
-      const filter: QueryFilter = { type: 'network', method: 'GET' };
+      const filter: QueryFilter = { eventType:'network', method: 'GET' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(1);
       const networkEvent = results[0] as NetworkEvent;
@@ -128,7 +128,7 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should filter network events by URL', async () => {
-      const filter: QueryFilter = { type: 'network', url: 'https://api.example.com/users' };
+      const filter: QueryFilter = { eventType:'network', url: 'https://api.example.com/users' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(1);
       const networkEvent = results[0] as NetworkEvent;
@@ -136,14 +136,14 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should filter network events by URL regex', async () => {
-      const filter: QueryFilter = { type: 'network', url: /api\.example\.com/ };
+      const filter: QueryFilter = { eventType:'network', url: /api\.example\.com/ };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(2);
       expect(results.every(event => event.type === 'network')).toBe(true);
     });
 
     test('should filter network events by status', async () => {
-      const filter: QueryFilter = { type: 'network', status: 200 };
+      const filter: QueryFilter = { eventType:'network', status: 200 };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(1);
       const networkEvent = results[0] as NetworkEvent;
@@ -151,7 +151,7 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should filter console events by level', async () => {
-      const filter: QueryFilter = { type: 'console', level: 'log' };
+      const filter: QueryFilter = { eventType:'console', level: 'log' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(1);
       const consoleEvent = results[0] as ConsoleEvent;
@@ -197,13 +197,13 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should return empty array for non-matching filter', async () => {
-      const filter: QueryFilter = { type: 'nonexistent' };
+      const filter: QueryFilter = { eventType:'nonexistent' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(0);
     });
 
     test('should handle streaming with filters', async () => {
-      const filter: QueryFilter = { type: 'network' };
+      const filter: QueryFilter = { eventType:'network' };
       const results: MonitoringEvent[] = [];
 
       for await (const event of queryEngine.queryEventsStream(tempFilePath, filter)) {
@@ -225,7 +225,7 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should count events with filter', async () => {
-      const filter: QueryFilter = { type: 'network' };
+      const filter: QueryFilter = { eventType:'network' };
       const count = await queryEngine.countEvents(tempFilePath, filter);
       expect(count).toBe(2);
     });
@@ -236,13 +236,13 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should count zero for non-matching filter', async () => {
-      const filter: QueryFilter = { type: 'nonexistent' };
+      const filter: QueryFilter = { eventType:'nonexistent' };
       const count = await queryEngine.countEvents(tempFilePath, filter);
       expect(count).toBe(0);
     });
 
     test('should filter storage events by storageType', async () => {
-      const filter: QueryFilter = { type: 'storage', storageType: 'localStorage' };
+      const filter: QueryFilter = { eventType:'storage', storageType: 'localStorage' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(1);
       const storageEvent = results[0] as StorageEvent;
@@ -250,7 +250,7 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should filter storage events by operation', async () => {
-      const filter: QueryFilter = { type: 'storage', operation: 'set' };
+      const filter: QueryFilter = { eventType:'storage', operation: 'set' };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
       expect(results).toHaveLength(1);
       const storageEvent = results[0] as StorageEvent;
@@ -267,9 +267,9 @@ describe('Analysis Engine Tests', () => {
     });
 
     test('should handle filters on custom fields in query filter', async () => {
-      // Test the [key: string]: unknown part allows custom filters
+      // Test that custom filters can be added (not in QueryFilter interface)
       const filter = {
-        type: 'network',
+        eventType: 'network',
         customField: 'customValue'
       };
       const results = await queryEngine.queryEvents(tempFilePath, filter);
