@@ -159,7 +159,7 @@ js_unshroud --url https://example.com --out events.jsonl && \
    js_unshroud analyze --input malware.jsonl --format stats
    ```
 
-The analyzer supports all 24 event types captured by the tool, including code execution, network requests, cryptographic operations, and advanced attack patterns.
+The analyzer supports all 26 event types captured by the tool, including code execution, network requests, cryptographic operations, download detection, and advanced attack patterns.
 
 ## Querying Events
 
@@ -414,6 +414,21 @@ You can optionally provide a configuration file to control what instrumentation 
   "enableEncoding": true,
   "enableCryptoJS": true,
   "enableDebuggerDetection": true,
+  "enableDownloadDetection": true,
+  "enableClipboard": false,
+  "enableBlobTracking": false,
+  "enableArtifactCollection": false,
+  "artifactDirectory": "./artifacts",
+  "artifactTypes": {
+    "downloads": true,
+    "codeExecution": true,
+    "encoding": true,
+    "cryptojs": true,
+    "clipboard": true,
+    "workers": true,
+    "iframes": true
+  },
+  "maxArtifactSize": 10485760,
   "monitoringTimeoutSeconds": 15,
   "outputMode": "file",
   "udpLogging": {
@@ -446,6 +461,22 @@ Configuration options:
 - `enableWorkers`: Capture Web Worker and SharedWorker creation, messaging, and errors (default: `false`)
 - `enableModules`: Capture ES module script injection via `<script type="module">` (default: `false`)
 - `enableIframes`: Capture iframe creation, srcdoc injection, and embedded scripts (default: `false`)
+- `enableDownloadDetection`: Capture file downloads via anchor elements and window.open() (default: `true`)
+- `enableClipboard`: Capture clipboard read/write operations (default: `false`)
+- `enableBlobTracking`: Capture Blob URL creation and content tracking (default: `false`)
+
+**Artifact Collection (Opt-In):**
+- `enableArtifactCollection`: Save full (non-truncated) content to disk for offline analysis (default: `false`)
+- `artifactDirectory`: Base directory for artifact storage (default: `'./artifacts'`)
+- `artifactTypes`: Object controlling which artifact types to save (default: all enabled)
+  - `downloads`: Downloaded files (blob URLs, data URLs) (default: `true`)
+  - `codeExecution`: Full eval/Function code (default: `true`)
+  - `encoding`: Full atob/btoa/fromCharCode output (default: `true`)
+  - `cryptojs`: Full decrypted plaintext (default: `true`)
+  - `clipboard`: Clipboard payloads (default: `true`)
+  - `workers`: Web Worker scripts (default: `true`)
+  - `iframes`: iframe srcdoc HTML (default: `true`)
+- `maxArtifactSize`: Maximum artifact size in bytes (default: `10485760` = 10MB)
 
 **Output Configuration:**
 - `outputMode`: Output destination - `'file'`, `'udp'`, or `'both'` (default: `'file'`)
@@ -820,6 +851,278 @@ Configure via `behaviorSimulationIntensity`:
 
 **Note**: For time-delayed malware (60s+ delays), set `monitoringTimeoutSeconds` to at least 75-90 seconds to allow Phase 3 interaction to occur.
 
+## Download Detection
+
+js_unshroud automatically detects file downloads initiated through blob URLs, data URLs, and `window.open()` calls. This feature is critical for capturing malware payloads that are generated dynamically in the browser and downloaded to the victim's system.
+
+**Enabled by default.** Set `enableDownloadDetection: false` to disable.
+
+### What's Detected
+
+**Anchor Element Downloads:**
+- Download attribute assignment (`<a download="malware.exe">`)
+- Href assignment with blob/data URLs (`<a href="blob:...">`)
+- Click events on download links
+- Full download correlation chain (blob → URL → anchor → click)
+
+**window.open() Downloads:**
+- `window.open()` calls with blob URLs
+- `window.open()` calls with data URLs
+- Target parameter tracking
+
+**Blob Content Resolution:**
+- Automatic blob content lookup from blob map
+- Content size and MIME type tracking
+- Optional artifact saving (see Artifact Collection below)
+
+### Download Events
+
+Download detection generates `DownloadEvent` objects with these event types:
+
+- `download_attribute_set`: Download attribute was set on anchor element
+- `download_href_set`: Href was set to blob/data URL
+- `download_click`: Download link was clicked
+- `window_open_download`: window.open() called with blob/data URL
+
+Each download event includes:
+- `downloadId`: Correlation ID linking related events
+- `filename`: Download filename (if specified)
+- `href` or `url`: Blob/data URL
+- `blobContent`: Truncated blob content preview (1KB) in event log
+- `artifactPath`: Path to saved artifact file (if artifact collection enabled)
+
+### Configuration
+
+```json
+{
+  "enableDownloadDetection": true
+}
+```
+
+### Example Download Event
+
+```json
+{
+  "id": "evt_1234567890_012",
+  "timestamp": 1640995201100,
+  "sessionId": "session_1640995200_abc123",
+  "type": "download",
+  "eventType": "download_click",
+  "downloadId": "dl_1234567890_xyz",
+  "filename": "payload.exe",
+  "href": "blob:http://example.com/abc-123-def",
+  "isBlobUrl": true,
+  "isDataUrl": false,
+  "blobType": "application/octet-stream",
+  "blobSize": 524288,
+  "blobContent": "MZ\u0090\u0000\u0003...",
+  "artifactPath": "artifacts/session_xyz/downloads/evt_1234567890_012.exe"
+}
+```
+
+## Artifact Collection
+
+**CRITICAL for malware analysis:** Artifact collection saves the full, non-truncated content of malware payloads, obfuscated code, decrypted data, and other forensic artifacts to disk for offline analysis.
+
+**Disabled by default (opt-in).** Enable via `enableArtifactCollection: true` in config.
+
+### Why Artifact Collection?
+
+Event logs (JSONL) truncate large payloads to keep file sizes manageable. For example:
+- Code execution events truncate eval code to first/last 1KB
+- Encoding events truncate decoded output to first/last 1KB
+- Download events include only 1KB blob preview
+
+**With artifact collection enabled**, the full (non-truncated) content is saved to organized filesystem directories for in-depth analysis.
+
+### Directory Structure
+
+```
+artifacts/
+  session_{timestamp}_{random}/
+    downloads/          # Downloaded files (blobs, data URLs)
+      evt_123_abc.exe
+      evt_123_abc.meta.json
+    code_execution/     # Full eval/Function code
+      evt_456_def.js
+      evt_456_def.meta.json
+    encoding/           # Full decoded/encoded output
+      evt_789_ghi.txt
+      evt_789_ghi.meta.json
+    cryptojs/           # Full decrypted plaintext
+      evt_012_jkl.txt
+      evt_012_jkl.meta.json
+    clipboard/          # Clipboard payloads
+      evt_345_mno.txt
+      evt_345_mno.meta.json
+    workers/            # Web Worker scripts
+      evt_678_pqr.js
+      evt_678_pqr.meta.json
+    iframes/            # iframe srcdoc HTML
+      evt_901_stu.html
+      evt_901_stu.meta.json
+```
+
+**Naming Convention:** `{eventId}.{extension}`
+
+**Metadata Files:** Each artifact has a `.meta.json` file containing:
+- Original event data
+- Artifact type, size, MIME type
+- Timestamp, session ID
+- Truncation status
+
+### Artifact Types
+
+7 artifact types are supported:
+
+1. **downloads** - Downloaded files (blob URLs, data URLs, window.open)
+2. **codeExecution** - Full eval(), Function(), and dynamic code execution
+3. **encoding** - Full atob/btoa/fromCharCode/URI encoding output
+4. **cryptojs** - Full decrypted plaintext from CryptoJS
+5. **clipboard** - Clipboard read/write payloads
+6. **workers** - Web Worker and SharedWorker scripts
+7. **iframes** - iframe srcdoc HTML content
+
+### Configuration
+
+**Minimal Configuration (Opt-In):**
+```json
+{
+  "enableArtifactCollection": true
+}
+```
+
+**Full Configuration:**
+```json
+{
+  "enableArtifactCollection": true,
+  "artifactDirectory": "./malware-artifacts",
+  "artifactTypes": {
+    "downloads": true,
+    "codeExecution": true,
+    "encoding": true,
+    "cryptojs": true,
+    "clipboard": true,
+    "workers": true,
+    "iframes": true
+  },
+  "maxArtifactSize": 10485760
+}
+```
+
+**Configuration Options:**
+- `enableArtifactCollection`: Enable artifact saving (default: `false`)
+- `artifactDirectory`: Base directory for artifacts (default: `./artifacts`)
+- `artifactTypes`: Which artifact types to save (default: all enabled)
+- `maxArtifactSize`: Maximum artifact size in bytes (default: 10MB = 10485760 bytes)
+
+### Size Limits
+
+Artifacts exceeding `maxArtifactSize` are logged as events but **not saved to disk**. A warning is logged to console.
+
+**Recommended Size Limits:**
+- **5MB (5242880 bytes)**: Conservative - saves disk space, may miss large payloads
+- **10MB (10485760 bytes)**: Balanced (default) - captures most malware artifacts
+- **25MB (26214400 bytes)**: Generous - captures larger payloads with moderate disk usage
+- **50MB (52428800 bytes)**: Aggressive - captures almost all artifacts, high disk usage
+
+### Security Warnings
+
+⚠️ **WARNING: Artifact directories contain live malware payloads.**
+
+**Security Best Practices:**
+- Store artifacts in isolated directories with restricted permissions
+- **DO NOT** open artifacts on production systems
+- Use dedicated malware analysis VMs only
+- Consider encrypting artifact directories at rest
+- Regularly purge old artifact sessions to free disk space
+- Never extract artifacts from the analysis VM without proper sanitization
+
+**Recommended Filesystem Permissions:**
+```bash
+# Restrict artifact directory to current user only
+chmod 700 artifacts/
+
+# On multi-user systems, consider separate partition
+sudo mount -t tmpfs -o size=1G,mode=700,uid=$(id -u) tmpfs /mnt/artifacts
+```
+
+### Workflow Examples
+
+**Capture with Artifact Collection:**
+```bash
+# Enable artifact collection
+echo '{
+  "enableArtifactCollection": true,
+  "artifactDirectory": "./malware-artifacts",
+  "maxArtifactSize": 10485760
+}' > artifact-config.json
+
+# Run against malware sample
+js_unshroud --url https://malicious-site.com --out events.jsonl --config artifact-config.json
+
+# Verify artifacts saved
+ls -lh malware-artifacts/session_*/
+
+# Check artifact metadata
+cat malware-artifacts/session_*/downloads/*.meta.json | jq .
+
+# View full malware payload (⚠️ DANGER - isolated VM only)
+cat malware-artifacts/session_*/code_execution/*.js
+```
+
+**Selective Artifact Collection (Downloads Only):**
+```bash
+# Save only downloaded files, ignore code execution
+echo '{
+  "enableArtifactCollection": true,
+  "artifactTypes": {
+    "downloads": true,
+    "codeExecution": false,
+    "encoding": false,
+    "cryptojs": false,
+    "clipboard": false,
+    "workers": false,
+    "iframes": false
+  }
+}' > downloads-only-config.json
+
+js_unshroud --url https://malicious-site.com --out events.jsonl --config downloads-only-config.json
+```
+
+**Conservative Disk Usage (5MB Limit):**
+```bash
+echo '{
+  "enableArtifactCollection": true,
+  "maxArtifactSize": 5242880,
+  "artifactTypes": {
+    "downloads": true,
+    "codeExecution": true,
+    "encoding": false,
+    "cryptojs": true,
+    "clipboard": false,
+    "workers": false,
+    "iframes": false
+  }
+}' > conservative-config.json
+
+js_unshroud --url https://malicious-site.com --out events.jsonl --config conservative-config.json
+```
+
+### Disk Space Planning
+
+**Estimated Artifact Storage:**
+- **Minimal malware (dropper)**: 10-50MB per session
+- **Average malware sample**: 50-200MB per session
+- **Complex multi-stage attack**: 200-500MB per session
+- **Aggressive collection (all types, 50MB limit)**: 500MB-2GB per session
+
+**Recommendations:**
+- Allocate 1-2GB storage per captured session
+- Regularly purge old sessions (cron job or manual cleanup)
+- Use separate partition or mount point for artifacts
+- Monitor disk usage: `du -sh artifacts/`
+
 ## Testing
 
 Run the test suite:
@@ -862,6 +1165,9 @@ The excluded files include:
 - `iframe-hooks.js` - iframe creation and srcdoc monitoring
 - `blob-hooks.js` - Blob URL creation and content tracking
 - `url-execution-hooks.js` - javascript: URL execution detection
+- `download-hooks.js` - Download detection (anchor elements, window.open)
+- `clipboard-hooks.js` - Clipboard read/write monitoring
+- `behavior-simulation.js` - Human-like interaction simulation
 
 All other TypeScript/JavaScript code (CLI, orchestration, analysis) runs in Node.js and contributes to coverage metrics normally.
 
@@ -878,7 +1184,7 @@ bun test tests/analysis.test.ts  # Analysis layer tests (QueryEngine, Correlatio
 The analysis layer (`src/analysis/`) maintains comprehensive test coverage:
 
 - **TimelineFormatter.ts**: 100% statement and line coverage
-  - Complete coverage of all 24 event types (network, storage, console, error, dom, timer, websocket, fingerprinting, headless_mitigation, performance_stats, performance_warning, service_worker, code_execution, encoding, cryptojs, script_injection, event_handler, blob, url_execution, worker, module, iframe)
+  - Complete coverage of all 26 event types (network, storage, console, error, dom, timer, websocket, fingerprinting, headless_mitigation, performance_stats, performance_warning, service_worker, code_execution, encoding, cryptojs, script_injection, event_handler, blob, url_execution, worker, module, iframe, clipboard, debugger, download)
   - Branch coverage for event variants (blob operations, worker messaging, module injection types)
   - Edge case testing (empty filters, time boundaries, missing optional fields)
 
