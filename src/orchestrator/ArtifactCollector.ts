@@ -6,6 +6,7 @@ export interface ArtifactConfig {
   enabled: boolean;
   baseDirectory: string;  // Default: './artifacts'
   types: {
+    pageSnapshot: boolean;        // Save initial page HTML snapshot
     downloads: boolean;           // Save downloaded files
     codeExecution: boolean;       // Save eval/Function code
     encoding: boolean;            // Save atob/btoa output
@@ -41,6 +42,7 @@ export class ArtifactCollector {
 
       // Create type-specific subdirectories
       const subdirs = [
+        'page_snapshot',
         'downloads',
         'code_execution',
         'encoding',
@@ -87,6 +89,7 @@ export class ArtifactCollector {
       const artifactId = event.id;
       const filename = `${artifactId}.${artifactData.extension}`;
       const subdirMap: Record<string, string> = {
+        page_snapshot: 'page_snapshot',
         download: 'downloads',
         code_execution: 'code_execution',
         encoding: 'encoding',
@@ -149,6 +152,7 @@ export class ArtifactCollector {
    */
   private shouldSaveArtifactType(type: string): boolean {
     const typeMap: Record<string, boolean> = {
+      page_snapshot: this.config.types.pageSnapshot,
       download: this.config.types.downloads,
       code_execution: this.config.types.codeExecution,
       encoding: this.config.types.encoding,

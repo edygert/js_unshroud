@@ -5,8 +5,8 @@ import { readFileSync } from 'fs';
 import { EventLogger } from '../orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../orchestrator/CDPSessionManager.ts';
 import { ArtifactCollector, type ArtifactConfig } from '../orchestrator/ArtifactCollector.ts';
-import type { SessionConfig, InstrumentationConfig, HeadlessMitigationConfig, MonitoringEvent } from '../schema/types.ts';
-import { validateEvent } from '../schema/events.ts';
+import type { SessionConfig, InstrumentationConfig, HeadlessMitigationConfig, MonitoringEvent, PageSnapshotEvent } from '../schema/types.ts';
+import { validateEvent, createEvent } from '../schema/events.ts';
 import { resolveHeadlessMitigationConfig } from './headless-profiles.ts';
 import { validateHeadlessMitigationConfig } from './validation.ts';
 
@@ -126,6 +126,7 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
     enableArtifactCollection: false,
     artifactDirectory: './artifacts',
     artifactTypes: {
+      pageSnapshot: true,
       downloads: true,
       codeExecution: true,
       encoding: true,
@@ -1066,6 +1067,7 @@ async function runMonitoring(args: Args): Promise<void> {
     enabled: config.enableArtifactCollection ?? false,
     baseDirectory: config.artifactDirectory ?? './artifacts',
     types: {
+      pageSnapshot: config.artifactTypes?.pageSnapshot ?? true,
       downloads: config.artifactTypes?.downloads ?? true,
       codeExecution: config.artifactTypes?.codeExecution ?? true,
       encoding: config.artifactTypes?.encoding ?? true,
@@ -1167,6 +1169,41 @@ async function runMonitoring(args: Args): Promise<void> {
       });
     } catch {
       logger.log('Warning: Instrumentation load timeout (bootstrap may be disabled)');
+    }
+
+    // Capture initial page HTML snapshot if artifact collection is enabled
+    if (artifactCollector.isEnabled() && artifactConfig.types.pageSnapshot) {
+      try {
+        const htmlContent = await page.content();
+        const pageTitle = await page.title();
+        const captureTime = Date.now();
+
+        // Create page snapshot event
+        const snapshotEvent = createEvent<PageSnapshotEvent>(sessionId, undefined, {
+          type: 'page_snapshot',
+          url: args.url,
+          title: pageTitle,
+          htmlLength: Buffer.byteLength(htmlContent, 'utf-8'),
+          captureTime: captureTime
+        });
+
+        // Save HTML content as artifact
+        const artifactPath = await artifactCollector.saveArtifact(snapshotEvent, {
+          type: 'page_snapshot',
+          content: htmlContent,
+          extension: 'html',
+          mimeType: 'text/html'
+        });
+
+        // Log the event with artifact path
+        if (artifactPath) {
+          snapshotEvent.artifactPath = artifactPath;
+          await eventLogger.logEvent(snapshotEvent);
+          logger.log(`Page snapshot saved: ${artifactPath}`);
+        }
+      } catch (error) {
+        logger.error('Failed to capture page snapshot:', error);
+      }
     }
 
     const monitoringDurationMs = config.monitoringTimeoutSeconds * 1000;

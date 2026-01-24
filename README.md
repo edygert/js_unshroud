@@ -420,6 +420,7 @@ You can optionally provide a configuration file to control what instrumentation 
   "enableArtifactCollection": false,
   "artifactDirectory": "./artifacts",
   "artifactTypes": {
+    "pageSnapshot": true,
     "downloads": true,
     "codeExecution": true,
     "encoding": true,
@@ -469,6 +470,7 @@ Configuration options:
 - `enableArtifactCollection`: Save full (non-truncated) content to disk for offline analysis (default: `false`)
 - `artifactDirectory`: Base directory for artifact storage (default: `'./artifacts'`)
 - `artifactTypes`: Object controlling which artifact types to save (default: all enabled)
+  - `pageSnapshot`: Initial page HTML snapshot after navigation (default: `true`)
   - `downloads`: Downloaded files (blob URLs, data URLs) (default: `true`)
   - `codeExecution`: Full eval/Function code (default: `true`)
   - `encoding`: Full atob/btoa/fromCharCode output (default: `true`)
@@ -940,6 +942,9 @@ Event logs (JSONL) truncate large payloads to keep file sizes manageable. For ex
 ```
 artifacts/
   session_{timestamp}_{random}/
+    page_snapshot/      # Initial page HTML snapshot
+      evt_000_aaa.html
+      evt_000_aaa.meta.json
     downloads/          # Downloaded files (blobs, data URLs)
       evt_123_abc.exe
       evt_123_abc.meta.json
@@ -998,6 +1003,7 @@ artifacts/
   "enableArtifactCollection": true,
   "artifactDirectory": "./malware-artifacts",
   "artifactTypes": {
+    "pageSnapshot": true,
     "downloads": true,
     "codeExecution": true,
     "encoding": true,

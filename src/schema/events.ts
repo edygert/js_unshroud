@@ -27,6 +27,7 @@ const EVENT_TYPES = [
   'iframe',
   'clipboard',
   'debugger',
+  'page_snapshot',
   'download'
 ] as const satisfies readonly MonitoringEvent['type'][];
 

@@ -292,6 +292,15 @@ export interface DebuggerEvent extends BaseEvent {
   scriptId?: string;          // CDP script ID
 }
 
+export interface PageSnapshotEvent extends BaseEvent {
+  type: 'page_snapshot';
+  url: string;                // URL of the captured page
+  title?: string;             // Page title
+  htmlLength: number;         // Length of HTML content in bytes
+  captureTime: number;        // Timestamp when snapshot was captured
+  artifactPath?: string;      // Path to saved artifact file (populated by ArtifactCollector)
+}
+
 export interface DownloadEvent extends BaseEvent {
   type: 'download';
   eventType: 'download_attribute_set' | 'download_href_set' | 'download_click' | 'window_open_download';
@@ -333,6 +342,7 @@ export type MonitoringEvent =
   | IframeEvent
   | ClipboardEvent
   | DebuggerEvent
+  | PageSnapshotEvent
   | DownloadEvent;
 
 export interface SessionConfig {
@@ -502,6 +512,7 @@ export interface InstrumentationConfig {
   enableArtifactCollection?: boolean;     // Enable artifact saving (default: false, opt-in)
   artifactDirectory?: string;             // Base directory for artifacts (default: './artifacts')
   artifactTypes?: {
+    pageSnapshot?: boolean;               // Save initial page HTML snapshot (default: true)
     downloads?: boolean;                  // Save downloaded files (default: true)
     codeExecution?: boolean;              // Save eval/Function code (default: true)
     encoding?: boolean;                   // Save atob/btoa output (default: true)
