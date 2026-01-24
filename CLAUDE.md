@@ -232,6 +232,7 @@ Key configuration options:
 - `enableObjectTracking`: Proxy-based object monitoring
 - `enableCodeExecution`: Capture eval(), Function(), dynamic code execution (default: `true`)
 - `enableEncoding`: Capture atob/btoa, fromCharCode, URI encoding/decoding (default: `true`)
+- `enableDebuggerDetection`: Detect `debugger;` statements via CDP (default: `true`). **Fire-and-forget optimization**: Captures only the first debugger location (~1-5ms latency), then immediately disables the Debugger domain so subsequent debugger statements run at native speed (~0ms). This minimizes detection risk from malware timing checks (typical threshold: 5-10ms). For maximum stealth, disable after confirming debugger usage in initial analysis run.
 - `monitoringTimeoutSeconds`: How long to monitor the page in seconds (default: `15`)
 - `outputMode`: Output destination - `'file'`, `'udp'`, or `'both'` (default: `'file'`)
 - `udpLogging`: UDP logging configuration (host, port, enabled)
@@ -399,6 +400,40 @@ Events are written to JSONL (JSON Lines) format. Each event has:
 - Type-specific fields (see `src/schema/types.ts`)
 
 **UDP Logging (P0.1b)**: Events can optionally be sent via UDP to remote collectors for real-time analysis or SIEM integration. Configure via `outputMode: 'udp'` or `'both'` and `udpLogging` settings.
+
+## Analyst Workflows
+
+### Two-Pass Anti-Analysis Detection Workflow
+
+When analyzing malware that may use `debugger;` statements as anti-analysis techniques:
+
+**Pass 1: Initial Analysis (Detect Anti-Analysis)**
+```bash
+# Run with default config (debugger detection enabled)
+js_unshroud --url https://malicious-site.com --out initial.jsonl
+
+# Check for debugger events
+js_unshroud query --input initial.jsonl --type debugger
+```
+
+If debugger events are found, the malware is using anti-analysis checks. The fire-and-forget optimization already minimizes detection risk (~1-5ms latency on first debugger only), but sophisticated malware with very aggressive timing thresholds (<3ms) may still detect it.
+
+**Pass 2: Full Behavior Capture (Maximum Stealth)**
+```bash
+# Disable debugger detection entirely
+echo '{"enableDebuggerDetection": false}' > stealth-config.json
+js_unshroud --url https://malicious-site.com --out full-behavior.jsonl --config stealth-config.json
+```
+
+**Rationale:**
+- Pass 1 captures the debugger location (valuable intelligence about anti-analysis techniques)
+- Pass 2 runs with zero detection risk - debugger statements execute at native speed (~0ms)
+- Information about anti-analysis is already gathered from Pass 1, so disabling detection in Pass 2 is safe
+
+**Performance Characteristics:**
+- With detection enabled (default): First debugger ~1-5ms, subsequent ~0ms (fire-and-forget optimization)
+- With detection disabled: All debuggers ~0ms (native speed)
+- Malware timing thresholds: Conservative 20ms, Moderate 10ms, Aggressive 5ms, Very Aggressive 3ms
 
 ## Common Pitfalls
 

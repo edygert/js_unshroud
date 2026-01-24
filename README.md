@@ -161,6 +161,38 @@ js_unshroud --url https://example.com --out events.jsonl && \
 
 The analyzer supports all 26 event types captured by the tool, including code execution, network requests, cryptographic operations, download detection, and advanced attack patterns.
 
+### Anti-Analysis Detection Workflow
+
+When malware uses `debugger;` statements as anti-analysis techniques, follow this two-pass workflow:
+
+**Pass 1: Detect Anti-Analysis Techniques**
+```bash
+# Run with debugger detection enabled (default)
+js_unshroud --url https://malicious-site.com --out initial.jsonl
+```
+
+Check for debugger events:
+```bash
+js_unshroud query --input initial.jsonl --type debugger
+```
+
+If debugger events are detected, the malware is using anti-analysis checks. Note the location and proceed to Pass 2.
+
+**Pass 2: Capture Full Behavior Without Detection Risk**
+```bash
+# Disable debugger detection to avoid timing-based detection
+echo '{"enableDebuggerDetection": false}' > no-debugger.json
+js_unshroud --url https://malicious-site.com --out full-behavior.jsonl --config no-debugger.json
+```
+
+**Rationale:**
+- Pass 1 confirms the malware uses `debugger;` statements and captures the location (valuable intelligence)
+- Pass 2 disables debugger detection to eliminate timing-based detection risk (~1-5ms overhead)
+- After disabling, subsequent `debugger` statements execute at native speed (~0ms), avoiding detection
+- The information about anti-analysis techniques is already gathered from Pass 1
+
+**Note:** The fire-and-forget optimization (implemented by default) already minimizes detection risk by only capturing the first debugger location and disabling the domain immediately. However, for maximum stealth against sophisticated malware with aggressive timing checks (<3ms threshold), disable debugger detection entirely in Pass 2.
+
 ## Querying Events
 
 The `query` subcommand enables targeted filtering of captured events, allowing malware analysts to quickly find specific patterns without loading entire event logs into memory.
@@ -458,7 +490,7 @@ Configuration options:
 - `enableCodeExecution`: Capture eval(), Function(), and dynamic code execution (default: `true`)
 - `enableEncoding`: Capture atob/btoa, fromCharCode, URI encoding/decoding (default: `true`)
 - `enableCryptoJS`: Capture CryptoJS library encryption/decryption (AES, DES, TripleDES, RC4, Rabbit) (default: `true`)
-- `enableDebuggerDetection`: Detect and automatically resume from `debugger;` statements - common anti-analysis technique (default: `true`)
+- `enableDebuggerDetection`: Detect and automatically resume from `debugger;` statements - common anti-analysis technique (default: `true`). Uses fire-and-forget optimization: captures only the first debugger location (~1-5ms latency), then disables the domain so subsequent debuggers run at native speed (~0ms). For maximum stealth against sophisticated malware, disable this setting after confirming debugger usage in an initial run (see Anti-Analysis Detection Workflow).
 - `enableWorkers`: Capture Web Worker and SharedWorker creation, messaging, and errors (default: `false`)
 - `enableModules`: Capture ES module script injection via `<script type="module">` (default: `false`)
 - `enableIframes`: Capture iframe creation, srcdoc injection, and embedded scripts (default: `false`)
