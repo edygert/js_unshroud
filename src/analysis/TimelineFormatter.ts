@@ -194,6 +194,11 @@ export class TimelineFormatter {
         return `Debugger Statement: ${debugEvent.url ?? 'inline'} line ${debugEvent.lineNumber ?? '?'}`;
       }
 
+      case 'page_snapshot': {
+        const snapshotEvent = event;
+        return `Page Snapshot: ${snapshotEvent.url} (${snapshotEvent.htmlLength} bytes)${snapshotEvent.title ? ` - ${snapshotEvent.title}` : ''}`;
+      }
+
       case 'download': {
         const downloadEvent = event;
         if (downloadEvent.eventType === 'download_click') {

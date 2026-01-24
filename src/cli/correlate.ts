@@ -300,6 +300,8 @@ export function formatEventSummary(event: MonitoringEvent): string {
       return `${(event).method}: ${(event).data?.substring(0, 40) ?? '(no data)'}${((event).data?.length ?? 0) > 40 ? '...' : ''}`;
     case 'debugger':
       return `debugger at ${(event).url ?? 'inline'}:${(event).lineNumber ?? '?'}`;
+    case 'page_snapshot':
+      return `Page Snapshot: ${(event).url} (${(event).htmlLength} bytes)`;
     case 'download':
       return `Download ${(event).eventType}: ${(event).filename ?? (event).url ?? (event).href ?? '(no filename)'}`;
   }
