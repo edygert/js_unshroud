@@ -190,32 +190,34 @@ export class CDPSessionManager {
     if (!this.cdpSession) return;
 
     // Debugger.paused - triggered when debugger statement is hit
+    // CRITICAL: Fire-and-forget pattern minimizes detectable latency
+    // After first pause, Debugger.disable() makes all subsequent debuggers run at native speed (~0ms)
     this.cdpSession.on('Debugger.paused', (params: Protocol.Debugger.PausedEvent) => {
       void (async () => {
-      // Log the debugger statement detection
-      const location = params.callFrames[0];
-      const event: Omit<DebuggerEvent, 'id' | 'timestamp' | 'sessionId' | 'frameId'> = {
-        type: 'debugger',
-        reason: params.reason,
-        ...(location?.url && { url: location.url }),
-        ...(location?.location.lineNumber !== undefined && { lineNumber: location.location.lineNumber }),
-        ...(location?.location.columnNumber !== undefined && { columnNumber: location.location.columnNumber }),
-        ...(location?.location.scriptId && { scriptId: location.location.scriptId })
-      };
+        // CRITICAL: Send resume + disable commands IMMEDIATELY (fire-and-forget, no await)
+        // This minimizes detectable latency on the first debugger statement
+        // Silent failures are acceptable - execution continues regardless
+        this.cdpSession?.send('Debugger.resume', {}).catch(() => {});
+        this.cdpSession?.send('Debugger.disable', {}).catch(() => {});
 
-      const promise = this.eventLogger.logEvent(createEvent<DebuggerEvent>(
-        this.sessionId,
-        undefined,
-        event
-      ));
-      this.queueLogEvent(promise);
+        // Background logging happens AFTER commands are already sent
+        // This overhead does NOT contribute to detectable latency
+        const location = params.callFrames[0];
+        const event: Omit<DebuggerEvent, 'id' | 'timestamp' | 'sessionId' | 'frameId'> = {
+          type: 'debugger',
+          reason: params.reason,
+          ...(location?.url && { url: location.url }),
+          ...(location?.location.lineNumber !== undefined && { lineNumber: location.location.lineNumber }),
+          ...(location?.location.columnNumber !== undefined && { columnNumber: location.location.columnNumber }),
+          ...(location?.location.scriptId && { scriptId: location.location.scriptId })
+        };
 
-      // Immediately resume execution to avoid blocking the page
-      try {
-        await this.cdpSession?.send('Debugger.resume', {});
-      } catch (error) {
-        console.warn('[JS Unshroud] Failed to resume after debugger statement:', error);
-      }
+        const promise = this.eventLogger.logEvent(createEvent<DebuggerEvent>(
+          this.sessionId,
+          undefined,
+          event
+        ));
+        this.queueLogEvent(promise);
       })();
     });
   }

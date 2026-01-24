@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debugger Latency - First Sample Only</title>
+</head>
+<body>
+  <h1>Debugger Detection Latency (What Malware Sees)</h1>
+  <div id="results"></div>
+
+  <script>
+    // CRITICAL: Only the FIRST debugger matters for fire-and-forget technique
+    // After first execution, Debugger.disable() is called, making all subsequent
+    // debugger statements run at native speed (~0ms)
+
+    const measurements = [];
+
+    // Measure first debugger (THE ONLY ONE THAT MATTERS)
+    const start = performance.now();
+    debugger;  // ← FIRST debugger: shows CDP pause + resume + disable latency
+    const firstDebuggerLatency = performance.now() - start;
+    measurements.push(firstDebuggerLatency);
+
+    console.log(`FIRST_DEBUGGER_LATENCY: ${firstDebuggerLatency}ms`);
+
+    // Measure a few more to confirm they're native speed (should all be ~0ms)
+    for (let i = 0; i < 10; i++) {
+      const s = performance.now();
+      debugger;  // ← Subsequent debuggers: native speed (domain disabled)
+      const elapsed = performance.now() - s;
+      measurements.push(elapsed);
+
+      // Small delay
+      const delayStart = performance.now();
+      while (performance.now() - delayStart < 10) { /* busy wait */ }
+    }
+
+    // Analysis
+    const subsequentMeasurements = measurements.slice(1);
+    const maxSubsequent = Math.max(...subsequentMeasurements);
+    const avgSubsequent = subsequentMeasurements.reduce((a,b) => a+b) / subsequentMeasurements.length;
+
+    // Determine detection risk
+    let detectionRisk = '';
+    let riskColor = '';
+    if (firstDebuggerLatency > 10) {
+      detectionRisk = 'HIGH - Detectable by all thresholds';
+      riskColor = '#ffcccc';
+    } else if (firstDebuggerLatency > 5) {
+      detectionRisk = 'MEDIUM - Detectable by aggressive (5ms) thresholds only';
+      riskColor = '#ffffcc';
+    } else if (firstDebuggerLatency > 1) {
+      detectionRisk = 'LOW - May evade most thresholds';
+      riskColor = '#ccffcc';
+    } else {
+      detectionRisk = 'NONE - Undetectable (native speed)';
+      riskColor = '#ccffcc';
+    }
+
+    // Display results
+    const results = `
+      <h2>⚠️ Detection Analysis ⚠️</h2>
+      <div style="background-color: #f0f0f0; padding: 15px; margin: 10px 0; border-left: 4px solid #333;">
+        <p><strong>Reality:</strong> Only the <strong>FIRST</strong> debugger statement is detectable.</p>
+        <p>After the first execution, <code>Debugger.disable()</code> is called via fire-and-forget,
+        making all subsequent debugger statements run at native speed (~0ms).</p>
+      </div>
+
+      <h2>Critical Measurement</h2>
+      <table border="1" cellpadding="10">
+        <tr style="background-color: ${riskColor};">
+          <td><b>First Debugger Latency</b><br/>(What Malware Detects)</td>
+          <td style="font-size: 24px;"><b>${firstDebuggerLatency.toFixed(3)} ms</b></td>
+        </tr>
+      </table>
+
+      <h2>Detection Risk Assessment</h2>
+      <table border="1" cellpadding="5">
+        <tr><td><b>Threshold</b></td><td><b>Typical Malware</b></td><td><b>Detected?</b></td></tr>
+        <tr><td>&gt; 20ms</td><td>Conservative (mass phishing)</td><td>${firstDebuggerLatency > 20 ? '🔴 YES' : '✅ NO'}</td></tr>
+        <tr><td>&gt; 10ms</td><td>Moderate (banking trojans)</td><td>${firstDebuggerLatency > 10 ? '🔴 YES' : '✅ NO'}</td></tr>
+        <tr style="background-color: #ffffcc;"><td>&gt; 5ms</td><td>Aggressive (APTs, sophisticated)</td><td>${firstDebuggerLatency > 5 ? '🔴 YES' : '✅ NO'}</td></tr>
+        <tr><td>&gt; 3ms</td><td>Very Aggressive (rare)</td><td>${firstDebuggerLatency > 3 ? '🔴 YES' : '✅ NO'}</td></tr>
+      </table>
+
+      <h2>Overall Risk: <span style="background-color: ${riskColor}; padding: 5px;">${detectionRisk}</span></h2>
+
+      <h2>Verification (Subsequent Debuggers)</h2>
+      <table border="1" cellpadding="5">
+        <tr><td><b>Metric</b></td><td><b>Value</b></td></tr>
+        <tr><td>Max of samples 2-11</td><td>${maxSubsequent.toFixed(3)} ms</td></tr>
+        <tr><td>Average of samples 2-11</td><td>${avgSubsequent.toFixed(3)} ms</td></tr>
+        <tr><td>Status</td><td>${maxSubsequent < 1 ? '✅ Native speed confirmed (domain disabled)' : '⚠️ Unexpected - domain may not be disabled'}</td></tr>
+      </table>
+
+      <h2>All Samples</h2>
+      <pre>${measurements.map((m, i) => `[${i}]: ${m.toFixed(3)}ms${i === 0 ? ' ← ONLY THIS MATTERS' : ' (post-disable, irrelevant)'}`).join('\n')}</pre>
+
+      <p><small>Browser: ${navigator.userAgent}</small></p>
+    `;
+
+    document.getElementById('results').innerHTML = results;
+
+    // Log structured data
+    console.log('TIMING_RESULTS', {
+      firstDebuggerLatency,
+      detectionRisk,
+      detectedAt5ms: firstDebuggerLatency > 5,
+      detectedAt10ms: firstDebuggerLatency > 10,
+      subsequentSamples: subsequentMeasurements
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "enableDebuggerDetection": true,
+  "enableConsole": true,
+  "enableNetwork": false,
+  "enableStorage": false,
+  "enableWebSocket": false,
+  "enableTimer": false,
+  "enableError": true,
+  "enableDOM": false,
+  "enableFingerprinting": false,
+  "enableObjectTracking": false,
+  "enableHeadlessMitigation": false,
+  "enableServiceWorker": false,
+  "enableCodeExecution": false,
+  "enableEncoding": false,
+  "monitoringTimeoutSeconds": 30,
+  "debug": true
+}
