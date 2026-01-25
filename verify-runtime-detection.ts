@@ -102,7 +102,7 @@ async function runDetectionTest(scenario: Scenario): Promise<DetectionResult> {
     // Extract Chrome version
     const userAgent = await page.evaluate(() => navigator.userAgent);
     const versionMatch = userAgent.match(/Chrome\/(\d+)/);
-    results.chromeVersion = versionMatch ? versionMatch[1] : 'Unknown';
+    results.chromeVersion = (versionMatch && versionMatch[1]) ? versionMatch[1] : 'Unknown';
 
     // Update risk level based on detection
     results.riskLevel = results.detected ? 'HIGH' : 'NONE';

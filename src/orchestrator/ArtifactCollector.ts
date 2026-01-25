@@ -6,7 +6,7 @@ export interface ArtifactConfig {
   enabled: boolean;
   baseDirectory: string;  // Default: './artifacts'
   types: {
-    pageSnapshot: boolean;        // Save initial page HTML snapshot
+    pageSnapshot: boolean;        // Save initial and final page HTML snapshots
     downloads: boolean;           // Save downloaded files
     codeExecution: boolean;       // Save eval/Function code
     encoding: boolean;            // Save atob/btoa output

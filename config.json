@@ -21,13 +21,14 @@
   "enableWorkers": false,
   "enableModules": false,
   "enableIframes": false,
+  "enableDebuggerDetection": true,
 
   "dedupeWindowMs": 100,
   "maxPayloadSize": 2051,
   "maxStackDepth": 20,
   "enableDeduplication": true,
 
-  "monitoringTimeoutSeconds": 15,
+  "monitoringTimeoutSeconds": 30,
 
   "enableBehaviorSimulation": false,
   "behaviorSimulationIntensity": "medium",
@@ -56,6 +57,78 @@
       "enableAtobBtoa": false,
       "enableFromCharCode": true,
       "enableURIEncoding": false
+    }
+  },
+
+  "_artifactCollectionComment": "Artifact collection configuration - saves file artifacts to disk for forensic analysis. Artifacts are saved to ./artifacts/<session-id>/ by default. pageSnapshot captures both initial (after page load) and final (before tool exit) HTML states for DOM manipulation analysis.",
+  "enableArtifactCollection": true,
+  "artifactDirectory": "./artifacts",
+  "artifactTypes": {
+    "pageSnapshot": true,
+    "downloads": false,
+    "codeExecution": false,
+    "encoding": false,
+    "cryptojs": false,
+    "clipboard": false,
+    "workers": false,
+    "iframes": false
+  },
+  "maxArtifactSize": 10485760,
+
+  "_headlessMitigationComment": "Headless mitigation configuration - customize browser fingerprint. Available profiles: windows-chrome (default), macos-safari, linux-firefox, android-chrome. All fields are optional - use profile for quick presets or customize individual values.",
+  "headlessMitigation": {
+    "profile": "windows-chrome",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+    "platform": "Win32",
+    "vendor": "Google Inc.",
+    "language": "en-US",
+    "languages": ["en-US", "en"],
+    "cdp": {
+      "platform": "Windows",
+      "platformVersion": "10.0.0",
+      "architecture": "x86",
+      "bitness": "64",
+      "mobile": false,
+      "brands": [
+        { "brand": "Chromium", "version": "143" },
+        { "brand": "Not A(Brand)", "version": "24" },
+        { "brand": "Google Chrome", "version": "143" }
+      ]
+    },
+    "hardware": {
+      "hardwareConcurrency": 8,
+      "deviceMemory": 8,
+      "maxTouchPoints": 0
+    },
+    "screen": {
+      "width": 1920,
+      "height": 1080,
+      "availWidth": 1920,
+      "availHeight": 1040,
+      "colorDepth": 24,
+      "pixelDepth": 24
+    },
+    "window": {
+      "innerWidth": 1280,
+      "innerHeight": 720,
+      "outerWidth": 1296,
+      "outerHeight": 825,
+      "devicePixelRatio": 1.0
+    },
+    "timezone": {
+      "offset": 300,
+      "name": "America/New_York"
+    },
+    "webgl": {
+      "vendor": "Google Inc. (NVIDIA)",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Ti (0x00002182) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    "audio": {
+      "sampleRate": 44100
+    },
+    "entropy": {
+      "canvas": 0.01,
+      "audio": 0.0001
     }
   }
 }

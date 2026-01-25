@@ -16,7 +16,7 @@
  *   - baseline: No Debugger domain (native performance)
  */
 
-import { chromium } from 'playwright-core';
+import { chromium, type CDPSession } from 'playwright-core';
 import { join } from 'path';
 
 type Implementation = 'current' | 'optimized' | 'baseline';
@@ -29,7 +29,7 @@ async function measureLatency(implementation: Implementation) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
-  let cdpSession;
+  let cdpSession: CDPSession | undefined;
   let firstDebuggerLatency: number | null = null;
 
   // Set up debugger handling based on implementation
@@ -76,7 +76,7 @@ async function measureLatency(implementation: Implementation) {
   page.on('console', msg => {
     const text = msg.text();
     const match = text.match(/FIRST_DEBUGGER_LATENCY: ([\d.]+)ms/);
-    if (match) {
+    if (match && match[1]) {
       firstDebuggerLatency = parseFloat(match[1]);
     }
   });
@@ -95,16 +95,19 @@ async function measureLatency(implementation: Implementation) {
     return;
   }
 
+  // Assert non-null for TypeScript (checked above)
+  const latency: number = firstDebuggerLatency;
+
   // Determine detection risk
   let detectionRisk = '';
   let riskIcon = '';
-  if (firstDebuggerLatency > 10) {
+  if (latency > 10) {
     detectionRisk = 'HIGH - Detectable by all thresholds';
     riskIcon = '🔴';
-  } else if (firstDebuggerLatency > 5) {
+  } else if (latency > 5) {
     detectionRisk = 'MEDIUM - Detectable by aggressive (5ms) thresholds';
     riskIcon = '🟡';
-  } else if (firstDebuggerLatency > 1) {
+  } else if (latency > 1) {
     detectionRisk = 'LOW - May evade most thresholds';
     riskIcon = '🟢';
   } else {
@@ -116,15 +119,15 @@ async function measureLatency(implementation: Implementation) {
   console.log('━'.repeat(70));
   console.log(`  CRITICAL MEASUREMENT (What Malware Detects)`);
   console.log('━'.repeat(70));
-  console.log(`  First Debugger Latency: ${riskIcon}  ${firstDebuggerLatency.toFixed(3)} ms\n`);
+  console.log(`  First Debugger Latency: ${riskIcon}  ${latency.toFixed(3)} ms\n`);
 
   console.log('━'.repeat(70));
   console.log(`  Detection Risk Assessment`);
   console.log('━'.repeat(70));
-  console.log(`  > 20ms (Conservative):     ${firstDebuggerLatency > 20 ? '🔴 DETECTED' : '✅ Undetected'}`);
-  console.log(`  > 10ms (Moderate):         ${firstDebuggerLatency > 10 ? '🔴 DETECTED' : '✅ Undetected'}`);
-  console.log(`  > 5ms  (Aggressive):       ${firstDebuggerLatency > 5 ? '🔴 DETECTED' : '✅ Undetected'}`);
-  console.log(`  > 3ms  (Very Aggressive):  ${firstDebuggerLatency > 3 ? '🔴 DETECTED' : '✅ Undetected'}\n`);
+  console.log(`  > 20ms (Conservative):     ${latency > 20 ? '🔴 DETECTED' : '✅ Undetected'}`);
+  console.log(`  > 10ms (Moderate):         ${latency > 10 ? '🔴 DETECTED' : '✅ Undetected'}`);
+  console.log(`  > 5ms  (Aggressive):       ${latency > 5 ? '🔴 DETECTED' : '✅ Undetected'}`);
+  console.log(`  > 3ms  (Very Aggressive):  ${latency > 3 ? '🔴 DETECTED' : '✅ Undetected'}\n`);
 
   console.log('━'.repeat(70));
   console.log(`  Overall Risk: ${riskIcon} ${detectionRisk}`);

@@ -980,16 +980,7 @@ describe('validateHeadlessMitigationConfig', () => {
   // ==================== Edge Cases ====================
   describe('edge cases', () => {
     test('should handle config with all undefined nested objects', () => {
-      const config: HeadlessMitigationConfig = {
-        cdp: undefined,
-        hardware: undefined,
-        screen: undefined,
-        window: undefined,
-        timezone: undefined,
-        webgl: undefined,
-        audio: undefined,
-        entropy: undefined
-      };
+      const config: HeadlessMitigationConfig = {};
       const result = validateHeadlessMitigationConfig(config);
       expect(result.valid).toBe(true);
       expect(result.errors).toEqual([]);

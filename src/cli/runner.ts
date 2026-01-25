@@ -1219,6 +1219,41 @@ async function runMonitoring(args: Args): Promise<void> {
     logger.error('Error during monitoring:', error);
     throw error; // Re-throw for main function to handle
   } finally {
+    // Capture final page HTML snapshot before cleanup
+    if (artifactCollector.isEnabled() && artifactConfig.types.pageSnapshot) {
+      try {
+        const htmlContent = await page.content();
+        const pageTitle = await page.title();
+        const captureTime = Date.now();
+
+        // Create page snapshot event (final state)
+        const finalSnapshotEvent = createEvent<PageSnapshotEvent>(sessionId, undefined, {
+          type: 'page_snapshot',
+          url: args.url,
+          title: pageTitle,
+          htmlLength: Buffer.byteLength(htmlContent, 'utf-8'),
+          captureTime: captureTime
+        });
+
+        // Save HTML content as artifact (final state)
+        const artifactPath = await artifactCollector.saveArtifact(finalSnapshotEvent, {
+          type: 'page_snapshot',
+          content: htmlContent,
+          extension: 'html',
+          mimeType: 'text/html'
+        });
+
+        // Log the event with artifact path
+        if (artifactPath) {
+          finalSnapshotEvent.artifactPath = artifactPath;
+          await eventLogger.logEvent(finalSnapshotEvent);
+          logger.log(`Final page snapshot saved: ${artifactPath}`);
+        }
+      } catch (error) {
+        logger.error('Failed to capture final page snapshot:', error);
+      }
+    }
+
     // Flush pending events before cleanup
     await cdpManager.flushPendingEvents();
     await cdpManager.disconnect();

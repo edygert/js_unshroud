@@ -49,7 +49,7 @@ export const HEADLESS_MITIGATION_PROFILES: Record<string, HeadlessMitigationConf
     },
     webgl: {
       vendor: 'Google Inc. (Intel)',
-      renderer: 'ANGLE (Intel, Mesa Intel(R) UHD Graphics (CML GT2), Version 27.2.1 (Linux x64))'
+      renderer: 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)'
     },
     audio: {
       sampleRate: 44100

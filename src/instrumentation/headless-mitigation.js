@@ -31,6 +31,86 @@
 
   // === CORE HEADLESS DETECTION MITIGATIONS ===
 
+  // 0. Fix broken image dimensions - Real Chrome reports 0x0, not 16x16
+  try {
+    // Override naturalWidth and naturalHeight for broken images
+    // eslint-disable-next-line no-undef
+    const originalImageDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalWidth');
+    // eslint-disable-next-line no-undef
+    const originalHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalHeight');
+
+    // eslint-disable-next-line no-undef
+    Object.defineProperty(HTMLImageElement.prototype, 'naturalWidth', {
+      get: function() {
+        // If image failed to load, return 0 (real Chrome behavior)
+        if (this.complete && !this.naturalWidth) {
+          logEvent({
+            type: 'headless_mitigation',
+            method: 'HTMLImageElement.naturalWidth',
+            operation: 'broken_image_dimension_fix',
+            originalValue: originalImageDescriptor ? originalImageDescriptor.get.call(this) : 16,
+            newValue: 0,
+            timestamp: Date.now()
+          });
+          return 0;
+        }
+        return originalImageDescriptor ? originalImageDescriptor.get.call(this) : 0;
+      },
+      configurable: true
+    });
+
+    // eslint-disable-next-line no-undef
+    Object.defineProperty(HTMLImageElement.prototype, 'naturalHeight', {
+      get: function() {
+        // If image failed to load, return 0 (real Chrome behavior)
+        if (this.complete && !this.naturalHeight) {
+          logEvent({
+            type: 'headless_mitigation',
+            method: 'HTMLImageElement.naturalHeight',
+            operation: 'broken_image_dimension_fix',
+            originalValue: originalHeightDescriptor ? originalHeightDescriptor.get.call(this) : 16,
+            newValue: 0,
+            timestamp: Date.now()
+          });
+          return 0;
+        }
+        return originalHeightDescriptor ? originalHeightDescriptor.get.call(this) : 0;
+      },
+      configurable: true
+    });
+
+    // Also override width/height properties for broken images
+    // eslint-disable-next-line no-undef
+    Object.defineProperty(HTMLImageElement.prototype, 'width', {
+      get: function() {
+        if (this.complete && this.naturalWidth === 0) {
+          return 0;
+        }
+        return this.getAttribute('width') || this.naturalWidth || 0;
+      },
+      set: function(value) {
+        this.setAttribute('width', value);
+      },
+      configurable: true
+    });
+
+    // eslint-disable-next-line no-undef
+    Object.defineProperty(HTMLImageElement.prototype, 'height', {
+      get: function() {
+        if (this.complete && this.naturalHeight === 0) {
+          return 0;
+        }
+        return this.getAttribute('height') || this.naturalHeight || 0;
+      },
+      set: function(value) {
+        this.setAttribute('height', value);
+      },
+      configurable: true
+    });
+  } catch (e) {
+    window.__js_unshroud_debug('[JS Unshroud] Could not fix broken image dimensions:', e.message);
+  }
+
   // 1. Navigator.webdriver override - The most common headless detection method
   try {
     Object.defineProperty(window.navigator, 'webdriver', {
@@ -103,31 +183,81 @@
 
   // 4. Plugins - Headless browsers often have no plugins
   try {
+    // Get the original plugins object to access prototypes
+    const originalPlugins = navigator.plugins;
+    const PluginArrayProto = Object.getPrototypeOf(originalPlugins);
+
+    // Get Plugin prototype from an existing plugin if available, otherwise use Object
+    let PluginProto = Object.prototype;
+    if (originalPlugins.length > 0) {
+      PluginProto = Object.getPrototypeOf(originalPlugins[0]);
+    }
+
     Object.defineProperty(window.navigator, 'plugins', {
       get: function() {
-        // Create a minimal but realistic plugin array
-        const fakePlugins = [
-          {
-            name: 'Chrome PDF Plugin',
-            description: 'Portable Document Format',
-            filename: 'internal-pdf-viewer',
-            length: 1,
-            0: { type: 'application/pdf', description: 'Portable Document Format' }
+        // Create individual Plugin objects with proper Plugin.prototype chain
+        // Use Object.defineProperty to avoid "getter only" errors
+        const plugin1 = Object.create(PluginProto);
+        Object.defineProperty(plugin1, 'name', { value: 'Chrome PDF Plugin', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin1, 'description', { value: 'Portable Document Format', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin1, 'filename', { value: 'internal-pdf-viewer', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin1, 'length', { value: 1, writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin1, '0', { value: { type: 'application/pdf', description: 'Portable Document Format', suffixes: 'pdf', enabledPlugin: plugin1 }, writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin1, 'toString', { value: function() { return '[object Plugin]'; }, writable: false, enumerable: false, configurable: true });
+        Object.defineProperty(plugin1, Symbol.toStringTag, { value: 'Plugin', writable: false, enumerable: false, configurable: true });
+
+        const plugin2 = Object.create(PluginProto);
+        Object.defineProperty(plugin2, 'name', { value: 'Chromium PDF Plugin', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin2, 'description', { value: 'Portable Document Format', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin2, 'filename', { value: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin2, 'length', { value: 1, writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin2, '0', { value: { type: 'application/pdf', description: 'Portable Document Format', suffixes: 'pdf', enabledPlugin: plugin2 }, writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin2, 'toString', { value: function() { return '[object Plugin]'; }, writable: false, enumerable: false, configurable: true });
+        Object.defineProperty(plugin2, Symbol.toStringTag, { value: 'Plugin', writable: false, enumerable: false, configurable: true });
+
+        const plugin3 = Object.create(PluginProto);
+        Object.defineProperty(plugin3, 'name', { value: 'Native Client', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin3, 'description', { value: 'Executes NaCl files', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin3, 'filename', { value: 'internal-nacl-plugin', writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin3, 'length', { value: 0, writable: false, enumerable: true, configurable: true });
+        Object.defineProperty(plugin3, 'toString', { value: function() { return '[object Plugin]'; }, writable: false, enumerable: false, configurable: true });
+        Object.defineProperty(plugin3, Symbol.toStringTag, { value: 'Plugin', writable: false, enumerable: false, configurable: true });
+
+        // Create PluginArray with proper PluginArray.prototype chain
+        // CRITICAL: Use __proto__ to set prototype - this makes instanceof PluginArray work
+        // Based on research: https://github.com/infosimples/detect-headless/issues/6
+        const fakePlugins = {
+          0: plugin1,
+          1: plugin2,
+          2: plugin3,
+          length: 3,
+          item: function(index) {
+            return this[index] || null;
           },
-          {
-            name: 'Chromium PDF Plugin',
-            description: 'Portable Document Format',
-            filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
-            length: 1,
-            0: { type: 'application/pdf', description: 'Portable Document Format' }
+          namedItem: function(name) {
+            for (let i = 0; i < this.length; i++) {
+              if (this[i] && this[i].name === name) return this[i];
+            }
+            return null;
           },
-          {
-            name: 'Native Client',
-            description: 'Executes NaCl files',
-            filename: 'internal-nacl-plugin',
-            length: 0
-          }
-        ];
+          refresh: function() {
+            // No-op for fake plugins
+          },
+          toString: function() {
+            return '[object PluginArray]';
+          },
+          __proto__: PluginArrayProto
+        };
+
+        // Set Symbol.toStringTag for correct Object.prototype.toString behavior
+        try {
+          Object.defineProperty(fakePlugins, Symbol.toStringTag, {
+            value: 'PluginArray',
+            configurable: true
+          });
+        } catch {
+          // Ignore if Symbol.toStringTag can't be set
+        }
 
         logEvent({
           type: 'headless_mitigation',
@@ -138,7 +268,8 @@
         });
 
         return fakePlugins;
-      }
+      },
+      configurable: true
     });
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.plugins:', e.message);
@@ -146,41 +277,25 @@
 
   // 5. Permissions API - Mitigate "denied" permissions that indicate headless
   try {
-    const originalQuery = window.navigator.permissions?.query;
-    if (originalQuery) {
+    if (window.navigator.permissions && window.navigator.permissions.query) {
       window.navigator.permissions.query = function(permissionDescriptor) {
-        return originalQuery.call(this, permissionDescriptor).then(function(result) {
-          logEvent({
-            type: 'headless_mitigation',
-            method: 'navigator.permissions.query',
-            operation: 'permission_override',
-            name: permissionDescriptor.name,
-            originalState: result.state,
-            newState: 'granted',
-            timestamp: Date.now()
-          });
+        logEvent({
+          type: 'headless_mitigation',
+          method: 'navigator.permissions.query',
+          operation: 'permission_override',
+          name: permissionDescriptor.name,
+          newState: 'prompt',
+          timestamp: Date.now()
+        });
 
-          // Always return 'granted' to mimic normal browser behavior
-          return {
-            state: 'granted',
-            onchange: null
-          };
-        }).catch(function(error) {
-          logEvent({
-            type: 'headless_mitigation',
-            method: 'navigator.permissions.query',
-            operation: 'permission_override',
-            name: permissionDescriptor.name,
-            originalError: error.message,
-            newState: 'granted',
-            timestamp: Date.now()
-          });
-
-          // Return a fake "granted" permission instead of denying
-          return Promise.resolve({
-            state: 'granted',
-            onchange: null
-          });
+        // Return 'prompt' to mimic normal browser behavior (more realistic than 'granted')
+        // Real browsers show 'prompt' until user explicitly grants/denies permission
+        return Promise.resolve({
+          state: 'prompt',
+          onchange: null,
+          addEventListener: function() {},
+          removeEventListener: function() {},
+          dispatchEvent: function() { return true; }
         });
       };
     }
