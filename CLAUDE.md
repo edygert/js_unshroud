@@ -28,7 +28,7 @@ The tool targets malicious JavaScript in web pages and requires headless browser
      - `network-hooks.js`: fetch/XMLHttpRequest/WebSocket interception
      - `storage-hooks.js`: localStorage/sessionStorage tracking
      - `fingerprinting-hooks.js`: Canvas/WebGL fingerprinting detection
-     - `headless-mitigation.js`: Browser evasion (navigator.webdriver, permissions, plugins, canvas entropy)
+     - `headless-mitigation.js`: Browser evasion (navigator properties, permissions, plugins, canvas entropy). Note: navigator.webdriver is NOT overridden - Chrome flag prevents creation.
      - `service-worker-hooks.js`: Service Worker registration/lifecycle/messaging
      - `code-execution-hooks.js`: eval/Function/dynamic code execution (P0.2)
      - `encoding-hooks.js`: atob/btoa/fromCharCode/URI encoding (P0.3)
@@ -326,7 +326,7 @@ All spoofed values are fully configurable via the `headlessMitigation` config ob
    ```
 
    **Navigator Properties (all configurable):**
-   - Override `navigator.webdriver` to return `false`
+   - `navigator.webdriver` - **INTENTIONALLY NOT OVERRIDDEN**. The `--disable-blink-features=AutomationControlled` flag (set in runner.ts) prevents Chromium from creating this property. By NOT creating an override in headless-mitigation.js, the property remains undefined, defeating both direct checks (`navigator.webdriver`) AND existence checks (`_.has(navigator, "webdriver")`, `'webdriver' in navigator`). Trade-off: We lose logging capability when malware checks this property, but gain complete evasion of property existence detection.
    - Override `navigator.hardwareConcurrency` to configurable value (default: 8 cores)
    - Override `navigator.deviceMemory` to configurable value (default: 8GB)
    - Override `navigator.plugins` with fake Chrome PDF plugins

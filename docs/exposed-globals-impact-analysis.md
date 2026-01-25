@@ -253,7 +253,7 @@ Modern web security has evolved significantly:
 
 The codebase implements some anti-detection measures:
 
-1. **headless-mitigation.js:32-57** - Overrides `navigator.webdriver` to return `false`
+1. **headless-mitigation.js + runner.ts** - Prevents `navigator.webdriver` from being created via `--disable-blink-features=AutomationControlled` Chrome flag. Property remains undefined, evading both direct checks and existence checks (`_.has()`, `'webdriver' in navigator`).
 2. **code-execution-hooks.js:63-70** - Filters out Playwright internal code to reduce noise
 3. **bootstrap.js:89-130** - Stores originals BEFORE wrapping (allows restoration if needed)
 

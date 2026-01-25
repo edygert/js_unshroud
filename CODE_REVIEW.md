@@ -349,7 +349,7 @@ if (document.readyState === 'loading') {
 
 **Implemented Countermeasures** (All Validated ✅):
 
-1. ✅ **navigator.webdriver override** - Most common headless detector neutralized
+1. ✅ **navigator.webdriver prevention** - Property prevented from creation via Chrome flag, evading both direct checks and existence checks (_.has(), 'webdriver' in navigator)
 2. ✅ **hardwareConcurrency spoofing** - Realistic 8-core value
 3. ✅ **deviceMemory spoofing** - Realistic 8GB value
 4. ✅ **Plugin array fabrication** - Chrome-like plugin list

@@ -94,7 +94,8 @@ This plan addresses gaps between **detection** (fingerprinting-hooks.js) and **c
 
 **Current State:**
 - fingerprinting-hooks.js: Detection ONLY (Canvas, WebGL, Navigator, Audio)
-- headless-mitigation.js: Both detection AND countermeasures (navigator.webdriver, plugins, canvas noise, WebGL spoofing)
+- headless-mitigation.js: Both detection AND countermeasures (navigator properties, plugins, canvas noise, WebGL spoofing)
+  - Note: navigator.webdriver is NOT overridden - Chrome flag prevents creation
 
 **Gaps to Address:**
 1. Audio fingerprinting - detection exists, no countermeasures
@@ -127,7 +128,7 @@ Based on comprehensive analysis of headless browser detection techniques used by
 
 **Current State Verified**:
 - ✅ HTTP user-agent spoofing (both CDP and extraHTTPHeaders) - WORKING
-- ✅ navigator.webdriver override - IMPLEMENTED
+- ✅ navigator.webdriver - Property prevented from creation via Chrome flag (not overridden)
 - ✅ navigator.hardwareConcurrency (8 cores) - IMPLEMENTED
 - ✅ navigator.deviceMemory (8GB) - IMPLEMENTED
 - ✅ navigator.plugins (fake Chrome PDF plugins) - IMPLEMENTED

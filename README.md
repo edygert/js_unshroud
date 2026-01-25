@@ -735,7 +735,7 @@ Full custom configuration (no profile):
 If `headlessMitigation` is not specified, the `windows-chrome` profile is used by default.
 
 ### Navigator Overrides (Configurable)
-- `navigator.webdriver` returns `false` instead of `true`
+- `navigator.webdriver` - **INTENTIONALLY NOT OVERRIDDEN**. The `--disable-blink-features=AutomationControlled` Chrome flag prevents Chromium from creating this property. By NOT creating an override, the property remains undefined, defeating both direct checks (`navigator.webdriver`) AND existence checks (`_.has(navigator, "webdriver")`, `'webdriver' in navigator`). Trade-off: We lose logging capability when malware checks this property, but gain complete evasion of property existence detection (~90% success rate on bot.sannysoft.com).
 - `navigator.hardwareConcurrency` returns realistic values (configurable, default: 8 cores)
 - `navigator.deviceMemory` returns realistic values (configurable, default: 8GB)
 - `navigator.plugins` provides fake Chrome PDF plugin entries
@@ -1545,10 +1545,12 @@ Note: Malicious JavaScript often uses `debugger;` statements to detect analysis 
   "timestamp": 1640995200600,
   "sessionId": "session_1640995200_abc123",
   "type": "headless_mitigation",
-  "method": "navigator.webdriver",
+  "method": "navigator.hardwareConcurrency",
   "operation": "value_override",
-  "originalValue": true,
-  "newValue": false,
-  "stackTrace": "checkWebdriver@https://example.com/detection.js:10:5"
+  "originalValue": 2,
+  "newValue": 8,
+  "stackTrace": "checkCPU@https://example.com/detection.js:15:5"
 }
 ```
+
+Note: `navigator.webdriver` is NOT overridden and will not generate events. The Chrome flag `--disable-blink-features=AutomationControlled` prevents the property from being created, making it completely undetectable.

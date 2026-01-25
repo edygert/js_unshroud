@@ -113,7 +113,7 @@ This report compares js_unshroud against 12 other tools in the JavaScript malwar
 - ✅ **Kameleo**: Industry-leading commercial solution (canvas, WebGL, audio, fonts, timezone, behavioral profiles)
 - ✅ **js_unshroud**: Comprehensive open-source solution:
   - ✅ HTTP user-agent (CDP + extraHTTPHeaders)
-  - ✅ navigator.webdriver, hardwareConcurrency, deviceMemory, plugins, permissions, languages (P3.1), mimeTypes (P3.1)
+  - ✅ navigator.webdriver (prevented from creation via Chrome flag), hardwareConcurrency, deviceMemory, plugins, permissions, languages (P3.1), mimeTypes (P3.1)
   - ✅ Canvas fingerprinting (random entropy injection)
   - ✅ WebGL (vendor/renderer spoofing)
   - ✅ Audio fingerprinting (sample rate + noise injection)
@@ -138,7 +138,7 @@ This report compares js_unshroud against 12 other tools in the JavaScript malwar
 
 | Evasion Technique | js_unshroud | puppeteer-extra-plugin-stealth | Winner |
 |-------------------|-------------|-------------------------------|--------|
-| navigator.webdriver | ✅ Dual override (headless-mitigation.js + runner.ts) | ✅ Yes | Tie |
+| navigator.webdriver | ✅ Prevented from creation via Chrome flag (--disable-blink-features=AutomationControlled) | ✅ Yes (overrides) | **js_unshroud** (property doesn't exist vs returns false) |
 | navigator.plugins | ✅ Fake Chrome PDF plugins (3 realistic entries) | ✅ Basic fake plugins | js_unshroud (more realistic) |
 | navigator.permissions | ✅ Always returns 'granted' | ✅ Basic override | Tie |
 | navigator.languages | ✅ P3.1 (planned: ['en-US', 'en']) | ❌ Missing | **js_unshroud** |
