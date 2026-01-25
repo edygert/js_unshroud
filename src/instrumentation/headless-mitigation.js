@@ -29,6 +29,50 @@
   // Config is injected by runner.ts before this script loads
   const config = window.__js_unshroud_headless_config || {};
 
+  // === UTILITY FUNCTIONS FOR NATIVE SPOOFING ===
+
+  // Make a regular function appear native by spoofing toString()
+  const makeNativeFunction = function(func, functionName) {
+    Object.defineProperty(func, 'toString', {
+      value: function() {
+        return 'function ' + functionName + '() { [native code] }';
+      },
+      writable: false,
+      enumerable: false,
+      configurable: true
+    });
+
+    Object.defineProperty(func, 'name', {
+      value: functionName,
+      writable: false,
+      enumerable: false,
+      configurable: true
+    });
+
+    return func;
+  };
+
+  // Make a getter function appear native (includes "get" keyword)
+  const makeNativeGetter = function(func, propertyName) {
+    Object.defineProperty(func, 'toString', {
+      value: function() {
+        return 'function get ' + propertyName + '() { [native code] }';
+      },
+      writable: false,
+      enumerable: false,
+      configurable: true
+    });
+
+    Object.defineProperty(func, 'name', {
+      value: 'get ' + propertyName,
+      writable: false,
+      enumerable: false,
+      configurable: true
+    });
+
+    return func;
+  };
+
   // === CORE HEADLESS DETECTION MITIGATIONS ===
 
   // 0. Fix broken image dimensions - Real Chrome reports 0x0, not 16x16
@@ -124,7 +168,7 @@
   try {
     const originalHardwareConcurrency = navigator.hardwareConcurrency;
     Object.defineProperty(window.navigator, 'hardwareConcurrency', {
-      get: function() {
+      get: makeNativeGetter(function() {
         const overrideValue = config.hardware?.hardwareConcurrency || 8; // Realistic value for modern systems
         logEvent({
           type: 'headless_mitigation',
@@ -135,7 +179,7 @@
           timestamp: Date.now()
         });
         return overrideValue;
-      }
+      }, 'hardwareConcurrency')
     });
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.hardwareConcurrency:', e.message);
@@ -145,7 +189,7 @@
   try {
     const originalDeviceMemory = navigator.deviceMemory;
     Object.defineProperty(window.navigator, 'deviceMemory', {
-      get: function() {
+      get: makeNativeGetter(function() {
         const overrideValue = config.hardware?.deviceMemory || 8; // Realistic value for modern systems
         logEvent({
           type: 'headless_mitigation',
@@ -156,7 +200,7 @@
           timestamp: Date.now()
         });
         return overrideValue;
-      }
+      }, 'deviceMemory')
     });
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.deviceMemory:', e.message);
@@ -175,7 +219,7 @@
     }
 
     Object.defineProperty(window.navigator, 'plugins', {
-      get: function() {
+      get: makeNativeGetter(function() {
         // Create individual Plugin objects with proper Plugin.prototype chain
         // Use Object.defineProperty to avoid "getter only" errors
         const plugin1 = Object.create(PluginProto);
@@ -184,7 +228,7 @@
         Object.defineProperty(plugin1, 'filename', { value: 'internal-pdf-viewer', writable: false, enumerable: true, configurable: true });
         Object.defineProperty(plugin1, 'length', { value: 1, writable: false, enumerable: true, configurable: true });
         Object.defineProperty(plugin1, '0', { value: { type: 'application/pdf', description: 'Portable Document Format', suffixes: 'pdf', enabledPlugin: plugin1 }, writable: false, enumerable: true, configurable: true });
-        Object.defineProperty(plugin1, 'toString', { value: function() { return '[object Plugin]'; }, writable: false, enumerable: false, configurable: true });
+        Object.defineProperty(plugin1, 'toString', { value: makeNativeFunction(function() { return '[object Plugin]'; }, 'toString'), writable: false, enumerable: false, configurable: true });
         Object.defineProperty(plugin1, Symbol.toStringTag, { value: 'Plugin', writable: false, enumerable: false, configurable: true });
 
         const plugin2 = Object.create(PluginProto);
@@ -193,7 +237,7 @@
         Object.defineProperty(plugin2, 'filename', { value: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', writable: false, enumerable: true, configurable: true });
         Object.defineProperty(plugin2, 'length', { value: 1, writable: false, enumerable: true, configurable: true });
         Object.defineProperty(plugin2, '0', { value: { type: 'application/pdf', description: 'Portable Document Format', suffixes: 'pdf', enabledPlugin: plugin2 }, writable: false, enumerable: true, configurable: true });
-        Object.defineProperty(plugin2, 'toString', { value: function() { return '[object Plugin]'; }, writable: false, enumerable: false, configurable: true });
+        Object.defineProperty(plugin2, 'toString', { value: makeNativeFunction(function() { return '[object Plugin]'; }, 'toString'), writable: false, enumerable: false, configurable: true });
         Object.defineProperty(plugin2, Symbol.toStringTag, { value: 'Plugin', writable: false, enumerable: false, configurable: true });
 
         const plugin3 = Object.create(PluginProto);
@@ -201,7 +245,7 @@
         Object.defineProperty(plugin3, 'description', { value: 'Executes NaCl files', writable: false, enumerable: true, configurable: true });
         Object.defineProperty(plugin3, 'filename', { value: 'internal-nacl-plugin', writable: false, enumerable: true, configurable: true });
         Object.defineProperty(plugin3, 'length', { value: 0, writable: false, enumerable: true, configurable: true });
-        Object.defineProperty(plugin3, 'toString', { value: function() { return '[object Plugin]'; }, writable: false, enumerable: false, configurable: true });
+        Object.defineProperty(plugin3, 'toString', { value: makeNativeFunction(function() { return '[object Plugin]'; }, 'toString'), writable: false, enumerable: false, configurable: true });
         Object.defineProperty(plugin3, Symbol.toStringTag, { value: 'Plugin', writable: false, enumerable: false, configurable: true });
 
         // Create PluginArray with proper PluginArray.prototype chain
@@ -224,9 +268,9 @@
           refresh: function() {
             // No-op for fake plugins
           },
-          toString: function() {
+          toString: makeNativeFunction(function() {
             return '[object PluginArray]';
-          },
+          }, 'toString'),
           __proto__: PluginArrayProto
         };
 
@@ -249,7 +293,7 @@
         });
 
         return fakePlugins;
-      },
+      }, 'plugins'),
       configurable: true
     });
   } catch (e) {
@@ -259,7 +303,7 @@
   // 5. Permissions API - Mitigate "denied" permissions that indicate headless
   try {
     if (window.navigator.permissions && window.navigator.permissions.query) {
-      window.navigator.permissions.query = function(permissionDescriptor) {
+      window.navigator.permissions.query = makeNativeFunction(function(permissionDescriptor) {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.permissions.query',
@@ -278,7 +322,7 @@
           removeEventListener: function() {},
           dispatchEvent: function() { return true; }
         });
-      };
+      }, 'query');
     }
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not override permissions.query:', e.message);
@@ -295,7 +339,7 @@
 
     // Canvas toDataURL randomization
     // eslint-disable-next-line no-undef
-    HTMLCanvasElement.prototype.toDataURL = function() {
+    HTMLCanvasElement.prototype.toDataURL = makeNativeFunction(function() {
       const result = originalToDataURL.apply(this, arguments);
 
       // Add small random variations to canvas output to avoid exact fingerprinting
@@ -316,11 +360,11 @@
       }
 
       return result;
-    };
+    }, 'toDataURL');
 
     // Canvas getImageData randomization
     // eslint-disable-next-line no-undef
-    CanvasRenderingContext2D.prototype.getImageData = function() {
+    CanvasRenderingContext2D.prototype.getImageData = makeNativeFunction(function() {
       const result = originalGetImageData.apply(this, arguments);
 
       // Add small noise to pixel data to break exact fingerprinting
@@ -346,7 +390,7 @@
       }
 
       return result;
-    };
+    }, 'getImageData');
 
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not apply canvas mitigations:', e.message);
@@ -355,7 +399,7 @@
   // 7. CSS media queries - Some headless detection uses CSS
   try {
     const originalMatchMedia = window.matchMedia;
-    window.matchMedia = function(query) {
+    window.matchMedia = makeNativeFunction(function(query) {
       const result = originalMatchMedia.call(this, query);
 
       // Monitor for headless-specific media queries
@@ -373,7 +417,7 @@
       }
 
       return result;
-    };
+    }, 'matchMedia');
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not override matchMedia:', e.message);
   }
@@ -384,7 +428,7 @@
     const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
     if (originalGetParameter) {
       // eslint-disable-next-line no-undef
-      WebGLRenderingContext.prototype.getParameter = function(parameter) {
+      WebGLRenderingContext.prototype.getParameter = makeNativeFunction(function(parameter) {
         const result = originalGetParameter.call(this, parameter);
 
         // Override GPU fingerprinting constants
@@ -415,7 +459,7 @@
         }
 
         return result;
-      };
+      }, 'getParameter');
     }
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not apply WebGL mitigations:', e.message);
@@ -465,7 +509,7 @@
     if (window.OfflineAudioContext && window.OfflineAudioContext.prototype.startRendering) {
       const originalStartRendering = window.OfflineAudioContext.prototype.startRendering;
 
-      window.OfflineAudioContext.prototype.startRendering = function() {
+      window.OfflineAudioContext.prototype.startRendering = makeNativeFunction(function() {
         const renderPromise = originalStartRendering.apply(this, arguments);
 
         return renderPromise.then(function(audioBuffer) {
@@ -489,7 +533,7 @@
 
           return audioBuffer;
         });
-      };
+      }, 'startRendering');
     }
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not apply OfflineAudioContext mitigations:', e.message);
@@ -573,7 +617,7 @@
 
   // 1. Block RTCPeerConnection
   try {
-    window.RTCPeerConnection = function() {
+    const rtcPeerConnectionWrapper = makeNativeFunction(function() {
       logEvent({
         type: 'headless_mitigation',
         method: 'RTCPeerConnection',
@@ -583,10 +627,11 @@
 
       // eslint-disable-next-line no-undef
       throw new DOMException('WebRTC is not supported in this browser', 'NotSupportedError');
-    };
+    }, 'RTCPeerConnection');
 
-    window.webkitRTCPeerConnection = window.RTCPeerConnection;
-    window.mozRTCPeerConnection = window.RTCPeerConnection;
+    window.RTCPeerConnection = rtcPeerConnectionWrapper;
+    window.webkitRTCPeerConnection = rtcPeerConnectionWrapper;
+    window.mozRTCPeerConnection = rtcPeerConnectionWrapper;
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not block RTCPeerConnection:', e.message);
   }
@@ -594,7 +639,7 @@
   // 2. Block getUserMedia and enumerateDevices
   try {
     if (navigator.mediaDevices) {
-      navigator.mediaDevices.getUserMedia = function(constraints) {
+      navigator.mediaDevices.getUserMedia = makeNativeFunction(function(constraints) {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.mediaDevices.getUserMedia',
@@ -605,10 +650,10 @@
 
         // eslint-disable-next-line no-undef
         return Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
-      };
+      }, 'getUserMedia');
 
       // Block device enumeration
-      navigator.mediaDevices.enumerateDevices = function() {
+      navigator.mediaDevices.enumerateDevices = makeNativeFunction(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.mediaDevices.enumerateDevices',
@@ -617,7 +662,7 @@
         });
 
         return Promise.resolve([]); // No devices available
-      };
+      }, 'enumerateDevices');
     }
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not block mediaDevices:', e.message);
@@ -637,7 +682,7 @@
 
     Object.defineProperties(window.screen, {
       width: {
-        get: function() {
+        get: makeNativeGetter(function() {
           logEvent({
             type: 'headless_mitigation',
             method: 'screen.width',
@@ -646,27 +691,27 @@
             timestamp: Date.now()
           });
           return screenWidth;
-        },
+        }, 'width'),
         configurable: true
       },
       height: {
-        get: function() { return screenHeight; },
+        get: makeNativeGetter(function() { return screenHeight; }, 'height'),
         configurable: true
       },
       availWidth: {
-        get: function() { return screenAvailWidth; },
+        get: makeNativeGetter(function() { return screenAvailWidth; }, 'availWidth'),
         configurable: true
       },
       availHeight: {
-        get: function() { return screenAvailHeight; },
+        get: makeNativeGetter(function() { return screenAvailHeight; }, 'availHeight'),
         configurable: true
       },
       colorDepth: {
-        get: function() { return screenColorDepth; },
+        get: makeNativeGetter(function() { return screenColorDepth; }, 'colorDepth'),
         configurable: true
       },
       pixelDepth: {
-        get: function() { return screenPixelDepth; },
+        get: makeNativeGetter(function() { return screenPixelDepth; }, 'pixelDepth'),
         configurable: true
       }
     });
@@ -678,7 +723,7 @@
   try {
     const devicePixelRatio = config.window?.devicePixelRatio || 1.0;
     Object.defineProperty(window, 'devicePixelRatio', {
-      get: function() { return devicePixelRatio; },
+      get: makeNativeGetter(function() { return devicePixelRatio; }, 'devicePixelRatio'),
       configurable: true
     });
   } catch (e) {
@@ -693,22 +738,22 @@
     const outerHeight = config.window?.outerHeight || 825;
 
     Object.defineProperty(window, 'innerWidth', {
-      get: function() { return innerWidth; },
+      get: makeNativeGetter(function() { return innerWidth; }, 'innerWidth'),
       configurable: true
     });
 
     Object.defineProperty(window, 'innerHeight', {
-      get: function() { return innerHeight; },
+      get: makeNativeGetter(function() { return innerHeight; }, 'innerHeight'),
       configurable: true
     });
 
     Object.defineProperty(window, 'outerWidth', {
-      get: function() { return outerWidth; },
+      get: makeNativeGetter(function() { return outerWidth; }, 'outerWidth'),
       configurable: true
     });
 
     Object.defineProperty(window, 'outerHeight', {
-      get: function() { return outerHeight; },
+      get: makeNativeGetter(function() { return outerHeight; }, 'outerHeight'),
       configurable: true
     });
   } catch (e) {
@@ -723,7 +768,7 @@
     const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
     const spoofedOffset = config.timezone?.offset || 300; // US Eastern Time (UTC-5, or -300 minutes)
 
-    Date.prototype.getTimezoneOffset = function() {
+    Date.prototype.getTimezoneOffset = makeNativeFunction(function() {
       logEvent({
         type: 'headless_mitigation',
         method: 'Date.prototype.getTimezoneOffset',
@@ -734,7 +779,7 @@
       });
 
       return spoofedOffset;
-    };
+    }, 'getTimezoneOffset');
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not override getTimezoneOffset:', e.message);
   }
@@ -743,11 +788,11 @@
   try {
     const OriginalDateTimeFormat = Intl.DateTimeFormat;
 
-    Intl.DateTimeFormat = function() {
+    Intl.DateTimeFormat = makeNativeFunction(function() {
       const formatter = new OriginalDateTimeFormat(...arguments);
       const originalResolvedOptions = formatter.resolvedOptions;
 
-      formatter.resolvedOptions = function() {
+      formatter.resolvedOptions = makeNativeFunction(function() {
         const options = originalResolvedOptions.call(this);
         const timeZoneName = config.timezone?.name || 'America/New_York';
         options.timeZone = timeZoneName;
@@ -761,10 +806,10 @@
         });
 
         return options;
-      };
+      }, 'resolvedOptions');
 
       return formatter;
-    };
+    }, 'DateTimeFormat');
 
     Intl.DateTimeFormat.prototype = OriginalDateTimeFormat.prototype;
   } catch (e) {
@@ -777,7 +822,7 @@
   // 1. Block navigator.getBattery
   try {
     if (navigator.getBattery) {
-      navigator.getBattery = function() {
+      navigator.getBattery = makeNativeFunction(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.getBattery',
@@ -787,7 +832,7 @@
 
         // eslint-disable-next-line no-undef
         return Promise.reject(new DOMException('Battery Status API is not supported', 'NotSupportedError'));
-      };
+      }, 'getBattery');
     }
 
     // Remove battery property if it exists
@@ -806,7 +851,7 @@
     if (!window.chrome) {
       window.chrome = {
         runtime: {},
-        loadTimes: function() {
+        loadTimes: makeNativeFunction(function() {
           return {
             requestTime: Date.now() / 1000,
             startLoadTime: Date.now() / 1000,
@@ -822,15 +867,15 @@
             wasAlternateProtocolAvailable: false,
             connectionInfo: 'h2'
           };
-        },
-        csi: function() {
+        }, 'loadTimes'),
+        csi: makeNativeFunction(function() {
           return {
             startE: Date.now(),
             onloadT: Date.now(),
             pageT: Math.random() * 1000 + 500,
             tran: 15
           };
-        },
+        }, 'csi'),
         app: {}
       };
 
@@ -850,7 +895,7 @@
   try {
     const languagesValue = config.languages || ['en-US', 'en'];
     Object.defineProperty(navigator, 'languages', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.languages',
@@ -859,7 +904,7 @@
           timestamp: Date.now()
         });
         return languagesValue;
-      },
+      }, 'languages'),
       configurable: true
     });
   } catch (e) {
@@ -898,7 +943,7 @@
     // Add length property and indexing
     fakeMimeTypes.length = 4;
     Object.defineProperty(navigator, 'mimeTypes', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.mimeTypes',
@@ -907,7 +952,7 @@
           timestamp: Date.now()
         });
         return fakeMimeTypes;
-      },
+      }, 'mimeTypes'),
       configurable: true
     });
   } catch (e) {
@@ -918,7 +963,7 @@
   try {
     const vendorValue = config.vendor || 'Google Inc.';
     Object.defineProperty(navigator, 'vendor', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.vendor',
@@ -927,7 +972,7 @@
           timestamp: Date.now()
         });
         return vendorValue;
-      },
+      }, 'vendor'),
       configurable: true
     });
   } catch (e) {
@@ -938,7 +983,7 @@
   try {
     const maxTouchPointsValue = config.hardware?.maxTouchPoints ?? 0;
     Object.defineProperty(navigator, 'maxTouchPoints', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.maxTouchPoints',
@@ -947,7 +992,7 @@
           timestamp: Date.now()
         });
         return maxTouchPointsValue;
-      },
+      }, 'maxTouchPoints'),
       configurable: true
     });
   } catch (e) {
@@ -957,7 +1002,7 @@
   // 6. navigator.pdfViewerEnabled - Should be true for Chrome
   try {
     Object.defineProperty(navigator, 'pdfViewerEnabled', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.pdfViewerEnabled',
@@ -966,7 +1011,7 @@
           timestamp: Date.now()
         });
         return true;
-      },
+      }, 'pdfViewerEnabled'),
       configurable: true
     });
   } catch (e) {
@@ -976,7 +1021,7 @@
   // 7. navigator.cookieEnabled - Should be true
   try {
     Object.defineProperty(navigator, 'cookieEnabled', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.cookieEnabled',
@@ -985,7 +1030,7 @@
           timestamp: Date.now()
         });
         return true;
-      },
+      }, 'cookieEnabled'),
       configurable: true
     });
   } catch (e) {
@@ -996,7 +1041,7 @@
   try {
     const spoofedUserAgent = config.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
     Object.defineProperty(navigator, 'userAgent', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.userAgent',
@@ -1005,7 +1050,7 @@
           timestamp: Date.now()
         });
         return spoofedUserAgent;
-      },
+      }, 'userAgent'),
       configurable: true
     });
   } catch (e) {
@@ -1016,7 +1061,7 @@
   try {
     const languageValue = config.language || 'en-US';
     Object.defineProperty(navigator, 'language', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.language',
@@ -1025,7 +1070,7 @@
           timestamp: Date.now()
         });
         return languageValue;
-      },
+      }, 'language'),
       configurable: true
     });
   } catch (e) {
@@ -1036,7 +1081,7 @@
   try {
     const platformValue = config.platform || 'Win32';
     Object.defineProperty(navigator, 'platform', {
-      get: function() {
+      get: makeNativeGetter(function() {
         logEvent({
           type: 'headless_mitigation',
           method: 'navigator.platform',
@@ -1045,7 +1090,7 @@
           timestamp: Date.now()
         });
         return platformValue;
-      },
+      }, 'platform'),
       configurable: true
     });
   } catch (e) {
@@ -1057,7 +1102,7 @@
     if (typeof Notification !== 'undefined') {
       // eslint-disable-next-line no-undef
       Object.defineProperty(Notification, 'permission', {
-        get: function() {
+        get: makeNativeGetter(function() {
           logEvent({
             type: 'headless_mitigation',
             method: 'Notification.permission',
@@ -1066,7 +1111,7 @@
             timestamp: Date.now()
           });
           return 'default';
-        },
+        }, 'permission'),
         configurable: true
       });
     }

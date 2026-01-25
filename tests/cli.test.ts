@@ -378,7 +378,7 @@ describe('Instrumentation Injection', () => {
 
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(8); // bridge + bootstrap + network + storage + clipboard + download + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(9); // playwright globals + bridge + bootstrap + network + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -432,7 +432,7 @@ describe('Instrumentation Injection', () => {
 
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(7); // bridge + bootstrap + storage + clipboard + download + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(8); // playwright globals + bridge + bootstrap + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -536,7 +536,7 @@ describe('Instrumentation Injection', () => {
 
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
 
-    expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor (clipboard disabled)
+    expect(addInitScript).toHaveBeenCalledTimes(5); // playwright globals + bridge + bootstrap + config + performanceMonitor (clipboard disabled)
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );

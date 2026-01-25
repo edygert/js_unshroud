@@ -370,24 +370,56 @@ async function injectInstrumentation(
     }
   });
 
+  // Make Playwright-exposed functions non-enumerable to hide them from detection
+  await page.addInitScript({
+    content: `
+      if (typeof window.__playwright_log_event !== 'undefined') {
+        Object.defineProperty(window, '__playwright_log_event', {
+          value: window.__playwright_log_event,
+          writable: false,
+          enumerable: false,  // Hide from Object.keys()
+          configurable: false
+        });
+      }
+      if (typeof window.__playwright_save_artifact !== 'undefined') {
+        Object.defineProperty(window, '__playwright_save_artifact', {
+          value: window.__playwright_save_artifact,
+          writable: false,
+          enumerable: false,  // Hide from Object.keys()
+          configurable: false
+        });
+      }
+    `
+  });
+
   // Install bridge connector BEFORE bootstrap loads
   // This overrides the silent no-op in bootstrap.js with a working implementation
   await page.addInitScript({
     content: `
-      window.__js_unshroud_log = function(data) {
-        if (window.__playwright_log_event) {
-          window.__playwright_log_event(data).catch(function(err) {
-            // Error handler - can't use console.log here due to recursion
-          });
-        }
-      };
-      window.__js_unshroud_save_artifact = function(artifactData) {
-        if (window.__playwright_save_artifact) {
-          window.__playwright_save_artifact(JSON.stringify(artifactData)).catch(function(err) {
-            // Error handler - silent failure
-          });
-        }
-      };
+      Object.defineProperty(window, '__js_unshroud_log', {
+        value: function(data) {
+          if (window.__playwright_log_event) {
+            window.__playwright_log_event(data).catch(function(err) {
+              // Error handler - can't use console.log here due to recursion
+            });
+          }
+        },
+        writable: true,
+        enumerable: false,  // Hidden from Object.keys()
+        configurable: false
+      });
+      Object.defineProperty(window, '__js_unshroud_save_artifact', {
+        value: function(artifactData) {
+          if (window.__playwright_save_artifact) {
+            window.__playwright_save_artifact(JSON.stringify(artifactData)).catch(function(err) {
+              // Error handler - silent failure
+            });
+          }
+        },
+        writable: true,
+        enumerable: false,  // Hidden from Object.keys()
+        configurable: false
+      });
     `
   });
 
@@ -397,32 +429,47 @@ async function injectInstrumentation(
   // Set up config BEFORE performance monitor and other hooks
   await page.addInitScript({
     content: `
-      window.__js_unshroud_config = ${JSON.stringify({
-        dedupeWindowMs: config.dedupeWindowMs,
-        maxPayloadSize: config.maxPayloadSize,
-        maxStackDepth: config.maxStackDepth,
-        enableDeduplication: config.enableDeduplication,
-        enableServiceWorker: config.enableServiceWorker,
-        enableCodeExecution: config.enableCodeExecution,
-        enableEncoding: config.enableEncoding,
-        enableEventHandlers: config.enableEventHandlers,
-        enableBlobTracking: config.enableBlobTracking,
-        enableURLExecution: config.enableURLExecution,
-        enableClipboard: config.enableClipboard,
-        clipboardPatternDetection: config.clipboardPatternDetection,
-        enableDownloadDetection: config.enableDownloadDetection,
-        enableArtifactCollection: config.enableArtifactCollection ?? false,
-        eventFiltering: config.eventFiltering,
-        debug: config.debug ?? false
-      })};
-      window.__js_unshroud_session_id = '${sessionId}';
+      Object.defineProperty(window, '__js_unshroud_config', {
+        value: ${JSON.stringify({
+          dedupeWindowMs: config.dedupeWindowMs,
+          maxPayloadSize: config.maxPayloadSize,
+          maxStackDepth: config.maxStackDepth,
+          enableDeduplication: config.enableDeduplication,
+          enableServiceWorker: config.enableServiceWorker,
+          enableCodeExecution: config.enableCodeExecution,
+          enableEncoding: config.enableEncoding,
+          enableEventHandlers: config.enableEventHandlers,
+          enableBlobTracking: config.enableBlobTracking,
+          enableURLExecution: config.enableURLExecution,
+          enableClipboard: config.enableClipboard,
+          clipboardPatternDetection: config.clipboardPatternDetection,
+          enableDownloadDetection: config.enableDownloadDetection,
+          enableArtifactCollection: config.enableArtifactCollection ?? false,
+          eventFiltering: config.eventFiltering,
+          debug: config.debug ?? false
+        })},
+        writable: true,
+        enumerable: false,  // Hidden from Object.keys()
+        configurable: false
+      });
+      Object.defineProperty(window, '__js_unshroud_session_id', {
+        value: '${sessionId}',
+        writable: true,
+        enumerable: false,  // Hidden from Object.keys()
+        configurable: false
+      });
     `
   });
 
   // Inject headless mitigation config if enabled
   if (config.enableHeadlessMitigation && headlessConfig) {
     await page.addInitScript({
-      content: `window.__js_unshroud_headless_config = ${JSON.stringify(headlessConfig)};`
+      content: `Object.defineProperty(window, '__js_unshroud_headless_config', {
+        value: ${JSON.stringify(headlessConfig)},
+        writable: true,
+        enumerable: false,  // Hidden from Object.keys()
+        configurable: false
+      });`
     });
   }
 

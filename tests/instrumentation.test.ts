@@ -782,7 +782,7 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       await page.close();
     });
 
-    test('should override permissions.query to return granted', async () => {
+    test('should override permissions.query to return prompt', async () => {
       page = await browser.newPage();
 
       const events: any[] = [];
@@ -805,12 +805,12 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
         return permission.state;
       });
 
-      expect(permissionResult).toBe('granted');
+      expect(permissionResult).toBe('prompt');
 
       const mitigationEvents = events.filter(e => e.type === 'headless_mitigation' && e.method === 'navigator.permissions.query');
       expect(mitigationEvents.length).toBeGreaterThan(0);
       expect(mitigationEvents[0].operation).toBe('permission_override');
-      expect(mitigationEvents[0].newState).toBe('granted');
+      expect(mitigationEvents[0].newState).toBe('prompt');
       await page.close();
     });
 
