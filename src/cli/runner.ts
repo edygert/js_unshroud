@@ -1140,15 +1140,10 @@ async function runMonitoring(args: Args): Promise<void> {
       // Apply additional headers for subrequests (fallback)
       await page.setExtraHTTPHeaders(spoofedHeaders);
 
-      // Remove webdriver property detection
-      await page.addInitScript({
-        content: `
-          Object.defineProperty(navigator, 'webdriver', {
-            get: () => false,
-            configurable: true
-          });
-        `
-      });
+      // Note: navigator.webdriver is prevented from being created by the
+      // --disable-blink-features=AutomationControlled flag at browser launch.
+      // We intentionally do NOT override it here, as creating the property
+      // (even with a getter returning false) makes it detectable by _.has() checks.
     }
 
     await injectInstrumentation(page, config, sessionId, eventLogger, artifactCollector, logger, headlessConfig);

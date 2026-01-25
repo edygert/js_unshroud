@@ -111,33 +111,14 @@
     window.__js_unshroud_debug('[JS Unshroud] Could not fix broken image dimensions:', e.message);
   }
 
-  // 1. Navigator.webdriver override - The most common headless detection method
-  try {
-    Object.defineProperty(window.navigator, 'webdriver', {
-      get: function() {
-        logEvent({
-          type: 'headless_mitigation',
-          method: 'navigator.webdriver',
-          operation: 'value_override',
-          originalValue: true,
-          newValue: false,
-          timestamp: Date.now()
-        });
-        return false; // Override to false
-      },
-      set: function() {
-        // Allow setting but log it
-        logEvent({
-          type: 'headless_mitigation',
-          method: 'navigator.webdriver',
-          operation: 'set_attempt',
-          timestamp: Date.now()
-        });
-      }
-    });
-  } catch (e) {
-    window.__js_unshroud_debug('[JS Unshroud] Could not override navigator.webdriver:', e.message);
-  }
+  // 1. Navigator.webdriver - INTENTIONALLY NOT OVERRIDDEN
+  // The --disable-blink-features=AutomationControlled flag (set in runner.ts) prevents
+  // Chromium from creating navigator.webdriver at all. By NOT creating an override here,
+  // the property remains undefined, which defeats both direct checks (navigator.webdriver)
+  // AND existence checks like _.has(navigator, "webdriver").
+  //
+  // Trade-off: We lose the ability to log when malware checks this property, but gain
+  // complete evasion of property existence detection (_.has, 'webdriver' in navigator, etc.)
 
   // 2. Hardware concurrency - Headless browsers often have unrealistic values
   try {
