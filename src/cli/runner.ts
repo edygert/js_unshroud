@@ -1108,7 +1108,7 @@ async function runMonitoring(args: Args): Promise<void> {
   
   // Launch browser with headless mitigation settings
   const browser = await chromium.launch({ 
-    headless: true,
+    headless: false,
     args: useHeadlessMitigation 
       ? ['--disable-blink-features=AutomationControlled']
       : []
