@@ -130,6 +130,29 @@ export class EventLogger {
     await Promise.all(events.map(event => this.logEvent(event)));
   }
 
+  /**
+   * Flush any buffered writes to disk
+   * Critical: Ensures all pending writes complete before close()
+   */
+  async flush(): Promise<void> {
+    if (this.closed || !this.writeStream) {
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      // Cork/uncork pattern forces immediate flush
+      this.writeStream!.cork();
+      this.writeStream!.uncork();
+
+      // Wait for drain event (stream fully flushed)
+      if (this.writeStream!.writableNeedDrain) {
+        this.writeStream!.once('drain', () => resolve());
+      } else {
+        resolve();
+      }
+    });
+  }
+
   getEventCount(): number {
     return this.eventCount;
   }

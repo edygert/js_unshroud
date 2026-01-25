@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { EventLogger } from '../orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../orchestrator/CDPSessionManager.ts';
 import { ArtifactCollector, type ArtifactConfig } from '../orchestrator/ArtifactCollector.ts';
@@ -1217,16 +1217,23 @@ async function runMonitoring(args: Args): Promise<void> {
     if (artifactCollector.isEnabled() && artifactConfig.types.pageSnapshot) {
       try {
         const htmlContent = await page.content();
+
+        // Warn if snapshot is empty
+        if (!htmlContent || htmlContent.trim().length === 0) {
+          logger.warn('Warning: Initial page snapshot is empty - page may not have loaded properly');
+        }
+
         const pageTitle = await page.title();
         const captureTime = Date.now();
 
-        // Create page snapshot event
+        // Create page snapshot event (initial state)
         const snapshotEvent = createEvent<PageSnapshotEvent>(sessionId, undefined, {
           type: 'page_snapshot',
           url: args.url,
           title: pageTitle,
           htmlLength: Buffer.byteLength(htmlContent, 'utf-8'),
-          captureTime: captureTime
+          captureTime: captureTime,
+          snapshotStage: 'initial'
         });
 
         // Save HTML content as artifact
@@ -1241,10 +1248,15 @@ async function runMonitoring(args: Args): Promise<void> {
         if (artifactPath) {
           snapshotEvent.artifactPath = artifactPath;
           await eventLogger.logEvent(snapshotEvent);
-          logger.log(`Page snapshot saved: ${artifactPath}`);
+          logger.log(`Initial page snapshot saved: ${artifactPath}`);
+
+          // Verify file was written
+          if (!existsSync(artifactPath)) {
+            logger.warn(`Warning: Initial snapshot file not found after write: ${artifactPath}`);
+          }
         }
       } catch (error) {
-        logger.error('Failed to capture page snapshot:', error);
+        logger.error('Failed to capture initial page snapshot:', error);
       }
     }
 
@@ -1265,6 +1277,12 @@ async function runMonitoring(args: Args): Promise<void> {
     if (artifactCollector.isEnabled() && artifactConfig.types.pageSnapshot) {
       try {
         const htmlContent = await page.content();
+
+        // Warn if snapshot is empty
+        if (!htmlContent || htmlContent.trim().length === 0) {
+          logger.warn('Warning: Final page snapshot is empty - page may have unloaded');
+        }
+
         const pageTitle = await page.title();
         const captureTime = Date.now();
 
@@ -1274,7 +1292,8 @@ async function runMonitoring(args: Args): Promise<void> {
           url: args.url,
           title: pageTitle,
           htmlLength: Buffer.byteLength(htmlContent, 'utf-8'),
-          captureTime: captureTime
+          captureTime: captureTime,
+          snapshotStage: 'final'
         });
 
         // Save HTML content as artifact (final state)
@@ -1289,7 +1308,16 @@ async function runMonitoring(args: Args): Promise<void> {
         if (artifactPath) {
           finalSnapshotEvent.artifactPath = artifactPath;
           await eventLogger.logEvent(finalSnapshotEvent);
-          logger.log(`Final page snapshot saved: ${artifactPath}`);
+
+          // CRITICAL: Flush logger to ensure write completes before cleanup
+          await eventLogger.flush();
+
+          // Verify file was written before cleanup starts
+          if (!existsSync(artifactPath)) {
+            logger.error(`ERROR: Final snapshot file not found after write: ${artifactPath}`);
+          } else {
+            logger.log(`Final page snapshot saved and verified: ${artifactPath}`);
+          }
         }
       } catch (error) {
         logger.error('Failed to capture final page snapshot:', error);

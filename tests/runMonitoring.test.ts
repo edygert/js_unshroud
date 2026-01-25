@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { runMonitoring } from '../src/cli/runner.ts';
-import { readFileSync, unlinkSync, existsSync } from 'fs';
+import { readFileSync, unlinkSync, existsSync, writeFileSync, rmSync } from 'fs';
 import { resolve } from 'path';
 
 describe('runMonitoring Function', () => {
@@ -278,4 +278,102 @@ describe('Main Function Entry Point', () => {
 
     expect(events.length).toBeGreaterThan(0);
   }, 15000);
+});
+
+describe('Page Snapshot Dual-Save', () => {
+  test('should capture both initial and final page snapshots with distinct stages', async () => {
+    const artifactsDir = `/tmp/artifacts-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create temp config file with artifact collection enabled
+    const configPath = `/tmp/snapshot-test-config-${Date.now()}.json`;
+    const testConfig = {
+      artifactCollection: {
+        enabled: true,
+        baseDirectory: artifactsDir,
+        types: {
+          pageSnapshot: true,
+          downloads: false,
+          codeExecution: false,
+          encoding: false,
+          cryptojs: false,
+          clipboard: false,
+          workers: false,
+          iframes: false
+        }
+      },
+      monitoringTimeoutSeconds: 3
+    };
+    writeFileSync(configPath, JSON.stringify(testConfig));
+
+    const tempOutputFile = `/tmp/test-output-snapshots-${Date.now()}.jsonl`;
+    const args = {
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
+      out: tempOutputFile,
+      config: configPath
+    };
+
+    try {
+      await runMonitoring(args);
+
+      // Read events from JSONL output
+      expect(existsSync(tempOutputFile)).toBe(true);
+      const loggedData = readFileSync(tempOutputFile, 'utf-8');
+      const events = loggedData.trim().split('\n').map(line => JSON.parse(line));
+
+      // Find snapshot events
+      const snapshotEvents = events.filter(e => e.type === 'page_snapshot');
+
+      // Should have exactly 2 snapshots
+      expect(snapshotEvents.length).toBe(2);
+
+      // Should have one initial and one final
+      const initialSnapshot = snapshotEvents.find(e => e.snapshotStage === 'initial');
+      const finalSnapshot = snapshotEvents.find(e => e.snapshotStage === 'final');
+
+      expect(initialSnapshot).toBeDefined();
+      expect(finalSnapshot).toBeDefined();
+
+      // Verify both have artifact paths
+      expect(initialSnapshot.artifactPath).toBeDefined();
+      expect(finalSnapshot.artifactPath).toBeDefined();
+
+      // Verify paths are different
+      expect(initialSnapshot.artifactPath).not.toBe(finalSnapshot.artifactPath);
+
+      // Verify filenames contain stage markers
+      expect(initialSnapshot.artifactPath).toContain('_initial.html');
+      expect(finalSnapshot.artifactPath).toContain('_final.html');
+
+      // Verify initial snapshot was captured before final
+      expect(initialSnapshot.timestamp).toBeLessThan(finalSnapshot.timestamp);
+      expect(initialSnapshot.captureTime).toBeLessThan(finalSnapshot.captureTime);
+
+      // CRITICAL: Verify both artifact files actually exist on disk
+      expect(existsSync(initialSnapshot.artifactPath)).toBe(true);
+      expect(existsSync(finalSnapshot.artifactPath)).toBe(true);
+
+      // Verify files have content (not empty)
+      const initialContent = readFileSync(initialSnapshot.artifactPath, 'utf-8');
+      const finalContent = readFileSync(finalSnapshot.artifactPath, 'utf-8');
+
+      expect(initialContent.length).toBeGreaterThan(0);
+      expect(finalContent.length).toBeGreaterThan(0);
+
+      // Both should be valid HTML
+      expect(initialContent).toContain('<html');
+      expect(finalContent).toContain('<html');
+
+    } finally {
+      // Cleanup
+      try {
+        unlinkSync(tempOutputFile);
+        unlinkSync(configPath);
+        if (existsSync(artifactsDir)) {
+          rmSync(artifactsDir, { recursive: true, force: true });
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }, 30000);
 });

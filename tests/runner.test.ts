@@ -133,6 +133,54 @@ describe('EventLogger', () => {
     // Should be able to get final count
     expect(logger.getEventCount()).toBe(1);
   });
+
+  test('should flush pending writes successfully', async () => {
+    const config: SessionConfig = {
+      id: 'test-session-flush',
+      url: 'http://example.com',
+      startTime: Date.now(),
+      outputPath: `/tmp/test-flush-${Date.now()}.jsonl`
+    };
+
+    const logger = new EventLogger(config);
+
+    // Log an event
+    const event = createEvent<ConsoleEvent>('test-session-flush', undefined, {
+      type: 'console',
+      level: 'log',
+      message: 'Test message',
+      args: []
+    });
+    await logger.logEvent(event);
+
+    // Flush should complete without error
+    await logger.flush();
+
+    // Close the logger
+    await logger.close();
+
+    expect(logger.getEventCount()).toBe(1);
+  });
+
+  test('should handle flush on closed logger safely', async () => {
+    const config: SessionConfig = {
+      id: 'test-session-closed-flush',
+      url: 'http://example.com',
+      startTime: Date.now(),
+      outputPath: `/tmp/test-closed-flush-${Date.now()}.jsonl`
+    };
+
+    const logger = new EventLogger(config);
+
+    // Close the logger first
+    await logger.close();
+
+    // Flush on closed logger should be a no-op (no error)
+    await logger.flush();
+
+    // Should succeed without throwing
+    expect(logger.getEventCount()).toBe(0);
+  });
 });
 
 describe('Schema validation', () => {

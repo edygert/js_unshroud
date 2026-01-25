@@ -1,6 +1,6 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { MonitoringEvent, SessionConfig, DownloadEvent } from '../schema/types.ts';
+import type { MonitoringEvent, SessionConfig, DownloadEvent, PageSnapshotEvent } from '../schema/types.ts';
 
 export interface ArtifactConfig {
   enabled: boolean;
@@ -87,7 +87,16 @@ export class ArtifactCollector {
     try {
       // Generate artifact filename
       const artifactId = event.id;
-      const filename = `${artifactId}.${artifactData.extension}`;
+
+      // Include stage in filename for page snapshots
+      let filename: string;
+      if (artifactData.type === 'page_snapshot') {
+        const snapshotEvent = event as PageSnapshotEvent;
+        filename = `${artifactId}_${snapshotEvent.snapshotStage}.${artifactData.extension}`;
+      } else {
+        filename = `${artifactId}.${artifactData.extension}`;
+      }
+
       const subdirMap: Record<string, string> = {
         page_snapshot: 'page_snapshot',
         download: 'downloads',

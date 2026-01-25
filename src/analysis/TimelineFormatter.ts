@@ -196,7 +196,8 @@ export class TimelineFormatter {
 
       case 'page_snapshot': {
         const snapshotEvent = event;
-        return `Page Snapshot: ${snapshotEvent.url} (${snapshotEvent.htmlLength} bytes)${snapshotEvent.title ? ` - ${snapshotEvent.title}` : ''}`;
+        const stage = `${snapshotEvent.snapshotStage.charAt(0).toUpperCase() + snapshotEvent.snapshotStage.slice(1)} `;
+        return `${stage}Page Snapshot: ${snapshotEvent.url} (${snapshotEvent.htmlLength} bytes)${snapshotEvent.title ? ` - ${snapshotEvent.title}` : ''}`;
       }
 
       case 'download': {

@@ -194,7 +194,8 @@ describe('ArtifactCollector', () => {
         type: 'page_snapshot',
         url: 'https://example.com',
         htmlLength: 100,
-        captureTime: Date.now()
+        captureTime: Date.now(),
+        snapshotStage: 'initial'
       });
 
       const content = '<html><body>Test</body></html>';
@@ -220,7 +221,8 @@ describe('ArtifactCollector', () => {
         type: 'page_snapshot',
         url: 'https://example.com',
         htmlLength: 100,
-        captureTime: Date.now()
+        captureTime: Date.now(),
+        snapshotStage: 'final'
       });
 
       const content = '<html><body>Test</body></html>';
@@ -248,6 +250,111 @@ describe('ArtifactCollector', () => {
       });
       expect(metadata.originalSize).toBeGreaterThan(0);
       expect(metadata.savedSize).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Page Snapshot Stage Differentiation', () => {
+    test('should include stage in filename for initial snapshot', async () => {
+      const sessionConfig = createTestSessionConfig();
+      const artifactConfig = createTestArtifactConfig();
+      const collector = new ArtifactCollector(sessionConfig, artifactConfig);
+      await collector.initialize();
+
+      const initialEvent = createEvent<PageSnapshotEvent>(sessionConfig.id, undefined, {
+        type: 'page_snapshot',
+        url: 'https://example.com',
+        htmlLength: 100,
+        captureTime: Date.now(),
+        snapshotStage: 'initial'
+      });
+
+      const initialPath = await collector.saveArtifact(initialEvent, {
+        type: 'page_snapshot',
+        content: '<html><body>Initial</body></html>',
+        extension: 'html',
+        mimeType: 'text/html'
+      });
+
+      // Verify filename contains stage
+      expect(initialPath).toContain('_initial.html');
+      expect(initialPath).toContain('page_snapshot/');
+    });
+
+    test('should include stage in filename for final snapshot', async () => {
+      const sessionConfig = createTestSessionConfig();
+      const artifactConfig = createTestArtifactConfig();
+      const collector = new ArtifactCollector(sessionConfig, artifactConfig);
+      await collector.initialize();
+
+      const finalEvent = createEvent<PageSnapshotEvent>(sessionConfig.id, undefined, {
+        type: 'page_snapshot',
+        url: 'https://example.com',
+        htmlLength: 150,
+        captureTime: Date.now(),
+        snapshotStage: 'final'
+      });
+
+      const finalPath = await collector.saveArtifact(finalEvent, {
+        type: 'page_snapshot',
+        content: '<html><body>Final - Modified</body></html>',
+        extension: 'html',
+        mimeType: 'text/html'
+      });
+
+      // Verify filename contains stage
+      expect(finalPath).toContain('_final.html');
+      expect(finalPath).toContain('page_snapshot/');
+    });
+
+    test('should save initial and final snapshots with different filenames', async () => {
+      const sessionConfig = createTestSessionConfig();
+      const artifactConfig = createTestArtifactConfig();
+      const collector = new ArtifactCollector(sessionConfig, artifactConfig);
+      await collector.initialize();
+
+      // Create initial snapshot
+      const initialEvent = createEvent<PageSnapshotEvent>(sessionConfig.id, undefined, {
+        type: 'page_snapshot',
+        url: 'https://example.com',
+        htmlLength: 100,
+        captureTime: Date.now(),
+        snapshotStage: 'initial'
+      });
+
+      const initialPath = await collector.saveArtifact(initialEvent, {
+        type: 'page_snapshot',
+        content: '<html><body>Initial</body></html>',
+        extension: 'html',
+        mimeType: 'text/html'
+      });
+
+      // Create final snapshot
+      const finalEvent = createEvent<PageSnapshotEvent>(sessionConfig.id, undefined, {
+        type: 'page_snapshot',
+        url: 'https://example.com',
+        htmlLength: 150,
+        captureTime: Date.now() + 5000,
+        snapshotStage: 'final'
+      });
+
+      const finalPath = await collector.saveArtifact(finalEvent, {
+        type: 'page_snapshot',
+        content: '<html><body>Final - Modified by malware</body></html>',
+        extension: 'html',
+        mimeType: 'text/html'
+      });
+
+      // Verify both paths are different
+      expect(initialPath).toBeDefined();
+      expect(finalPath).toBeDefined();
+      expect(initialPath).not.toBe(finalPath);
+
+      // Verify filenames contain appropriate stages
+      expect(initialPath).toContain('_initial.html');
+      expect(finalPath).toContain('_final.html');
+
+      // Verify both files were written (2 snapshots × 2 files each = content + metadata)
+      expect(fs.writeFile).toHaveBeenCalledTimes(4);
     });
   });
 

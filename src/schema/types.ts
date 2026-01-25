@@ -299,6 +299,7 @@ export interface PageSnapshotEvent extends BaseEvent {
   htmlLength: number;         // Length of HTML content in bytes
   captureTime: number;        // Timestamp when snapshot was captured
   artifactPath?: string;      // Path to saved artifact file (populated by ArtifactCollector)
+  snapshotStage: 'initial' | 'final';  // Stage when snapshot was captured (initial after load, final before cleanup)
 }
 
 export interface DownloadEvent extends BaseEvent {
