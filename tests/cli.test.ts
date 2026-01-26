@@ -15,6 +15,16 @@ import { EventLogger } from '../src/orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../src/orchestrator/CDPSessionManager.ts';
 import type { InstrumentationConfig, SessionConfig } from '../src/schema/types.ts';
 
+// Helper to create a mock CDPSessionManager for testing
+function createMockCdpManager() {
+  return {
+    setupLoggingBridge: vi.fn().mockResolvedValue({
+      logBindingName: '__zone_symbol__messageHandler',
+      artifactBindingName: '__zone_symbol__dataChannel'
+    })
+  } as unknown as CDPSessionManager;
+}
+
 describe('CLI Argument Parsing', () => {
   test('should parse required arguments --url and --out', () => {
     process.argv = ['node', 'runner.ts', '--url', 'https://example.com', '--out', '/tmp/test.jsonl'];
@@ -376,9 +386,10 @@ describe('Instrumentation Injection', () => {
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
+    const mockCdpManager = createMockCdpManager();
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger, mockCdpManager);
 
-    expect(addInitScript).toHaveBeenCalledTimes(9); // playwright globals + bridge + bootstrap + network + storage + clipboard + download + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(8); // bridge + bootstrap + network + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -418,8 +429,7 @@ describe('Instrumentation Injection', () => {
     };
 
     const addInitScript = vi.fn();
-    const exposeFunction = vi.fn();
-    const page = { addInitScript, exposeFunction } as any;
+    const page = { addInitScript } as any;
 
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
@@ -430,9 +440,10 @@ describe('Instrumentation Injection', () => {
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
+    const mockCdpManager = createMockCdpManager();
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger, mockCdpManager);
 
-    expect(addInitScript).toHaveBeenCalledTimes(8); // playwright globals + bridge + bootstrap + storage + clipboard + download + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(7); // bridge + bootstrap + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -472,8 +483,7 @@ describe('Instrumentation Injection', () => {
     };
 
     const addInitScript = vi.fn().mockRejectedValueOnce(new Error('Injection failed'));
-    const exposeFunction = vi.fn();
-    const page = { addInitScript, exposeFunction } as any;
+    const page = { addInitScript } as any;
 
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
@@ -484,8 +494,10 @@ describe('Instrumentation Injection', () => {
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
+    const mockCdpManager = createMockCdpManager();
+
     // Should rethrow the error
-    await expect(injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger)).rejects.toThrow('Injection failed');
+    await expect(injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger, mockCdpManager)).rejects.toThrow('Injection failed');
   });
 
   test('should handle minimal config with only bootstrap', async () => {
@@ -522,8 +534,7 @@ describe('Instrumentation Injection', () => {
     };
 
     const addInitScript = vi.fn();
-    const exposeFunction = vi.fn();
-    const page = { addInitScript, exposeFunction } as any;
+    const page = { addInitScript } as any;
 
     // Mock eventLogger
     const mockEventLogger = { logEvent: vi.fn() } as any;
@@ -534,9 +545,10 @@ describe('Instrumentation Injection', () => {
     // Mock logger
     const mockLogger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
-    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger);
+    const mockCdpManager = createMockCdpManager();
+    await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger, mockCdpManager);
 
-    expect(addInitScript).toHaveBeenCalledTimes(5); // playwright globals + bridge + bootstrap + config + performanceMonitor (clipboard disabled)
+    expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor (no exposeFunction needed)
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -761,7 +773,7 @@ describe('End-to-End Integration Tests', () => {
       const mockArtifactCollector = { saveArtifact: vi.fn() } as any;
 
       // Inject instrumentation scripts
-      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger, cdpManager);
 
       // Navigate to test page
       await page.goto(sessionConfig.url, {
@@ -821,7 +833,7 @@ describe('End-to-End Integration Tests', () => {
     try {
       const cdpManager = new CDPSessionManager(page, eventLogger, sessionConfig.id);
       await cdpManager.initialize(page);
-      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger);
+      await injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger, cdpManager);
 
       // This should fail with navigation error
 
@@ -887,7 +899,7 @@ describe('End-to-End Integration Tests', () => {
 
       const config = loadInstrumentationConfig();
 
-      await expect(injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger)).rejects.toThrow('Script injection failed');
+      await expect(injectInstrumentation(page, config, sessionConfig.id, eventLogger, mockArtifactCollector, mockLogger, cdpManager)).rejects.toThrow('Script injection failed');
 
     } finally {
       await performCleanup(browser, eventLogger, mockLogger);

@@ -304,6 +304,7 @@ async function injectInstrumentation(
   eventLogger: EventLogger,
   artifactCollector: ArtifactCollector,
   logger: Logger,
+  cdpManager: CDPSessionManager,
   headlessConfig?: HeadlessMitigationConfig
 ): Promise<{
   bootstrap: string;
@@ -330,74 +331,69 @@ async function injectInstrumentation(
 }> {
   const scripts = loadInstrumentationScripts(config);
 
-  // CRITICAL: Set up browser-to-Node.js logging bridge BEFORE bootstrap loads
-  // This fixes the bug where instrumentation hooks were silent no-ops
-  await page.exposeFunction('__playwright_log_event', async (eventJson: string) => {
-    try {
-      const event = JSON.parse(eventJson) as unknown;
-      if (validateEvent(event)) {
-        await eventLogger.logEvent(event);
-      } else {
-        logger.warn('[JS Unshroud] Invalid event received from instrumentation:' + eventJson.substring(0, 200));
+  // CRITICAL: Set up browser-to-Node.js logging bridge using CDP Runtime.addBinding
+  // This avoids creating __playwright__binding__ which is detected by bot detection scripts
+  // The binding names mimic Zone.js (Angular) patterns to blend in with common frameworks
+  const { logBindingName, artifactBindingName } = await cdpManager.setupLoggingBridge(
+    // Log event handler
+    async (eventJson: string) => {
+      try {
+        const event = JSON.parse(eventJson) as unknown;
+        if (validateEvent(event)) {
+          await eventLogger.logEvent(event);
+        } else {
+          logger.warn('[JS Unshroud] Invalid event received from instrumentation:' + eventJson.substring(0, 200));
+        }
+      } catch (error) {
+        logger.error('[JS Unshroud] Failed to parse instrumentation event:', error);
       }
-    } catch (error) {
-      logger.error('[JS Unshroud] Failed to parse instrumentation event:', error);
-    }
-  });
+    },
+    // Artifact save handler
+    async (artifactJson: string) => {
+      try {
+        const artifact = JSON.parse(artifactJson) as {
+          event: MonitoringEvent;
+          type: string;
+          content: string;
+          extension: string;
+          mimeType?: string;
+        };
+        const artifactPath = await artifactCollector.saveArtifact(artifact.event, {
+          type: artifact.type,
+          content: artifact.content,
+          extension: artifact.extension,
+          ...(artifact.mimeType !== undefined && { mimeType: artifact.mimeType })
+        });
 
-  // Set up artifact saving bridge (if artifact collection is enabled)
-  await page.exposeFunction('__playwright_save_artifact', async (artifactJson: string) => {
-    try {
-      const artifact = JSON.parse(artifactJson) as {
-        event: MonitoringEvent;
-        type: string;
-        content: string;
-        extension: string;
-        mimeType?: string;
-      };
-      const artifactPath = await artifactCollector.saveArtifact(artifact.event, {
-        type: artifact.type,
-        content: artifact.content,
-        extension: artifact.extension,
-        ...(artifact.mimeType !== undefined && { mimeType: artifact.mimeType })
-      });
-
-      // If artifact was saved, update event with path and log it
-      if (artifactPath) {
-        const updatedEvent = { ...artifact.event, artifactPath };
-        await eventLogger.logEvent(updatedEvent);
+        // If artifact was saved, update event with path and log it
+        if (artifactPath) {
+          const updatedEvent = { ...artifact.event, artifactPath };
+          await eventLogger.logEvent(updatedEvent);
+        }
+      } catch (error) {
+        logger.error('[JS Unshroud] Failed to save artifact:', error);
       }
-    } catch (error) {
-      logger.error('[JS Unshroud] Failed to save artifact:', error);
     }
-  });
+  );
 
-  // Hide Playwright-exposed functions using closure pattern
-  // This prevents detection via direct property access (typeof window.__playwright_log_event)
-  // Note: Cannot delete __playwright__binding__ as it breaks Playwright internally
+  // Create internal bridge functions that use the CDP bindings
+  // The binding names are injected at runtime to avoid hardcoding detectable strings
   await page.addInitScript({
     content: `
       (function() {
-        // Store Playwright functions in closure (invisible from window scope)
-        const _playwrightLogEvent = window.__playwright_log_event;
-        const _playwrightSaveArtifact = window.__playwright_save_artifact;
+        // Get CDP binding references (created by Runtime.addBinding)
+        var logBinding = window['${logBindingName}'];
+        var artifactBinding = window['${artifactBindingName}'];
 
-        // Delete our exposed functions from window (safe to delete)
-        // This makes direct property access return undefined
-        delete window.__playwright_log_event;
-        delete window.__playwright_save_artifact;
-
-        // NOTE: Cannot delete __playwright__binding__ - breaks Playwright!
-        // Detection script checks: '__playwright__binding__' in window
-        // This will still return true - accepted limitation
-
-        // Create internal bridge functions using closure references
+        // Create internal bridge functions using the CDP bindings
         Object.defineProperty(window, '__js_unshroud_log', {
           value: function(data) {
-            if (_playwrightLogEvent) {
-              _playwrightLogEvent(data).catch(function() {
-                // Error handler - silent (can't use console.log due to recursion)
-              });
+            if (logBinding) {
+              try {
+                logBinding(data);
+              } catch (e) {
+                // Silent error handling
+              }
             }
           },
           writable: false,
@@ -407,10 +403,12 @@ async function injectInstrumentation(
 
         Object.defineProperty(window, '__js_unshroud_save_artifact', {
           value: function(artifactData) {
-            if (_playwrightSaveArtifact) {
-              _playwrightSaveArtifact(JSON.stringify(artifactData)).catch(function() {
-                // Error handler - silent
-              });
+            if (artifactBinding) {
+              try {
+                artifactBinding(JSON.stringify(artifactData));
+              } catch (e) {
+                // Silent error handling
+              }
             }
           },
           writable: false,
@@ -1194,7 +1192,7 @@ async function runMonitoring(args: Args): Promise<void> {
       // (even with a getter returning false) makes it detectable by _.has() checks.
     }
 
-    await injectInstrumentation(page, config, sessionId, eventLogger, artifactCollector, logger, headlessConfig);
+    await injectInstrumentation(page, config, sessionId, eventLogger, artifactCollector, logger, cdpManager, headlessConfig);
 
     // Navigate to the URL
     logger.log(`Navigating to ${args.url}...`);

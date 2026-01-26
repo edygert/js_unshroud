@@ -290,10 +290,52 @@ export class CDPSessionManager {
     }
   }
 
+  /**
+   * Set up logging bridge using CDP Runtime.addBinding instead of Playwright's exposeFunction.
+   * This avoids creating __playwright__binding__ which is detected by bot detection scripts.
+   *
+   * @param onLogEvent - Callback for log events from instrumentation
+   * @param onSaveArtifact - Callback for artifact save requests from instrumentation
+   * @returns Object containing the binding names to use in init scripts
+   */
+  async setupLoggingBridge(
+    onLogEvent: (eventJson: string) => Promise<void>,
+    onSaveArtifact: (artifactJson: string) => Promise<void>
+  ): Promise<{ logBindingName: string; artifactBindingName: string }> {
+    if (!this.cdpSession) {
+      throw new Error('CDP session not initialized');
+    }
+
+    // Use names that mimic common framework internals (Zone.js pattern from Angular)
+    // These blend in with legitimate globals on many websites
+    // Zone.js creates many __zone_symbol__* globals, so this pattern is common
+    const logBindingName = '__zone_symbol__messageHandler';
+    const artifactBindingName = '__zone_symbol__dataChannel';
+
+    // Register bindings via CDP (this does NOT create __playwright__binding__)
+    await this.cdpSession.send('Runtime.addBinding', { name: logBindingName });
+    await this.cdpSession.send('Runtime.addBinding', { name: artifactBindingName });
+
+    // Listen for binding calls
+    this.cdpSession.on('Runtime.bindingCalled', (params: Protocol.Runtime.BindingCalledEvent) => {
+      if (params.name === logBindingName) {
+        onLogEvent(params.payload).catch(() => {
+          // Silent error handling
+        });
+      } else if (params.name === artifactBindingName) {
+        onSaveArtifact(params.payload).catch(() => {
+          // Silent error handling
+        });
+      }
+    });
+
+    return { logBindingName, artifactBindingName };
+  }
+
   async disconnect(): Promise<void> {
     // Flush any pending event logs before disconnecting
     await this.flushPendingEvents();
-    
+
     // CDP cleanup is now handled automatically by browser.close()
     // Manual disconnect operations are unreliable and often hang
     if (this.cdpSession) {
