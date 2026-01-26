@@ -284,9 +284,11 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
     encoding: config.enableEncoding ? encodingScript : null,
     cryptojs: config.enableCryptoJS ? cryptojsScript : null,
     eventHandler: config.enableEventHandlers ? eventHandlerScript : null,
-    blobTracking: config.enableBlobTracking ? blobTrackingScript : null,
+    // Blob tracking needed for worker CDP mitigation (to capture blob content)
+    blobTracking: (config.enableBlobTracking || config.enableHeadlessMitigation) ? blobTrackingScript : null,
     urlExecution: config.enableURLExecution ? urlExecutionScript : null,
-    worker: config.enableWorkers ? workerScript : null,
+    // Worker hooks needed for CDP mitigation in workers (even if worker logging disabled)
+    worker: (config.enableWorkers || config.enableHeadlessMitigation) ? workerScript : null,
     module: config.enableModules ? moduleScript : null,
     iframe: config.enableIframes ? iframeScript : null,
     clipboard: config.enableClipboard ? clipboardScript : null,
@@ -370,56 +372,52 @@ async function injectInstrumentation(
     }
   });
 
-  // Make Playwright-exposed functions non-enumerable to hide them from detection
+  // Hide Playwright-exposed functions using closure pattern
+  // This prevents detection via direct property access (typeof window.__playwright_log_event)
+  // Note: Cannot delete __playwright__binding__ as it breaks Playwright internally
   await page.addInitScript({
     content: `
-      if (typeof window.__playwright_log_event !== 'undefined') {
-        Object.defineProperty(window, '__playwright_log_event', {
-          value: window.__playwright_log_event,
-          writable: false,
-          enumerable: false,  // Hide from Object.keys()
-          configurable: false
-        });
-      }
-      if (typeof window.__playwright_save_artifact !== 'undefined') {
-        Object.defineProperty(window, '__playwright_save_artifact', {
-          value: window.__playwright_save_artifact,
-          writable: false,
-          enumerable: false,  // Hide from Object.keys()
-          configurable: false
-        });
-      }
-    `
-  });
+      (function() {
+        // Store Playwright functions in closure (invisible from window scope)
+        const _playwrightLogEvent = window.__playwright_log_event;
+        const _playwrightSaveArtifact = window.__playwright_save_artifact;
 
-  // Install bridge connector BEFORE bootstrap loads
-  // This overrides the silent no-op in bootstrap.js with a working implementation
-  await page.addInitScript({
-    content: `
-      Object.defineProperty(window, '__js_unshroud_log', {
-        value: function(data) {
-          if (window.__playwright_log_event) {
-            window.__playwright_log_event(data).catch(function(err) {
-              // Error handler - can't use console.log here due to recursion
-            });
-          }
-        },
-        writable: true,
-        enumerable: false,  // Hidden from Object.keys()
-        configurable: false
-      });
-      Object.defineProperty(window, '__js_unshroud_save_artifact', {
-        value: function(artifactData) {
-          if (window.__playwright_save_artifact) {
-            window.__playwright_save_artifact(JSON.stringify(artifactData)).catch(function(err) {
-              // Error handler - silent failure
-            });
-          }
-        },
-        writable: true,
-        enumerable: false,  // Hidden from Object.keys()
-        configurable: false
-      });
+        // Delete our exposed functions from window (safe to delete)
+        // This makes direct property access return undefined
+        delete window.__playwright_log_event;
+        delete window.__playwright_save_artifact;
+
+        // NOTE: Cannot delete __playwright__binding__ - breaks Playwright!
+        // Detection script checks: '__playwright__binding__' in window
+        // This will still return true - accepted limitation
+
+        // Create internal bridge functions using closure references
+        Object.defineProperty(window, '__js_unshroud_log', {
+          value: function(data) {
+            if (_playwrightLogEvent) {
+              _playwrightLogEvent(data).catch(function() {
+                // Error handler - silent (can't use console.log due to recursion)
+              });
+            }
+          },
+          writable: false,
+          enumerable: false,
+          configurable: false
+        });
+
+        Object.defineProperty(window, '__js_unshroud_save_artifact', {
+          value: function(artifactData) {
+            if (_playwrightSaveArtifact) {
+              _playwrightSaveArtifact(JSON.stringify(artifactData)).catch(function() {
+                // Error handler - silent
+              });
+            }
+          },
+          writable: false,
+          enumerable: false,
+          configurable: false
+        });
+      })();
     `
   });
 
@@ -446,7 +444,10 @@ async function injectInstrumentation(
           enableDownloadDetection: config.enableDownloadDetection,
           enableArtifactCollection: config.enableArtifactCollection ?? false,
           eventFiltering: config.eventFiltering,
-          debug: config.debug ?? false
+          debug: config.debug ?? false,
+          // Worker-related flags needed by worker-hooks.js for CDP mitigation
+          enableWorkers: config.enableWorkers,
+          enableHeadlessMitigation: config.enableHeadlessMitigation
         })},
         writable: true,
         enumerable: false,  // Hidden from Object.keys()

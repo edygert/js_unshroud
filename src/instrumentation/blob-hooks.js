@@ -33,6 +33,37 @@
   const OriginalBlob = window.Blob;
   const OriginalFileReader = window.FileReader;
 
+  // Helper to extract text content from blob parts synchronously
+  // This is critical for worker blob injection - async extraction causes race conditions
+  // where URL.createObjectURL is called before FileReader completes
+  const extractBlobPartsContent = function(blobParts) {
+    if (!blobParts || !Array.isArray(blobParts)) {
+      return null;
+    }
+
+    try {
+      const parts = [];
+      for (let i = 0; i < blobParts.length; i++) {
+        const part = blobParts[i];
+        if (typeof part === 'string') {
+          parts.push(part);
+        } else if (part instanceof ArrayBuffer) {
+          // Convert ArrayBuffer to string
+          // eslint-disable-next-line no-undef
+          parts.push(new TextDecoder().decode(part));
+        } else if (ArrayBuffer.isView(part)) {
+          // TypedArray or DataView
+          // eslint-disable-next-line no-undef
+          parts.push(new TextDecoder().decode(part));
+        }
+        // Skip Blob parts - can't read synchronously
+      }
+      return parts.length > 0 ? parts.join('') : null;
+    } catch {
+      return null;
+    }
+  };
+
   // Instrument Blob constructor
   if (OriginalBlob) {
     window.Blob = function(blobParts, options) {
@@ -43,27 +74,47 @@
         const blobType = options && options.type ? options.type : 'unknown';
         const blobSize = blob.size;
         const isJavaScript = blobType.includes('javascript') || blobType.includes('ecmascript');
-
-        // Extract content asynchronously if it's JavaScript or small enough
         const shouldExtractContent = isJavaScript || blobSize < 10240; // 10KB limit
 
-        if (shouldExtractContent && OriginalFileReader) {
+        // Extract content SYNCHRONOUSLY from blobParts for immediate use
+        // This is critical for worker blob injection to avoid race conditions
+        let syncContent = null;
+        if (shouldExtractContent) {
+          syncContent = extractBlobPartsContent(blobParts);
+        }
+
+        // Store content on the blob object immediately for later retrieval
+        if (syncContent !== null) {
+          try {
+            Object.defineProperty(blob, '__js_unshroud_content', {
+              value: syncContent,
+              writable: false,
+              enumerable: false,
+              configurable: false
+            });
+          } catch {
+            // Ignore if property can't be defined
+          }
+        }
+
+        // Log blob creation event
+        logEvent({
+          type: 'blob',
+          eventType: 'blob_create',
+          blobType: blobType,
+          blobSize: blobSize,
+          content: syncContent ? String(syncContent).substring(0, 1024) : null,
+          isJavaScript: isJavaScript,
+          timestamp: Date.now()
+        });
+
+        // If sync extraction failed (e.g., blob created from other blobs),
+        // fall back to async extraction
+        if (syncContent === null && shouldExtractContent && OriginalFileReader) {
           const reader = new OriginalFileReader();
 
           reader.onload = function() {
             const content = reader.result;
-
-            // Log blob creation event
-            logEvent({
-              type: 'blob',
-              eventType: 'blob_create',
-              blobType: blobType,
-              blobSize: blobSize,
-              content: content ? String(content).substring(0, 1024) : null, // Truncate to 1KB for logging
-              isJavaScript: isJavaScript,
-              timestamp: Date.now()
-            });
-
             // Store content on the blob object for later retrieval
             try {
               Object.defineProperty(blob, '__js_unshroud_content', {
@@ -73,40 +124,15 @@
                 configurable: false
               });
             } catch {
-              // Ignore if property can't be defined
+              // Ignore - property might already exist from sync extraction
             }
           };
 
-          reader.onerror = function() {
-            // Log blob creation even if we couldn't read it
-            logEvent({
-              type: 'blob',
-              eventType: 'blob_create',
-              blobType: blobType,
-              blobSize: blobSize,
-              content: null,
-              isJavaScript: isJavaScript,
-              timestamp: Date.now()
-            });
-          };
-
-          // Read blob content as text
+          // Read blob content as text (async fallback)
           reader.readAsText(blob);
-        } else {
-          // Log blob creation without content extraction
-          logEvent({
-            type: 'blob',
-            eventType: 'blob_create',
-            blobType: blobType,
-            blobSize: blobSize,
-            content: null,
-            isJavaScript: isJavaScript,
-            timestamp: Date.now()
-          });
         }
-      } catch (error) {
-        // Log error but don't break blob creation
-        window.__js_unshroud_debug('[JS Unshroud] Error tracking blob:', error);
+      } catch {
+        // Don't break blob creation if tracking fails
       }
 
       return blob;

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Phase 3 Test: Worker CDP Detection and Mitigation</title>
+</head>
+<body>
+    <h1>Phase 3: Test Worker CDP Detection and Mitigation</h1>
+    <pre id="results"></pre>
+
+    <script>
+        const resultsEl = document.getElementById('results');
+        const log = (msg) => {
+            resultsEl.textContent += msg + '\n';
+            console.log('[PHASE3]', msg);
+        };
+
+        log('=== ASSUMPTION 1: Workers detect CDP via Error.prepareStackTrace ===');
+        log('Testing current behavior (before fix)...');
+        log('');
+
+        // Test 1: Basic worker CDP detection
+        log('Test 1: Standard worker CDP detection (from device_info.min.js)');
+        const workerCode1 = `
+            try {
+                let wasAccessed = false;
+                const originalPrepareStackTrace = Error.prepareStackTrace;
+                Error.prepareStackTrace = function() {
+                    wasAccessed = true;
+                    return originalPrepareStackTrace;
+                };
+                const err = new Error('');
+                console.log(err);
+                self.postMessage({ test: 1, cdpDetected: wasAccessed });
+            } catch(e) {
+                self.postMessage({ test: 1, cdpDetected: 'ERROR: ' + e.message });
+            }
+        `;
+
+        const blob1 = new Blob([workerCode1], { type: 'application/javascript' });
+        const worker1 = new Worker(URL.createObjectURL(blob1));
+        worker1.onmessage = (e) => {
+            log('  Worker CDP detection result: ' + e.data.cdpDetected);
+            log('  ' + (e.data.cdpDetected === true ? '[DETECTED] CDP active in worker' : '[NOT DETECTED]'));
+        };
+        worker1.onerror = (e) => {
+            log('  [ERROR] Worker failed: ' + e.message);
+        };
+
+        // Test 2: Can we freeze Error.prepareStackTrace in worker?
+        log('');
+        log('Test 2: Can Error.prepareStackTrace be frozen in worker context?');
+        const workerCode2 = `
+            try {
+                // First, freeze prepareStackTrace
+                const orig = Error.prepareStackTrace;
+                Object.defineProperty(Error, 'prepareStackTrace', {
+                    get: function() { return orig; },
+                    set: function(v) { /* silently ignore */ return v; },
+                    enumerable: false,
+                    configurable: false
+                });
+
+                // Now try the detection
+                let wasAccessed = false;
+                Error.prepareStackTrace = function() {
+                    wasAccessed = true;
+                    return orig;
+                };
+                const err = new Error('');
+                console.log(err);
+
+                self.postMessage({
+                    test: 2,
+                    freezeWorked: true,
+                    cdpDetected: wasAccessed,
+                    prepareStackTraceType: typeof Error.prepareStackTrace
+                });
+            } catch(e) {
+                self.postMessage({ test: 2, freezeWorked: false, error: e.message });
+            }
+        `;
+
+        setTimeout(() => {
+            const blob2 = new Blob([workerCode2], { type: 'application/javascript' });
+            const worker2 = new Worker(URL.createObjectURL(blob2));
+            worker2.onmessage = (e) => {
+                log('  Freeze attempt succeeded: ' + e.data.freezeWorked);
+                log('  CDP detected after freeze: ' + e.data.cdpDetected);
+                log('  ' + (e.data.cdpDetected === false ? '[PASS] Freezing prevents detection' : '[FAIL] Still detected'));
+            };
+            worker2.onerror = (e) => {
+                log('  [ERROR] Worker failed: ' + e.message);
+            };
+        }, 500);
+
+        // Test 3: Can we inject script into blob worker?
+        log('');
+        log('Test 3: Can mitigation script be prepended to blob workers?');
+        setTimeout(() => {
+            const mitigationScript = `
+                // Injected mitigation
+                self.__mitigation_injected__ = true;
+                const orig = Error.prepareStackTrace;
+                Object.defineProperty(Error, 'prepareStackTrace', {
+                    get: function() { return orig; },
+                    set: function(v) { return v; },
+                    configurable: false
+                });
+            `;
+
+            const originalWorkerCode = `
+                // Original worker code
+                let wasAccessed = false;
+                Error.prepareStackTrace = function() {
+                    wasAccessed = true;
+                };
+                console.log(new Error(''));
+                self.postMessage({
+                    test: 3,
+                    mitigationPresent: !!self.__mitigation_injected__,
+                    cdpDetected: wasAccessed
+                });
+            `;
+
+            // Combine scripts (simulating what Phase 3 would do)
+            const combinedCode = mitigationScript + '\n' + originalWorkerCode;
+            const blob3 = new Blob([combinedCode], { type: 'application/javascript' });
+            const worker3 = new Worker(URL.createObjectURL(blob3));
+            worker3.onmessage = (e) => {
+                log('  Mitigation script present: ' + e.data.mitigationPresent);
+                log('  CDP detected: ' + e.data.cdpDetected);
+                log('  ' + (e.data.mitigationPresent && !e.data.cdpDetected ? '[PASS] Injection approach works' : '[NEEDS WORK]'));
+            };
+        }, 1000);
+
+        // Test 4: Worker value consistency (verify current state)
+        log('');
+        log('Test 4: Worker value consistency check');
+        setTimeout(() => {
+            const workerCode4 = `
+                self.postMessage({
+                    test: 4,
+                    workerValues: {
+                        hardwareConcurrency: navigator.hardwareConcurrency,
+                        platform: navigator.platform,
+                        userAgent: navigator.userAgent.substring(0, 50) + '...',
+                        languages: JSON.stringify(navigator.languages)
+                    }
+                });
+            `;
+            const blob4 = new Blob([workerCode4], { type: 'application/javascript' });
+            const worker4 = new Worker(URL.createObjectURL(blob4));
+            worker4.onmessage = (e) => {
+                const main = {
+                    hardwareConcurrency: navigator.hardwareConcurrency,
+                    platform: navigator.platform,
+                    languages: JSON.stringify(navigator.languages)
+                };
+                const worker = e.data.workerValues;
+
+                log('  Main hardwareConcurrency: ' + main.hardwareConcurrency);
+                log('  Worker hardwareConcurrency: ' + worker.hardwareConcurrency);
+                log('  Match: ' + (main.hardwareConcurrency === worker.hardwareConcurrency));
+
+                log('  Main platform: ' + main.platform);
+                log('  Worker platform: ' + worker.platform);
+                log('  Match: ' + (main.platform === worker.platform));
+
+                const allMatch =
+                    main.hardwareConcurrency === worker.hardwareConcurrency &&
+                    main.platform === worker.platform &&
+                    main.languages === worker.languages;
+                log('  All values consistent: ' + allMatch);
+            };
+        }, 1500);
+
+        // Summary after all tests
+        setTimeout(() => {
+            log('');
+            log('=== PHASE 3 SUMMARY ===');
+            log('The freezing approach (Test 2 & 3) should prevent CDP detection in workers');
+            log('If Test 2 shows [PASS], the mitigation strategy is validated');
+            log('');
+            log('[INFO] Phase 3 may not be needed if Phase 2 (Runtime.disable) also affects workers');
+            log('[INFO] Test Phase 2 first, then check if worker CDP detection still occurs');
+        }, 2000);
+    </script>
+</body>
+</html>

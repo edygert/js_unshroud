@@ -39,14 +39,14 @@
       },
       writable: false,
       enumerable: false,
-      configurable: true
+      configurable: false  // Match native behavior (non-configurable)
     });
 
     Object.defineProperty(func, 'name', {
       value: functionName,
       writable: false,
       enumerable: false,
-      configurable: true
+      configurable: false  // Match native behavior (non-configurable)
     });
 
     return func;
@@ -60,14 +60,14 @@
       },
       writable: false,
       enumerable: false,
-      configurable: true
+      configurable: false  // Match native behavior (non-configurable)
     });
 
     Object.defineProperty(func, 'name', {
       value: 'get ' + propertyName,
       writable: false,
       enumerable: false,
-      configurable: true
+      configurable: false  // Match native behavior (non-configurable)
     });
 
     return func;

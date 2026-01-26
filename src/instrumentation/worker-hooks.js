@@ -2,8 +2,14 @@
 (function() {
   'use strict';
 
-  // Check if worker monitoring is enabled
-  if (!window.__js_unshroud_config || !window.__js_unshroud_config.enableWorkers) {
+  // Determine if worker monitoring (logging) is enabled
+  const workerLoggingEnabled = window.__js_unshroud_config && window.__js_unshroud_config.enableWorkers;
+
+  // Determine if headless mitigation is enabled (for CDP detection prevention in workers)
+  const headlessMitigationEnabled = window.__js_unshroud_config && window.__js_unshroud_config.enableHeadlessMitigation;
+
+  // If neither feature is enabled, exit early
+  if (!workerLoggingEnabled && !headlessMitigationEnabled) {
     return;
   }
 
@@ -112,12 +118,117 @@
   const OriginalSharedWorker = window.SharedWorker;
 
   // ============================================================================
+  // CDP DETECTION MITIGATION FOR WORKERS
+  // ============================================================================
+
+  // Get headless mitigation config for worker spoofing
+  // These values must match what's spoofed in main context (headless-mitigation.js)
+  const headlessConfig = window.__js_unshroud_headless_config || {};
+  const spoofedValues = {
+    hardwareConcurrency: headlessConfig.hardware?.cores || 8,
+    deviceMemory: headlessConfig.hardware?.deviceMemory || 8,
+    userAgent: headlessConfig.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+    platform: headlessConfig.platform || 'Win32',
+    language: headlessConfig.language || 'en-US',
+    languages: headlessConfig.languages || ['en-US', 'en']
+  };
+
+  // Generate worker CDP mitigation script
+  // This prevents detection via Error.prepareStackTrace in worker contexts
+  // Also spoofs navigator properties to match main context (prevents value comparison detection)
+  const getWorkerMitigationScript = function() {
+    return `
+      // Worker-side CDP detection prevention and navigator spoofing (js_unshroud)
+      (function() {
+        // Prevent Error.prepareStackTrace detection in workers
+        // Detection scripts set Error.prepareStackTrace to a function that sets wasAccessed=true
+        // Then call console.log(new Error()) which triggers CDP serialization
+        // By freezing prepareStackTrace, we prevent the detection script from installing its trap
+        const OriginalError = self.Error;
+        const originalPrepareStackTrace = OriginalError.prepareStackTrace;
+
+        // Freeze prepareStackTrace so it cannot be overridden by detection scripts
+        Object.defineProperty(OriginalError, 'prepareStackTrace', {
+          get: function() { return originalPrepareStackTrace; },
+          set: function(value) {
+            // Silently ignore attempts to set prepareStackTrace
+            // This prevents the detection script from installing its trap
+            return value;
+          },
+          enumerable: false,
+          configurable: false
+        });
+
+        // Spoof navigator properties to match main context
+        // This prevents detection via worker/main value comparison
+        var nav = self.navigator;
+        var spoofedProps = {
+          hardwareConcurrency: { value: ${spoofedValues.hardwareConcurrency} },
+          deviceMemory: { value: ${spoofedValues.deviceMemory} },
+          userAgent: { value: ${JSON.stringify(spoofedValues.userAgent)} },
+          platform: { value: ${JSON.stringify(spoofedValues.platform)} },
+          language: { value: ${JSON.stringify(spoofedValues.language)} },
+          languages: { value: Object.freeze(${JSON.stringify(spoofedValues.languages)}) }
+        };
+
+        for (var prop in spoofedProps) {
+          try {
+            Object.defineProperty(nav, prop, {
+              get: function(val) { return function() { return val; }; }(spoofedProps[prop].value),
+              enumerable: true,
+              configurable: false
+            });
+          } catch (e) {
+            // Ignore if property cannot be overridden
+          }
+        }
+      })();
+    `;
+  };
+
+  // Inject mitigation script into blob URL workers
+  const injectMitigationIntoBlob = function(scriptURL) {
+    if (typeof scriptURL === 'string' && scriptURL.startsWith('blob:')) {
+      try {
+        // Get original blob content using full content (not truncated)
+        const blobContent = getFullBlobContent(scriptURL);
+        if (blobContent) {
+          // Create new blob with mitigation prepended
+          const mitigationScript = getWorkerMitigationScript();
+          // eslint-disable-next-line no-undef
+          const newBlob = new Blob(
+            [mitigationScript + '\n' + blobContent],
+            { type: 'application/javascript' }
+          );
+          // eslint-disable-next-line no-undef
+          return URL.createObjectURL(newBlob);
+        }
+      } catch {
+        // Fall back to original if injection fails
+      }
+    }
+    return scriptURL;
+  };
+
+  // ============================================================================
   // HOOK Worker CONSTRUCTOR
   // ============================================================================
 
   if (OriginalWorker) {
     window.Worker = function(scriptURL, options) {
-      const worker = new OriginalWorker(scriptURL, options);
+      // Inject CDP mitigation into blob workers (if headless mitigation enabled)
+      const modifiedScriptURL = headlessMitigationEnabled
+        ? injectMitigationIntoBlob(scriptURL)
+        : scriptURL;
+
+      const worker = new OriginalWorker(modifiedScriptURL, options);
+
+      // If worker logging is disabled, just return the worker without wrapping
+      if (!workerLoggingEnabled) {
+        return worker;
+      }
+
+      // --- Worker logging is enabled below this point ---
       const blobContent = resolveBlobContent(scriptURL);
 
       // Log worker creation
@@ -298,7 +409,19 @@
 
   if (OriginalSharedWorker) {
     window.SharedWorker = function(scriptURL, options) {
-      const sharedWorker = new OriginalSharedWorker(scriptURL, options);
+      // Inject CDP mitigation into blob workers (if headless mitigation enabled)
+      const modifiedScriptURL = headlessMitigationEnabled
+        ? injectMitigationIntoBlob(scriptURL)
+        : scriptURL;
+
+      const sharedWorker = new OriginalSharedWorker(modifiedScriptURL, options);
+
+      // If worker logging is disabled, just return the worker without wrapping
+      if (!workerLoggingEnabled) {
+        return sharedWorker;
+      }
+
+      // --- Worker logging is enabled below this point ---
       const blobContent = resolveBlobContent(scriptURL);
 
       // Log shared worker creation

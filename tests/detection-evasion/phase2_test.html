@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Phase 2 Test: CDP Error.prepareStackTrace Detection</title>
+</head>
+<body>
+    <h1>Phase 2: Test CDP Detection via Error.prepareStackTrace</h1>
+    <pre id="results"></pre>
+
+    <script>
+        const log = (msg) => {
+            document.getElementById('results').textContent += msg + '\n';
+            console.log('[PHASE2]', msg);
+        };
+
+        log('=== ASSUMPTION 1: Error.prepareStackTrace is invoked by CDP when console.log(Error) ===');
+        log('This test validates the CURRENT behavior (before fix)');
+        log('');
+
+        // Test 1: Basic prepareStackTrace detection
+        log('Test 1: Standard detection method (from device_info.min.js)');
+        try {
+            let wasAccessed = false;
+            const originalPrepareStackTrace = Error.prepareStackTrace;
+            Error.prepareStackTrace = function() {
+                wasAccessed = true;
+                return originalPrepareStackTrace;
+            };
+            const err = new Error('test');
+            console.log(err);
+
+            log('  Error.prepareStackTrace was invoked: ' + wasAccessed);
+            log('  ' + (wasAccessed ? '[DETECTED] CDP is active' : '[NOT DETECTED] CDP not active'));
+
+            // Restore
+            Error.prepareStackTrace = originalPrepareStackTrace;
+        } catch(e) {
+            log('  [ERROR] ' + e.message);
+        }
+
+        log('');
+        log('Test 2: Check if prepareStackTrace is triggered by different console methods');
+
+        const testConsoleMethods = ['log', 'warn', 'error', 'info', 'debug'];
+        for (const method of testConsoleMethods) {
+            try {
+                let triggered = false;
+                const orig = Error.prepareStackTrace;
+                Error.prepareStackTrace = function() {
+                    triggered = true;
+                    return orig;
+                };
+                console[method](new Error('test-' + method));
+                Error.prepareStackTrace = orig;
+                log('  console.' + method + '(Error) triggers prepareStackTrace: ' + triggered);
+            } catch(e) {
+                log('  console.' + method + ' error: ' + e.message);
+            }
+        }
+
+        log('');
+        log('Test 3: Is prepareStackTrace triggered without console.log?');
+        try {
+            let triggered = false;
+            const orig = Error.prepareStackTrace;
+            Error.prepareStackTrace = function() {
+                triggered = true;
+                return orig;
+            };
+            const err = new Error('no-console');
+            // Just create error, don't log it
+            const stack = err.stack; // Access stack property
+            Error.prepareStackTrace = orig;
+            log('  Creating Error + accessing .stack triggers prepareStackTrace: ' + triggered);
+        } catch(e) {
+            log('  [ERROR] ' + e.message);
+        }
+
+        log('');
+        log('=== ASSUMPTION 2: After fix, prepareStackTrace should NOT be invoked ===');
+        log('[INFO] This assumption cannot be tested from browser JS');
+        log('[INFO] It requires modifying CDPSessionManager.ts and re-running');
+        log('[INFO] After implementing Phase 2, re-run this test to verify detection fails');
+
+        log('');
+        log('=== ASSUMPTION 3: Errors are still captured after Runtime.disable() ===');
+        log('[INFO] This needs to be tested by checking JSONL output for error events');
+        log('[INFO] After Phase 2, intentionally throw an error and verify it appears in output');
+
+        // Intentionally throw an error for verification
+        log('');
+        log('Throwing test error for JSONL verification...');
+        setTimeout(() => {
+            throw new Error('PHASE2_TEST_ERROR - This error should appear in JSONL if error capture works');
+        }, 100);
+
+        log('');
+        log('=== CURRENT STATE SUMMARY ===');
+        log('CDP detection via Error.prepareStackTrace: WORKING (expected before fix)');
+        log('After Phase 2 implementation, this test should show: NOT DETECTED');
+    </script>
+</body>
+</html>

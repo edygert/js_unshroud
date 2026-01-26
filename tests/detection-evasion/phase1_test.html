@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Phase 1 Test: Playwright Global Deletion</title>
+</head>
+<body>
+    <h1>Phase 1: Test Playwright Global Deletion Assumptions</h1>
+    <pre id="results"></pre>
+
+    <script>
+        const log = (msg) => {
+            document.getElementById('results').textContent += msg + '\n';
+            console.log('[PHASE1]', msg);
+        };
+
+        log('=== ASSUMPTION 1: __playwright__binding__ exists and can be deleted ===');
+        log('Before deletion:');
+        log('  __playwright__binding__ in window: ' + ('__playwright__binding__' in window));
+        log('  typeof __playwright__binding__: ' + typeof window.__playwright__binding__);
+
+        if ('__playwright__binding__' in window) {
+            const deleted = delete window.__playwright__binding__;
+            log('  delete succeeded: ' + deleted);
+            log('After deletion:');
+            log('  __playwright__binding__ in window: ' + ('__playwright__binding__' in window));
+        } else {
+            log('  [INFO] __playwright__binding__ not present - Playwright may not inject it in this context');
+        }
+
+        log('');
+        log('=== ASSUMPTION 2: __playwright_log_event exists and can be stored in closure ===');
+        log('Before deletion:');
+        log('  __playwright_log_event in window: ' + ('__playwright_log_event' in window));
+        log('  typeof __playwright_log_event: ' + typeof window.__playwright_log_event);
+
+        if (typeof window.__playwright_log_event === 'function') {
+            // Store in closure
+            const closureRef = window.__playwright_log_event;
+            log('  Stored reference in closure');
+
+            // Delete from window
+            delete window.__playwright_log_event;
+            log('After deletion:');
+            log('  __playwright_log_event in window: ' + ('__playwright_log_event' in window));
+            log('  typeof closureRef: ' + typeof closureRef);
+
+            // Test if closure reference still works
+            log('');
+            log('=== ASSUMPTION 3: Closure reference still works after window deletion ===');
+            try {
+                closureRef(JSON.stringify({test: 'closure_test', timestamp: Date.now()}));
+                log('  [PASS] Closure reference call succeeded (no error thrown)');
+            } catch(e) {
+                log('  [FAIL] Closure reference call failed: ' + e.message);
+            }
+        } else {
+            log('  [FAIL] __playwright_log_event not found - is this running under js_unshroud?');
+        }
+
+        log('');
+        log('=== ASSUMPTION 4: __pwInitScripts can be deleted ===');
+        log('  __pwInitScripts in window: ' + ('__pwInitScripts' in window));
+        if ('__pwInitScripts' in window) {
+            delete window.__pwInitScripts;
+            log('  After delete: ' + ('__pwInitScripts' in window));
+        }
+
+        log('');
+        log('=== ASSUMPTION 5: Playwright internal functionality still works after deletion ===');
+        log('  Testing navigation and basic page functions...');
+        log('  document.title: ' + document.title);
+        log('  window.location.href accessible: ' + (typeof window.location.href === 'string'));
+        log('  [INFO] If you see this, Playwright core functionality is working');
+
+        log('');
+        log('=== SUMMARY ===');
+        const playwrightDetected = ('__playwright__binding__' in window) || ('__pwInitScripts' in window);
+        const functionsExposed = (typeof window.__playwright_log_event !== 'undefined');
+        log('Playwright globals still detectable: ' + playwrightDetected);
+        log('Functions still exposed: ' + functionsExposed);
+        log((!playwrightDetected && !functionsExposed) ? '[PASS] Phase 1 approach validated' : '[NEEDS WORK] Some items still detectable');
+    </script>
+</body>
+</html>

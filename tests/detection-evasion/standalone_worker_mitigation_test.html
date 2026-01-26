@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Standalone Worker CDP Mitigation Test</title>
+</head>
+<body>
+    <h1>Standalone Worker CDP Mitigation Test</h1>
+    <pre id="results"></pre>
+
+    <script>
+        const log = (msg) => {
+            document.getElementById('results').textContent += msg + '\n';
+            console.log(msg);
+        };
+
+        // The mitigation script that would be injected into workers
+        const MITIGATION_SCRIPT = `
+            // Worker-side CDP detection prevention
+            (function() {
+                const OriginalError = self.Error;
+                const originalPrepareStackTrace = OriginalError.prepareStackTrace;
+
+                // Freeze prepareStackTrace so it cannot be overridden
+                Object.defineProperty(OriginalError, 'prepareStackTrace', {
+                    get: function() { return originalPrepareStackTrace; },
+                    set: function(value) { return value; },
+                    enumerable: false,
+                    configurable: false
+                });
+            })();
+        `;
+
+        // Detection script (from device_info.min.js)
+        const DETECTION_SCRIPT = `
+            try {
+                let wasAccessed = false;
+                const originalPrepareStackTrace = Error.prepareStackTrace;
+                Error.prepareStackTrace = function() {
+                    wasAccessed = true;
+                    return originalPrepareStackTrace;
+                };
+                const err = new Error('');
+                console.log(err);
+                self.postMessage({ cdpDetected: wasAccessed });
+            } catch(e) {
+                self.postMessage({ cdpDetected: 'ERROR: ' + e.message });
+            }
+        `;
+
+        log('=== Test 1: Worker WITHOUT mitigation ===');
+        const blob1 = new Blob([DETECTION_SCRIPT], { type: 'application/javascript' });
+        const worker1 = new Worker(URL.createObjectURL(blob1));
+        worker1.onmessage = (e) => {
+            log('CDP detected (no mitigation): ' + e.data.cdpDetected);
+            log(e.data.cdpDetected ? '[EXPECTED] Detection works without mitigation' : '[UNEXPECTED] Detection failed');
+            log('');
+            runTest2();
+        };
+
+        function runTest2() {
+            log('=== Test 2: Worker WITH mitigation prepended ===');
+            const mitigatedScript = MITIGATION_SCRIPT + '\n' + DETECTION_SCRIPT;
+            const blob2 = new Blob([mitigatedScript], { type: 'application/javascript' });
+            const worker2 = new Worker(URL.createObjectURL(blob2));
+            worker2.onmessage = (e) => {
+                log('CDP detected (with mitigation): ' + e.data.cdpDetected);
+                log(e.data.cdpDetected === false ? '[PASS] Mitigation WORKS!' : '[FAIL] Mitigation did NOT work');
+                log('');
+                runTest3();
+            };
+        }
+
+        function runTest3() {
+            log('=== Test 3: Simulating js_unshroud injection flow ===');
+
+            // Simulate what js_unshroud does:
+            // 1. Page creates blob with worker code
+            // 2. js_unshroud intercepts, reads content, prepends mitigation
+            // 3. Creates new blob and URL
+
+            const originalWorkerCode = DETECTION_SCRIPT;
+            const originalBlob = new Blob([originalWorkerCode], { type: 'application/javascript' });
+            const originalUrl = URL.createObjectURL(originalBlob);
+
+            // Simulate reading blob content (this is where js_unshroud uses __js_unshroud_blob_map)
+            // In this test, we have direct access to the content
+            const capturedContent = originalWorkerCode;
+
+            // Prepend mitigation
+            const modifiedContent = MITIGATION_SCRIPT + '\n' + capturedContent;
+            const modifiedBlob = new Blob([modifiedContent], { type: 'application/javascript' });
+            const modifiedUrl = URL.createObjectURL(modifiedBlob);
+
+            const worker3 = new Worker(modifiedUrl);
+            worker3.onmessage = (e) => {
+                log('CDP detected (simulated injection): ' + e.data.cdpDetected);
+                log(e.data.cdpDetected === false ? '[PASS] Injection simulation WORKS!' : '[FAIL] Injection simulation did NOT work');
+                log('');
+                log('=== SUMMARY ===');
+                log('If Test 2 and Test 3 show [PASS], the mitigation approach is valid.');
+                log('If they show [FAIL], there may be a Chrome version or CDP behavior issue.');
+            };
+        }
+    </script>
+</body>
+</html>
