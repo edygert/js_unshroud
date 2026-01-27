@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Main Context: Freeze prepareStackTrace Test</title>
+</head>
+<body>
+    <h1>Main Context: Test if Freezing Error.prepareStackTrace Prevents CDP Detection</h1>
+    <pre id="results"></pre>
+
+    <script>
+        const log = (msg) => {
+            document.getElementById('results').textContent += msg + '\n';
+            console.log('[MAIN_FREEZE]', msg);
+        };
+
+        log('=== TEST: Can freezing Error.prepareStackTrace prevent CDP detection in main context? ===');
+        log('');
+
+        // Test 1: Baseline - Detection WITHOUT freeze (should detect if CDP active)
+        log('Test 1: Baseline detection (no freeze)');
+        try {
+            let wasAccessed1 = false;
+            const orig1 = Error.prepareStackTrace;
+            Error.prepareStackTrace = function() {
+                wasAccessed1 = true;
+                return orig1;
+            };
+            const err1 = new Error('baseline');
+            console.log(err1);
+            Error.prepareStackTrace = orig1; // restore
+
+            log('  Detection result: ' + wasAccessed1);
+            log('  ' + (wasAccessed1 ? '[DETECTED] CDP is active (baseline confirms detection works)' : '[NOT DETECTED] CDP not active'));
+            log('');
+        } catch(e) {
+            log('  [ERROR] ' + e.message);
+        }
+
+        // Test 2: Freeze THEN try detection (this simulates our mitigation)
+        log('Test 2: Freeze prepareStackTrace BEFORE detection script runs');
+        try {
+            // Step 1: Save original
+            const originalPrepareStackTrace = Error.prepareStackTrace;
+
+            // Step 2: Freeze it (this is what our init script would do)
+            Object.defineProperty(Error, 'prepareStackTrace', {
+                get: function() { return originalPrepareStackTrace; },
+                set: function(value) {
+                    // Silently ignore attempts to override
+                    return value;
+                },
+                enumerable: false,
+                configurable: false
+            });
+
+            log('  prepareStackTrace frozen successfully');
+
+            // Step 3: Now simulate the detection script trying to install its trap
+            let wasAccessed2 = false;
+            Error.prepareStackTrace = function() {
+                wasAccessed2 = true;
+                return originalPrepareStackTrace;
+            };
+
+            // Step 4: Trigger detection
+            const err2 = new Error('after-freeze');
+            console.log(err2);
+
+            log('  Detection result after freeze: ' + wasAccessed2);
+            log('  ' + (wasAccessed2 ? '[FAIL] Still detected (freeze did not work)' : '[PASS] NOT detected (freeze worked!)'));
+            log('');
+
+            // Verify the setter was truly ignored
+            log('  Verifying freeze worked:');
+            log('    typeof Error.prepareStackTrace: ' + typeof Error.prepareStackTrace);
+            log('    Is original preserved: ' + (Error.prepareStackTrace === originalPrepareStackTrace));
+
+        } catch(e) {
+            log('  [ERROR] ' + e.message);
+            log('  Stack: ' + e.stack);
+        }
+
+        log('');
+        log('=== Test 3: Verify freeze is truly non-configurable ===');
+        try {
+            // Try to reconfigure
+            Object.defineProperty(Error, 'prepareStackTrace', {
+                value: function() { return 'hacked'; },
+                configurable: true
+            });
+            log('  [FAIL] Was able to reconfigure (freeze not strong enough)');
+        } catch(e) {
+            log('  [PASS] Cannot reconfigure: ' + e.message);
+        }
+
+        log('');
+        log('=== SUMMARY ===');
+        log('If Test 1 shows [DETECTED] and Test 2 shows [PASS]:');
+        log('  -> Freezing prepareStackTrace WORKS for main context!');
+        log('  -> We can apply the same approach used in worker-hooks.js');
+        log('');
+        log('If Test 2 shows [FAIL]:');
+        log('  -> The freeze approach does NOT work');
+        log('  -> Need alternative mitigation strategy');
+    </script>
+</body>
+</html>
