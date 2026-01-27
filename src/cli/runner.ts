@@ -376,6 +376,31 @@ async function injectInstrumentation(
     }
   );
 
+  // CRITICAL: Freeze Error.prepareStackTrace BEFORE any page scripts run
+  // This prevents CDP detection via the prepareStackTrace trap technique
+  // Detection scripts try to set Error.prepareStackTrace to a function that sets a flag
+  // when invoked. By freezing it first, their assignment silently fails.
+  await page.addInitScript({
+    content: `
+      (function() {
+        // Save original prepareStackTrace (may be undefined)
+        var originalPrepareStackTrace = Error.prepareStackTrace;
+
+        // Freeze prepareStackTrace so detection scripts cannot install their trap
+        Object.defineProperty(Error, 'prepareStackTrace', {
+          get: function() { return originalPrepareStackTrace; },
+          set: function(value) {
+            // Silently ignore attempts to override
+            // This prevents detection scripts from installing their trap
+            return value;
+          },
+          enumerable: false,
+          configurable: false
+        });
+      })();
+    `
+  });
+
   // Create internal bridge functions that use the CDP bindings
   // The binding names are injected at runtime to avoid hardcoding detectable strings
   await page.addInitScript({

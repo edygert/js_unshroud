@@ -130,7 +130,10 @@
     userAgent: headlessConfig.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
     platform: headlessConfig.platform || 'Win32',
     language: headlessConfig.language || 'en-US',
-    languages: headlessConfig.languages || ['en-US', 'en']
+    languages: headlessConfig.languages || ['en-US', 'en'],
+    // WebGL values must match main context to pass isSameAsMainJsContext check
+    webglVendor: headlessConfig.webgl?.vendor || 'Google Inc. (Intel)',
+    webglRenderer: headlessConfig.webgl?.renderer || 'ANGLE (Intel, Mesa Intel(R) UHD Graphics (CML GT2), Version 27.2.1 (Linux x64))'
   };
 
   // Generate worker CDP mitigation script
@@ -181,6 +184,39 @@
           } catch (e) {
             // Ignore if property cannot be overridden
           }
+        }
+
+        // Spoof WebGL getParameter to match main context
+        // Workers use OffscreenCanvas for WebGL, detection compares vendor/renderer
+        var webglVendor = ${JSON.stringify(spoofedValues.webglVendor)};
+        var webglRenderer = ${JSON.stringify(spoofedValues.webglRenderer)};
+        var UNMASKED_VENDOR_WEBGL = 37445;
+        var UNMASKED_RENDERER_WEBGL = 37446;
+
+        // Override WebGLRenderingContext.prototype.getParameter
+        if (typeof WebGLRenderingContext !== 'undefined') {
+          var originalGetParameter = WebGLRenderingContext.prototype.getParameter;
+          WebGLRenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === UNMASKED_VENDOR_WEBGL) {
+              return webglVendor;
+            } else if (parameter === UNMASKED_RENDERER_WEBGL) {
+              return webglRenderer;
+            }
+            return originalGetParameter.call(this, parameter);
+          };
+        }
+
+        // Also override WebGL2RenderingContext if available
+        if (typeof WebGL2RenderingContext !== 'undefined') {
+          var originalGetParameter2 = WebGL2RenderingContext.prototype.getParameter;
+          WebGL2RenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === UNMASKED_VENDOR_WEBGL) {
+              return webglVendor;
+            } else if (parameter === UNMASKED_RENDERER_WEBGL) {
+              return webglRenderer;
+            }
+            return originalGetParameter2.call(this, parameter);
+          };
         }
       })();
     `;
