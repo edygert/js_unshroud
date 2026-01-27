@@ -73,6 +73,37 @@
     return func;
   };
 
+  // Create a Chrome event object with addListener, removeListener, etc.
+  // These are stubs that exist but do nothing (matching non-extension page behavior)
+  const createChromeEvent = function(_eventName) {
+    const listeners = [];
+    return {
+      addListener: makeNativeFunction(function(callback) {
+        if (typeof callback === 'function') {
+          listeners.push(callback);
+        }
+      }, 'addListener'),
+      removeListener: makeNativeFunction(function(callback) {
+        const index = listeners.indexOf(callback);
+        if (index > -1) {
+          listeners.splice(index, 1);
+        }
+      }, 'removeListener'),
+      hasListener: makeNativeFunction(function(callback) {
+        return listeners.indexOf(callback) > -1;
+      }, 'hasListener'),
+      hasListeners: makeNativeFunction(function() {
+        return listeners.length > 0;
+      }, 'hasListeners'),
+      // getRules and other methods exist but throw in non-extension context
+      getRules: makeNativeFunction(function() {
+        return [];
+      }, 'getRules'),
+      addRules: makeNativeFunction(function() {}, 'addRules'),
+      removeRules: makeNativeFunction(function() {}, 'removeRules')
+    };
+  };
+
   // === CORE HEADLESS DETECTION MITIGATIONS ===
 
   // 0. Fix broken image dimensions - Real Chrome reports 0x0, not 16x16
@@ -846,11 +877,142 @@
 
   // === P3.1: BROWSER OBJECT MODEL SPOOFING ===
 
+  // Helper to create the full chrome.runtime object
+  const createChromeRuntime = function() {
+    return {
+      // Properties (undefined on regular pages, matching real Chrome)
+      id: undefined,
+      lastError: undefined,
+
+      // Methods that exist but behave appropriately for non-extension context
+      sendMessage: makeNativeFunction(function(extensionId, message, options, callback) {
+        // In real Chrome on non-extension pages, this returns undefined
+        if (typeof options === 'function') {
+          callback = options;
+        }
+        if (typeof callback === 'function') {
+          setTimeout(function() { callback(undefined); }, 0);
+        }
+        return undefined;
+      }, 'sendMessage'),
+
+      connect: makeNativeFunction(function(_extensionId, _connectInfo) {
+        // Return undefined for non-extension pages
+        return undefined;
+      }, 'connect'),
+
+      getURL: makeNativeFunction(function(_path) {
+        return undefined;
+      }, 'getURL'),
+
+      getManifest: makeNativeFunction(function() {
+        return undefined;
+      }, 'getManifest'),
+
+      getPlatformInfo: makeNativeFunction(function(callback) {
+        const platformInfo = {
+          os: 'win',
+          arch: 'x86-64',
+          nacl_arch: 'x86-64'
+        };
+        if (typeof callback === 'function') {
+          setTimeout(function() { callback(platformInfo); }, 0);
+        }
+        // Return a promise for modern usage
+        return Promise.resolve(platformInfo);
+      }, 'getPlatformInfo'),
+
+      getBackgroundPage: makeNativeFunction(function(callback) {
+        if (typeof callback === 'function') {
+          setTimeout(function() { callback(undefined); }, 0);
+        }
+        return undefined;
+      }, 'getBackgroundPage'),
+
+      openOptionsPage: makeNativeFunction(function(callback) {
+        if (typeof callback === 'function') {
+          setTimeout(function() { callback(); }, 0);
+        }
+        return undefined;
+      }, 'openOptionsPage'),
+
+      setUninstallURL: makeNativeFunction(function(_url, callback) {
+        if (typeof callback === 'function') {
+          setTimeout(function() { callback(); }, 0);
+        }
+        return undefined;
+      }, 'setUninstallURL'),
+
+      reload: makeNativeFunction(function() {
+        // No-op for non-extension context
+      }, 'reload'),
+
+      requestUpdateCheck: makeNativeFunction(function(callback) {
+        if (typeof callback === 'function') {
+          setTimeout(function() { callback('no_update', {}); }, 0);
+        }
+        return Promise.resolve({ status: 'no_update' });
+      }, 'requestUpdateCheck'),
+
+      // Event objects (stubs that exist but do nothing in non-extension context)
+      onConnect: createChromeEvent('onConnect'),
+      onConnectExternal: createChromeEvent('onConnectExternal'),
+      onMessage: createChromeEvent('onMessage'),
+      onMessageExternal: createChromeEvent('onMessageExternal'),
+      onInstalled: createChromeEvent('onInstalled'),
+      onStartup: createChromeEvent('onStartup'),
+      onSuspend: createChromeEvent('onSuspend'),
+      onSuspendCanceled: createChromeEvent('onSuspendCanceled'),
+      onUpdateAvailable: createChromeEvent('onUpdateAvailable'),
+      onBrowserUpdateAvailable: createChromeEvent('onBrowserUpdateAvailable'),
+      onRestartRequired: createChromeEvent('onRestartRequired')
+    };
+  };
+
+  // Helper to create chrome.app object
+  const createChromeApp = function() {
+    return {
+      isInstalled: false,
+      InstallState: {
+        DISABLED: 'disabled',
+        INSTALLED: 'installed',
+        NOT_INSTALLED: 'not_installed'
+      },
+      RunningState: {
+        CANNOT_RUN: 'cannot_run',
+        READY_TO_RUN: 'ready_to_run',
+        RUNNING: 'running'
+      },
+      getDetails: makeNativeFunction(function() {
+        return null;
+      }, 'getDetails'),
+      getIsInstalled: makeNativeFunction(function() {
+        return false;
+      }, 'getIsInstalled'),
+      installState: makeNativeFunction(function(callback) {
+        if (typeof callback === 'function') {
+          setTimeout(function() { callback('not_installed'); }, 0);
+        }
+        return undefined;
+      }, 'installState'),
+      runningState: makeNativeFunction(function() {
+        return 'cannot_run';
+      }, 'runningState')
+    };
+  };
+
   // 1. window.chrome object - Common headless detection check
   try {
+    // Check if chrome.runtime is missing or incomplete (empty object)
+    const needsRuntimeFix = !window.chrome ||
+                           !window.chrome.runtime ||
+                           Object.keys(window.chrome.runtime).length === 0 ||
+                           typeof window.chrome.runtime.sendMessage !== 'function';
+
     if (!window.chrome) {
+      // Create entire chrome object
       window.chrome = {
-        runtime: {},
+        runtime: createChromeRuntime(),
         loadTimes: makeNativeFunction(function() {
           return {
             requestTime: Date.now() / 1000,
@@ -876,7 +1038,7 @@
             tran: 15
           };
         }, 'csi'),
-        app: {}
+        app: createChromeApp()
       };
 
       logEvent({
@@ -884,6 +1046,55 @@
         method: 'window.chrome',
         operation: 'object_injection',
         message: 'Injected fake window.chrome object',
+        timestamp: Date.now()
+      });
+    } else if (needsRuntimeFix) {
+      // window.chrome exists but runtime is missing or incomplete - fix it
+      window.chrome.runtime = createChromeRuntime();
+
+      // Also fix app if missing
+      if (!window.chrome.app || Object.keys(window.chrome.app).length === 0) {
+        window.chrome.app = createChromeApp();
+      }
+
+      // Add loadTimes if missing
+      if (typeof window.chrome.loadTimes !== 'function') {
+        window.chrome.loadTimes = makeNativeFunction(function() {
+          return {
+            requestTime: Date.now() / 1000,
+            startLoadTime: Date.now() / 1000,
+            commitLoadTime: Date.now() / 1000,
+            finishDocumentLoadTime: Date.now() / 1000,
+            finishLoadTime: Date.now() / 1000,
+            firstPaintTime: Date.now() / 1000,
+            firstPaintAfterLoadTime: 0,
+            navigationType: 'Other',
+            wasFetchedViaSpdy: false,
+            wasNpnNegotiated: true,
+            npnNegotiatedProtocol: 'h2',
+            wasAlternateProtocolAvailable: false,
+            connectionInfo: 'h2'
+          };
+        }, 'loadTimes');
+      }
+
+      // Add csi if missing
+      if (typeof window.chrome.csi !== 'function') {
+        window.chrome.csi = makeNativeFunction(function() {
+          return {
+            startE: Date.now(),
+            onloadT: Date.now(),
+            pageT: Math.random() * 1000 + 500,
+            tran: 15
+          };
+        }, 'csi');
+      }
+
+      logEvent({
+        type: 'headless_mitigation',
+        method: 'window.chrome.runtime',
+        operation: 'runtime_fix',
+        message: 'Fixed incomplete window.chrome.runtime object',
         timestamp: Date.now()
       });
     }
