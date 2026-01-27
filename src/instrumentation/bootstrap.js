@@ -83,7 +83,11 @@
   };
 
   // Intercept console methods immediately when safe, using MutationObserver to avoid timing detection
-  if (document.readyState === 'loading') {
+  // Special handling for about:blank and pages that already have body
+  if (document.body || document.readyState === 'complete' || document.readyState === 'interactive') {
+    // Body already exists or page is loaded - intercept immediately
+    interceptConsole();
+  } else if (document.readyState === 'loading') {
     // Use MutationObserver for immediate execution when body is available
     // This eliminates the 100ms detection window while ensuring DOM safety
     const observer = new MutationObserver(function(_mutations) {
@@ -94,15 +98,24 @@
     });
     observer.observe(document, { childList: true, subtree: true });
 
-    // Fallback: intercept on DOMContentLoaded if MutationObserver doesn't fire (shouldn't happen)
+    // Fallback: intercept on DOMContentLoaded if MutationObserver doesn't fire
     document.addEventListener('DOMContentLoaded', function() {
       observer.disconnect(); // Clean up observer
       if (!window.__js_unshroud_console_intercepted) {
         interceptConsole();
       }
     });
+
+    // Safety timeout fallback for edge cases (about:blank without body, broken DOM)
+    // This ensures instrumentation always activates even if observer never fires
+    setTimeout(function() {
+      if (!window.__js_unshroud_console_intercepted) {
+        observer.disconnect();
+        interceptConsole();
+      }
+    }, 100);
   } else {
-    // Page already loaded, intercept immediately
+    // Unknown state, intercept immediately
     interceptConsole();
   }
 

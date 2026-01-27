@@ -1,12 +1,25 @@
-import { describe, test, expect, afterAll } from 'vitest';
+import { describe, test, expect, beforeEach, afterAll } from 'vitest';
 import { runMonitoring } from '../src/cli/runner';
 import { readFileSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { InstrumentationConfig } from '../src/schema/types';
 
+// Run tests sequentially to avoid browser resource contention
+// Each test launches a Chromium instance via runMonitoring()
 describe('Behavioral Simulation Integration Tests', () => {
   const testOutputDir = '/tmp';
   const createdFiles: string[] = [];
+
+  // Add delay between tests to ensure browser cleanup completes
+  // Prevents resource contention when multiple tests run consecutively
+  let isFirstTest = true;
+  beforeEach(async () => {
+    if (!isFirstTest) {
+      // Wait 500ms between tests for browser cleanup to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    isFirstTest = false;
+  });
 
   afterAll(() => {
     // Clean up test output files

@@ -10,6 +10,9 @@ export default defineConfig({
     // Limit file parallelism to prevent browser resource exhaustion
     // Multiple test files launch Chromium simultaneously, causing timeouts
     fileParallelism: false,
+    // Limit test concurrency within files to prevent browser resource contention
+    // Tests that launch Chromium (instrumentation, behavioral-simulation) can't run concurrently
+    maxConcurrency: 1,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

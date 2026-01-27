@@ -655,33 +655,9 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
   });
 
   describe('Headless Mitigation Script', () => {
-    test('should override navigator.webdriver to false', async () => {
-      page = await browser.newPage();
-
-      const events: any[] = [];
-      await page.exposeFunction('__test_log_event', (event: string) => {
-        events.push(JSON.parse(event));
-      });
-
-      await page.addInitScript(() => {
-        window.__js_unshroud_log = (data: string) => {
-          (window as any).__test_log_event(data);
-        };
-      });
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(headlessMitigationScript);
-      await page.goto('about:blank');
-
-      const webdriver = await page.evaluate(() => navigator.webdriver);
-      expect(webdriver).toBe(false);
-
-      const mitigationEvents = events.filter(e => e.type === 'headless_mitigation' && e.method === 'navigator.webdriver');
-      expect(mitigationEvents.length).toBeGreaterThan(0);
-      expect(mitigationEvents[0].operation).toBe('value_override');
-      expect(mitigationEvents[0].newValue).toBe(false);
-      await page.close();
-    });
+    // Note: navigator.webdriver test removed - property is intentionally NOT overridden
+    // The --disable-blink-features=AutomationControlled flag prevents property creation
+    // See headless-mitigation.js lines 189-196 and CLAUDE.md line 329-330
 
     test('should override navigator.hardwareConcurrency to 8', async () => {
       page = await browser.newPage();

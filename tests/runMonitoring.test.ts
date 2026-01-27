@@ -5,8 +5,16 @@ import { resolve } from 'path';
 
 describe('runMonitoring Function', () => {
   let tempOutputFile: string;
+  let isFirstTest = true;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Add delay between tests to ensure browser cleanup completes
+    // Prevents resource contention when multiple tests run consecutively
+    if (!isFirstTest) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    isFirstTest = false;
+
     tempOutputFile = `/tmp/runmon-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
   });
 
