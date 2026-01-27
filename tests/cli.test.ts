@@ -389,7 +389,7 @@ describe('Instrumentation Injection', () => {
     const mockCdpManager = createMockCdpManager();
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger, mockCdpManager);
 
-    expect(addInitScript).toHaveBeenCalledTimes(8); // bridge + bootstrap + network + storage + clipboard + download + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(9); // prepareStackTrace freeze + bridge + bootstrap + network + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -443,7 +443,7 @@ describe('Instrumentation Injection', () => {
     const mockCdpManager = createMockCdpManager();
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger, mockCdpManager);
 
-    expect(addInitScript).toHaveBeenCalledTimes(7); // bridge + bootstrap + storage + clipboard + download + config + performanceMonitor
+    expect(addInitScript).toHaveBeenCalledTimes(8); // prepareStackTrace freeze + bridge + bootstrap + storage + clipboard + download + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );
@@ -548,7 +548,7 @@ describe('Instrumentation Injection', () => {
     const mockCdpManager = createMockCdpManager();
     await injectInstrumentation(page, config, 'test-session', mockEventLogger, mockArtifactCollector, mockLogger, mockCdpManager);
 
-    expect(addInitScript).toHaveBeenCalledTimes(4); // bridge + bootstrap + config + performanceMonitor (no exposeFunction needed)
+    expect(addInitScript).toHaveBeenCalledTimes(5); // prepareStackTrace freeze + bridge + bootstrap + config + performanceMonitor
     expect(addInitScript).toHaveBeenCalledWith(
       expect.objectContaining({ content: expect.any(String) })
     );

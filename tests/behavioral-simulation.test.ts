@@ -16,7 +16,7 @@ describe('Behavioral Simulation Integration Tests', () => {
   beforeEach(async () => {
     if (!isFirstTest) {
       // Wait 500ms between tests for browser cleanup to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => globalThis.setTimeout(resolve, 500));
     }
     isFirstTest = false;
   });

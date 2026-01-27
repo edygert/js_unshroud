@@ -11,7 +11,7 @@ describe('runMonitoring Function', () => {
     // Add delay between tests to ensure browser cleanup completes
     // Prevents resource contention when multiple tests run consecutively
     if (!isFirstTest) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => globalThis.setTimeout(resolve, 500));
     }
     isFirstTest = false;
 
@@ -143,8 +143,15 @@ describe('runMonitoring Function', () => {
 
 describe('Main Function Entry Point', () => {
   let tempOutputFile: string;
+  let isFirstTest = true;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Add delay between tests to ensure browser cleanup completes
+    if (!isFirstTest) {
+      await new Promise(resolve => globalThis.setTimeout(resolve, 500));
+    }
+    isFirstTest = false;
+
     tempOutputFile = `/tmp/main-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
   });
 
@@ -289,25 +296,28 @@ describe('Main Function Entry Point', () => {
 });
 
 describe('Page Snapshot Dual-Save', () => {
+  beforeEach(async () => {
+    // Add delay to ensure browser cleanup from previous tests
+    await new Promise(resolve => globalThis.setTimeout(resolve, 500));
+  });
+
   test('should capture both initial and final page snapshots with distinct stages', async () => {
     const artifactsDir = `/tmp/artifacts-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Create temp config file with artifact collection enabled
     const configPath = `/tmp/snapshot-test-config-${Date.now()}.json`;
     const testConfig = {
-      artifactCollection: {
-        enabled: true,
-        baseDirectory: artifactsDir,
-        types: {
-          pageSnapshot: true,
-          downloads: false,
-          codeExecution: false,
-          encoding: false,
-          cryptojs: false,
-          clipboard: false,
-          workers: false,
-          iframes: false
-        }
+      enableArtifactCollection: true,
+      artifactDirectory: artifactsDir,
+      artifactTypes: {
+        pageSnapshot: true,
+        downloads: false,
+        codeExecution: false,
+        encoding: false,
+        cryptojs: false,
+        clipboard: false,
+        workers: false,
+        iframes: false
       },
       monitoringTimeoutSeconds: 3
     };
