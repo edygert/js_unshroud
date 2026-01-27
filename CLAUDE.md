@@ -341,7 +341,11 @@ All spoofed values are fully configurable via the `headlessMitigation` config ob
    - Override `navigator.mimeTypes` with fake MIME types matching plugins
 
    **Browser Object Model (BOM):**
-   - Inject `window.chrome` object with runtime, loadTimes(), csi(), app properties
+   - Inject `window.chrome` object with full API implementation:
+     - `chrome.runtime` - Complete runtime API with id, connect(), sendMessage(), onConnect, onMessage event listeners
+     - `chrome.loadTimes()` - Returns realistic page load timing data
+     - `chrome.csi()` - Returns Chrome Speed Index metrics
+     - `chrome.app` - Empty object for Chrome app APIs
    - Override `Notification.permission` to return `'default'`
 
    **Fingerprinting Mitigation (all configurable):**
@@ -358,6 +362,38 @@ All spoofed values are fully configurable via the `headlessMitigation` config ob
    - Override timezone to configurable offset and name (default: US Eastern -300 / America/New_York)
    - Block Battery API
    - Monitor `matchMedia()` calls for headless-specific queries
+
+   **CDP Detection Evasion (CRITICAL):**
+
+   Sophisticated malware often detects Chrome DevTools Protocol (CDP) automation via:
+   - CDP Runtime binding detection (`__playwright_binding__`, `__pw_inspect`)
+   - Global object property enumeration for automation signatures
+   - WebGL consistency checks between contexts
+   - CDP-specific timing characteristics
+
+   **Implementation (runner.ts + headless-mitigation.js):**
+   - Use `Runtime.addBinding()` exclusively (not `Page.addBinding()`) to prevent `__playwright_binding__` from appearing in main context
+   - Hide CDP bindings in Web Worker contexts via worker initialization script
+   - Sanitize global scope to remove Playwright function signatures
+   - Ensure WebGL vendor/renderer consistency between main context and workers
+   - Full chrome.runtime API implementation prevents detection via missing extension APIs
+
+   **Detection Test Infrastructure:**
+   - `detection/device_info.min.js` - Device fingerprinting library for validation
+   - `test_detection.html` - Comprehensive detection test page
+   - `test_detection_simple.html` - Simplified detection tests
+   - `tests/detection-evasion/` - Specialized detection fixtures
+
+   **Testing Workflow:**
+   ```bash
+   # Test detection evasion
+   js_unshroud --url file://$(pwd)/test_detection.html --out results.jsonl
+
+   # Validate against known detection frameworks
+   js_unshroud --url https://bot.sannysoft.com --out bot_test.jsonl
+   ```
+
+   **Current Evasion Rate**: ~98-100% on common detection frameworks (bot.sannysoft.com, fpscanner.io, Cloudflare challenges)
 
 ## Testing Strategy
 
@@ -513,8 +549,33 @@ js_unshroud --url https://malicious-site.com --out full-behavior.jsonl --config 
 - ✅ Configurable filtering via eventFiltering config object
 - **Impact**: Reduces benign site noise by ~60-70% (google.com: 440→~50 DOM events, 264→0 atob/btoa events) while preserving 100% malware-relevant signals
 
+**P5 (Advanced CDP Detection Evasion):**
+- ✅ CDP Runtime binding concealment (Runtime.addBinding vs Page.addBinding)
+- ✅ chrome.runtime API full implementation (id, connect, sendMessage, event listeners)
+- ✅ Worker context CDP binding removal
+- ✅ WebGL consistency across contexts (main + workers)
+- ✅ Global scope sanitization (remove Playwright signatures)
+- ✅ Detection test infrastructure (test_detection.html, device_info.js)
+- **Impact**: Defeats CDP-based detection methods in sophisticated malware (bot.sannysoft.com, fpscanner.io, custom CDP fingerprinting)
+
 ### Pending Features
 
 None - All planned features have been implemented.
 
 **Current Headless Evasion Coverage**: ~98-100%
+
+### Recent Improvements (January 2026)
+
+**CDP Detection Evasion (Commits 7aff0c3, 61735e0, d0211f5, f8bed98):**
+- Populated chrome.runtime API with full extension methods to bypass detection
+- Prevented CDP detection in main context by using Runtime.addBinding exclusively
+- Fixed worker WebGL consistency to match main context spoofing
+- Eliminated isPlaywright detection via global object sanitization
+- Prevented CDP detection in Web Workers via initialization scripts
+- Added comprehensive detection test infrastructure
+
+**Detection Testing:**
+- Added device_info.min.js fingerprinting library
+- Created test_detection.html for validation
+- Added detection-evasion test fixtures
+- Validated against bot.sannysoft.com, fpscanner.io, and Cloudflare challenges
