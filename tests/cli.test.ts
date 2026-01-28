@@ -691,7 +691,7 @@ describe('CDPSessionManager Tests', () => {
 
   test('should successfully flush pending events', async () => {
     const sessionConfig: SessionConfig = createSessionConfig({
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: undefined
     });
@@ -743,7 +743,7 @@ describe('End-to-End Integration Tests', () => {
   test('should successfully instrument and monitor test page', async () => {
     // Create real SessionConfig using the test HTML file
     const sessionConfig: SessionConfig = createSessionConfig({
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: undefined
     });
@@ -846,7 +846,7 @@ describe('End-to-End Integration Tests', () => {
 
   test('should handle CDP session initialization errors', async () => {
     const sessionConfig: SessionConfig = createSessionConfig({
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: undefined
     });
@@ -877,7 +877,7 @@ describe('End-to-End Integration Tests', () => {
 
   test('should handle instrumentation injection failures', async () => {
     const sessionConfig: SessionConfig = createSessionConfig({
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: undefined
     });

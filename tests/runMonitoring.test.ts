@@ -30,7 +30,7 @@ describe('runMonitoring Function', () => {
 
   test('should complete full monitoring cycle with runMonitoring', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: undefined
     };
@@ -59,7 +59,7 @@ describe('runMonitoring Function', () => {
 
   test('should handle runMonitoring with custom config', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: './tests/fixtures/valid-config.json'
     };
@@ -89,7 +89,7 @@ describe('runMonitoring Function', () => {
 
   test('should capture console and network events via runMonitoring', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: undefined
     };
@@ -110,7 +110,7 @@ describe('runMonitoring Function', () => {
 
   test('should properly cleanup on success', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: undefined
     };
@@ -124,7 +124,7 @@ describe('runMonitoring Function', () => {
 
   test('should handle partial config in runMonitoring', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: './tests/fixtures/partial-config.json'
     };
@@ -179,7 +179,7 @@ describe('Main Function Entry Point', () => {
 
   test('should execute with headless mitigation enabled', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: {
         enableHeadlessMitigation: true,
@@ -203,7 +203,7 @@ describe('Main Function Entry Point', () => {
 
   test('should execute with UDP logging enabled', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: {
         outputMode: 'both' as const,
@@ -224,7 +224,7 @@ describe('Main Function Entry Point', () => {
 
   test('should execute with all instrumentation features enabled', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: {
         enableHeadlessMitigation: true,
@@ -253,7 +253,7 @@ describe('Main Function Entry Point', () => {
 
   test('should execute with custom monitoring timeout', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: {
         monitoringTimeoutSeconds: 2
@@ -273,7 +273,7 @@ describe('Main Function Entry Point', () => {
 
   test('should execute with performance tuning configuration', async () => {
     const args = {
-      url: `file://${resolve('test_monitoring.html')}`,
+      url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: {
         dedupeWindowMs: 200,
