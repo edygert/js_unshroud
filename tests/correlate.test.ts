@@ -1,4 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { parseCorrelateArgs, validateArgs, loadCustomRules, correlateEvents, formatEventSummary, resolveRulesFilePath, runCorrelate } from '../src/cli/correlate.ts';
 import type { MonitoringEvent, NetworkEvent, StorageEvent, ErrorEvent, ConsoleEvent, TimerEvent, CodeExecutionEvent, FingerprintingEvent } from '../src/schema/types.ts';
 import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmdirSync } from 'fs';
@@ -10,8 +12,8 @@ describe('Correlate Command Tests', () => {
 
   beforeEach(() => {
     originalArgv = [...process.argv];
-    tempFilePath = `/tmp/correlate-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
-    tempRulesPath = `/tmp/rules-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.json`;
+    tempFilePath = join(tmpdir(), `correlate-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
+    tempRulesPath = join(tmpdir(), `rules-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.json`);
   });
 
   afterEach(() => {
@@ -191,7 +193,7 @@ describe('Correlate Command Tests', () => {
       const originalCwd = process.cwd();
 
       // Create a unique temp directory with a correlation_rules.json file
-      const uniqueTempDir = `/tmp/correlate-test-cwd-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const uniqueTempDir = join(tmpdir(), `correlate-test-cwd-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
       const tempRulesPath = `${uniqueTempDir}/correlation_rules.json`;
       const tempCwdContent = JSON.stringify({ rules: [] });
 
@@ -227,7 +229,7 @@ describe('Correlate Command Tests', () => {
       const originalCwd = process.cwd();
 
       // Create a unique temp directory that definitely won't have correlation_rules.json
-      const uniqueTempDir = `/tmp/correlate-test-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const uniqueTempDir = join(tmpdir(), `correlate-test-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
 
       try {
         // Create and change to the unique temp directory

@@ -1,9 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { tmpdir } from 'os';
 import { QueryEngine, type QueryFilter } from '../src/analysis/QueryEngine.ts';
 import { TimelineFormatter, type TimeRange } from '../src/analysis/TimelineFormatter.ts';
 import { CorrelationEngine, type CorrelationRule } from '../src/analysis/CorrelationEngine.ts';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
+import { resolve, join } from 'path';
 import type {
   MonitoringEvent,
   ConsoleEvent,
@@ -78,7 +79,7 @@ describe('Analysis Engine Tests', () => {
 
   beforeEach(() => {
     // Create temp file with test data
-    tempFilePath = `/tmp/analysis-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+    tempFilePath = join(tmpdir(), `analysis-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
     const content = events.map(event => JSON.stringify(event)).join('\n');
     writeFileSync(tempFilePath, content);
   });
@@ -1175,7 +1176,7 @@ describe('Analysis Engine Tests', () => {
 
     beforeEach(() => {
       // Create temp file with correlation test data
-      tempFilePath = `/tmp/correlation-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+      tempFilePath = join(tmpdir(), `correlation-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
     });
 
     afterEach(() => {
@@ -1394,7 +1395,7 @@ describe('Analysis Engine Tests', () => {
 
     test('should throw error for non-existent correlation rule', async () => {
       correlationEngine = new CorrelationEngine(new QueryEngine(), loadDefaultRules());
-      await expect(correlationEngine.findCorrelations('/tmp/empty.jsonl', 'non-existent-rule'))
+      await expect(correlationEngine.findCorrelations(join(tmpdir(), 'empty.jsonl'), 'non-existent-rule'))
         .rejects.toThrow('Correlation rule \'non-existent-rule\' not found');
     });
 

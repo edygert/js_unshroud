@@ -1,4 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { ArtifactCollector, type ArtifactConfig } from '../src/orchestrator/ArtifactCollector.ts';
 import type {
   SessionConfig,
@@ -27,7 +29,7 @@ describe('ArtifactCollector', () => {
       id: `test-session-${Date.now()}`,
       url: 'https://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test.jsonl'
+      outputPath: join(tmpdir(), 'test.jsonl')
     };
   }
 

@@ -1,4 +1,6 @@
 import { describe, test, expect } from 'vitest';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { EventLogger } from '../src/orchestrator/EventLogger.ts';
 import { createEvent, validateEvent, serializeEvent } from '../src/schema/events.ts';
 import type { ConsoleEvent, NetworkEvent, StorageEvent, SessionConfig, MonitoringEvent } from '../src/schema/types.ts';
@@ -9,7 +11,7 @@ describe('EventLogger', () => {
       id: 'test-session-init',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test_init.jsonl'
+      outputPath: join(tmpdir(), 'test_init.jsonl')
     };
 
     const logger = new EventLogger(config);
@@ -21,7 +23,7 @@ describe('EventLogger', () => {
       id: 'test-session-validate',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test_validate.jsonl'
+      outputPath: join(tmpdir(), 'test_validate.jsonl')
     };
 
     const logger = new EventLogger(config);
@@ -59,7 +61,7 @@ describe('EventLogger', () => {
       id: 'test-session-multi',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test_multi.jsonl'
+      outputPath: join(tmpdir(), 'test_multi.jsonl')
     };
 
     const logger = new EventLogger(config);
@@ -94,7 +96,7 @@ describe('EventLogger', () => {
       id: 'test-session-reject',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test_reject.jsonl'
+      outputPath: join(tmpdir(), 'test_reject.jsonl')
     };
 
     const logger = new EventLogger(config);
@@ -114,7 +116,7 @@ describe('EventLogger', () => {
       id: 'test-session-close',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: '/tmp/test_close.jsonl'
+      outputPath: join(tmpdir(), 'test_close.jsonl')
     };
 
     const logger = new EventLogger(config);
@@ -139,7 +141,7 @@ describe('EventLogger', () => {
       id: 'test-session-flush',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: `/tmp/test-flush-${Date.now()}.jsonl`
+      outputPath: join(tmpdir(), `test-flush-${Date.now()}.jsonl`)
     };
 
     const logger = new EventLogger(config);
@@ -167,7 +169,7 @@ describe('EventLogger', () => {
       id: 'test-session-closed-flush',
       url: 'http://example.com',
       startTime: Date.now(),
-      outputPath: `/tmp/test-closed-flush-${Date.now()}.jsonl`
+      outputPath: join(tmpdir(), `test-closed-flush-${Date.now()}.jsonl`)
     };
 
     const logger = new EventLogger(config);

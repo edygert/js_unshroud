@@ -1,5 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import {
   parseAnalyzeArgs,
   validateArgs,
@@ -33,41 +35,48 @@ import type {
 
 describe('Analyze Command Argument Parsing', () => {
   test('should parse required --input argument', () => {
-    process.argv = ['node', 'runner.ts', 'analyze', '--input', '/tmp/events.jsonl'];
+    const testPath = join(tmpdir(), 'events.jsonl');
+    process.argv = ['node', 'runner.ts', 'analyze', '--input', testPath];
     const args = parseAnalyzeArgs();
 
-    expect(args.input).toBe('/tmp/events.jsonl');
+    expect(args.input).toBe(testPath);
     expect(args.format).toBeUndefined();
     expect(args.output).toBeUndefined();
   });
 
   test('should parse optional --format argument', () => {
-    process.argv = ['node', 'runner.ts', 'analyze', '--input', '/tmp/events.jsonl', '--format', 'json'];
+    const testPath = join(tmpdir(), 'events.jsonl');
+    process.argv = ['node', 'runner.ts', 'analyze', '--input', testPath, '--format', 'json'];
     const args = parseAnalyzeArgs();
 
-    expect(args.input).toBe('/tmp/events.jsonl');
+    expect(args.input).toBe(testPath);
     expect(args.format).toBe('json');
   });
 
   test('should parse optional --output argument', () => {
-    process.argv = ['node', 'runner.ts', 'analyze', '--input', '/tmp/events.jsonl', '--output', '/tmp/timeline.txt'];
+    const inputPath = join(tmpdir(), 'events.jsonl');
+    const outputPath = join(tmpdir(), 'timeline.txt');
+    process.argv = ['node', 'runner.ts', 'analyze', '--input', inputPath, '--output', outputPath];
     const args = parseAnalyzeArgs();
 
-    expect(args.input).toBe('/tmp/events.jsonl');
-    expect(args.output).toBe('/tmp/timeline.txt');
+    expect(args.input).toBe(inputPath);
+    expect(args.output).toBe(outputPath);
   });
 
   test('should parse all arguments together', () => {
-    process.argv = ['node', 'runner.ts', 'analyze', '--input', '/tmp/events.jsonl', '--format', 'stats', '--output', '/tmp/stats.txt'];
+    const inputPath = join(tmpdir(), 'events.jsonl');
+    const outputPath = join(tmpdir(), 'stats.txt');
+    process.argv = ['node', 'runner.ts', 'analyze', '--input', inputPath, '--format', 'stats', '--output', outputPath];
     const args = parseAnalyzeArgs();
 
-    expect(args.input).toBe('/tmp/events.jsonl');
+    expect(args.input).toBe(inputPath);
     expect(args.format).toBe('stats');
-    expect(args.output).toBe('/tmp/stats.txt');
+    expect(args.output).toBe(outputPath);
   });
 
   test('should default format to undefined when not specified', () => {
-    process.argv = ['node', 'runner.ts', 'analyze', '--input', '/tmp/events.jsonl'];
+    const testPath = join(tmpdir(), 'events.jsonl');
+    process.argv = ['node', 'runner.ts', 'analyze', '--input', testPath];
     const args = parseAnalyzeArgs();
 
     expect(args.format).toBeUndefined();
@@ -93,7 +102,7 @@ describe('Analyze Command Validation', () => {
   let tempFilePath: string;
 
   beforeEach(() => {
-    tempFilePath = '/tmp/test-analyze-events.jsonl';
+    tempFilePath = join(tmpdir(), `test-analyze-events-${Date.now()}.jsonl`);
     writeFileSync(tempFilePath, '{"id":"1","timestamp":1000,"sessionId":"session-1","type":"console","level":"log","message":"test"}\n');
   });
 
@@ -114,7 +123,7 @@ describe('Analyze Command Validation', () => {
     });
     const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const args = { input: '/tmp/nonexistent-file.jsonl' };
+    const args = { input: join(tmpdir(), 'nonexistent-file.jsonl') };
     expect(() => validateArgs(args)).toThrow('Process exit');
     expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('Input file not found'));
 
@@ -148,7 +157,7 @@ describe('Analyze Command Execution', () => {
   let sampleEvents: MonitoringEvent[];
 
   beforeEach(() => {
-    tempFilePath = '/tmp/test-analyze-execution.jsonl';
+    tempFilePath = join(tmpdir(), `test-analyze-execution-${Date.now()}.jsonl`);
 
     // Create sample events
     sampleEvents = [
@@ -222,7 +231,7 @@ describe('Analyze Command Execution', () => {
   });
 
   test('should handle empty input file gracefully', async () => {
-    const emptyFile = '/tmp/test-empty.jsonl';
+    const emptyFile = join(tmpdir(), `test-empty-${Date.now()}.jsonl`);
     writeFileSync(emptyFile, '');
 
     const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -238,7 +247,7 @@ describe('Analyze Command Execution', () => {
   });
 
   test('should handle malformed JSONL lines gracefully', async () => {
-    const malformedFile = '/tmp/test-malformed.jsonl';
+    const malformedFile = join(tmpdir(), `test-malformed-${Date.now()}.jsonl`);
     writeFileSync(malformedFile,
       JSON.stringify(sampleEvents[0]) + '\n' +
       '{incomplete json\n' +
@@ -268,7 +277,7 @@ describe('Statistics Formatting', () => {
   let tempFilePath: string;
 
   beforeEach(() => {
-    tempFilePath = '/tmp/test-stats.jsonl';
+    tempFilePath = join(tmpdir(), `test-stats-${Date.now()}.jsonl`);
 
     const events: MonitoringEvent[] = [
       { id: '1', timestamp: 1000, sessionId: 's1', type: 'console', level: 'log', message: 'msg1' } as ConsoleEvent,
@@ -343,7 +352,7 @@ describe('All Event Types Coverage', () => {
   let tempFilePath: string;
 
   beforeEach(() => {
-    tempFilePath = '/tmp/test-all-event-types.jsonl';
+    tempFilePath = join(tmpdir(), `test-all-event-types-${Date.now()}.jsonl`);
   });
 
   afterEach(() => {

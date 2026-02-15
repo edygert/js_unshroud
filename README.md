@@ -9,9 +9,9 @@ A headless JavaScript monitoring and analysis tool that instruments web pages to
 
 ## Installation
 
-### Complete Environment Setup
+### Linux/macOS Setup
 
-Follow these steps to set up the complete development environment:
+Follow these steps to set up the development environment on Linux or macOS:
 
 1. **Install Bun runtime:**
    ```bash
@@ -20,7 +20,11 @@ Follow these steps to set up the complete development environment:
 
 2. **Reload your shell configuration:**
    ```bash
+   # For bash
    . ~/.bashrc
+
+   # For zsh
+   . ~/.zshrc
    ```
 
 3. **Verify Bun installation:**
@@ -47,7 +51,7 @@ Follow these steps to set up the complete development environment:
 
 7. **Verify installation by running tests:**
    ```bash
-   bun test:coverage
+   bun test
    ```
 
 8. **Build the standalone executable:**
@@ -56,6 +60,58 @@ Follow these steps to set up the complete development environment:
    ```
 
 After completing these steps, you'll have a fully functional development environment with the compiled binary at `dist/js_unshroud`.
+
+### Windows Setup
+
+Follow these steps to set up the development environment on Windows:
+
+1. **Install Bun runtime:**
+
+   Open PowerShell and run:
+   ```powershell
+   powershell -c "irm bun.sh/install.ps1 | iex"
+   ```
+
+2. **Restart PowerShell** to reload environment variables
+
+3. **Verify Bun installation:**
+   ```powershell
+   bun --version
+   ```
+
+4. **Clone the repository and install dependencies:**
+   ```powershell
+   git clone <repository-url>
+   cd js_unshroud
+   bun install
+   ```
+
+5. **Install Playwright test dependencies:**
+   ```powershell
+   npm install @playwright/test
+   ```
+
+6. **Install Chromium browser for Playwright:**
+   ```powershell
+   npx playwright install chromium
+   ```
+
+7. **Verify installation by running tests:**
+   ```powershell
+   bun test
+   ```
+
+8. **Build the standalone executable:**
+   ```powershell
+   bun run build
+   ```
+
+After completing these steps, you'll have a fully functional development environment with the compiled binary at `dist/js_unshroud-windows-x64.exe`.
+
+**Note for Windows users:**
+- The shell scripts (`*.sh` files) require WSL, Git Bash, or similar Unix-like environment
+- All `bun` commands work natively in PowerShell or Command Prompt
+- The compiled Windows executable (`js_unshroud-windows-x64.exe`) runs without any dependencies
 
 ## Building
 
@@ -79,12 +135,24 @@ bun run dev
 
 ### Using the built binary (recommended for production)
 
+**Linux/macOS:**
 ```bash
 ./dist/js_unshroud run --url https://example.com --out events.jsonl
 ```
 
+**Windows (PowerShell):**
+```powershell
+.\dist\js_unshroud-windows-x64.exe run --url https://example.com --out events.jsonl
+```
+
+**Windows (Command Prompt):**
+```cmd
+dist\js_unshroud-windows-x64.exe run --url https://example.com --out events.jsonl
+```
+
 ### Using TypeScript source (development)
 
+Works the same on all platforms:
 ```bash
 bun run dev --url https://example.com --out events.jsonl
 ```

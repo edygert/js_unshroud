@@ -1,4 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { parseQueryArgs, validateArgs, buildQueryFilter, queryEvents } from '../src/cli/query.ts';
 import type { MonitoringEvent, NetworkEvent, ConsoleEvent, StorageEvent } from '../src/schema/types.ts';
 import { writeFileSync, unlinkSync } from 'fs';
@@ -52,7 +54,7 @@ describe('Query Command Tests', () => {
     originalArgv = [...process.argv];
 
     // Create temp file with test data
-    tempFilePath = `/tmp/query-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+    tempFilePath = join(tmpdir(), `query-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
     const content = testEvents.map(event => JSON.stringify(event)).join('\n');
     writeFileSync(tempFilePath, content);
   });
@@ -473,7 +475,7 @@ describe('Query Command Tests', () => {
         args: []
       }));
 
-      const largeTempFile = `/tmp/large-query-test-${Date.now()}.jsonl`;
+      const largeTempFile = join(tmpdir(), `large-query-test-${Date.now()}.jsonl`);
       writeFileSync(largeTempFile, largeEvents.map(e => JSON.stringify(e)).join('\n'));
 
       try {
@@ -486,7 +488,7 @@ describe('Query Command Tests', () => {
     });
 
     test('should handle malformed JSON gracefully', async () => {
-      const malformedFile = `/tmp/malformed-query-test-${Date.now()}.jsonl`;
+      const malformedFile = join(tmpdir(), `malformed-query-test-${Date.now()}.jsonl`);
       const content = [
         JSON.stringify(testEvents[0]),
         '{"invalid": json',

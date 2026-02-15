@@ -10,7 +10,8 @@ import {
   performCleanup
 } from '../src/cli/runner.ts';
 import { readFileSync, unlinkSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
+import { tmpdir } from 'os';
 import { EventLogger } from '../src/orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../src/orchestrator/CDPSessionManager.ts';
 import type { InstrumentationConfig, SessionConfig } from '../src/schema/types.ts';
@@ -27,25 +28,28 @@ function createMockCdpManager() {
 
 describe('CLI Argument Parsing', () => {
   test('should parse required arguments --url and --out', () => {
-    process.argv = ['node', 'runner.ts', '--url', 'https://example.com', '--out', '/tmp/test.jsonl'];
+    const testPath = join(tmpdir(), 'test.jsonl');
+    process.argv = ['node', 'runner.ts', '--url', 'https://example.com', '--out', testPath];
     const args = parseArgs();
 
     expect(args.url).toBe('https://example.com');
-    expect(args.out).toBe('/tmp/test.jsonl');
+    expect(args.out).toBe(testPath);
     expect(args.config).toBeUndefined();
   });
 
   test('should parse optional --config argument', () => {
-    process.argv = ['node', 'runner.ts', '--url', 'https://example.com', '--out', '/tmp/test.jsonl', '--config', '/path/to/config.json'];
+    const testPath = join(tmpdir(), 'test.jsonl');
+    process.argv = ['node', 'runner.ts', '--url', 'https://example.com', '--out', testPath, '--config', '/path/to/config.json'];
     const args = parseArgs();
 
     expect(args.url).toBe('https://example.com');
-    expect(args.out).toBe('/tmp/test.jsonl');
+    expect(args.out).toBe(testPath);
     expect(args.config).toBe('/path/to/config.json');
   });
 
   test('should exit with error when --url is missing', () => {
-    process.argv = ['node', 'runner.ts', '--out', '/tmp/test.jsonl'];
+    const testPath = join(tmpdir(), 'test.jsonl');
+    process.argv = ['node', 'runner.ts', '--out', testPath];
 
     // Mock process.exit and console.error
     const originalExit = process.exit;
@@ -97,16 +101,18 @@ describe('CLI Argument Parsing', () => {
   });
 
   test('should ignore unknown arguments', () => {
-    process.argv = ['node', 'runner.ts', '--url', 'https://example.com', '--out', '/tmp/test.jsonl', '--unknown', 'value'];
+    const testPath = join(tmpdir(), 'test.jsonl');
+    process.argv = ['node', 'runner.ts', '--url', 'https://example.com', '--out', testPath, '--unknown', 'value'];
     const args = parseArgs();
 
     expect(args.url).toBe('https://example.com');
-    expect(args.out).toBe('/tmp/test.jsonl');
+    expect(args.out).toBe(testPath);
     expect(args.config).toBeUndefined();
   });
 
   test('should handle malformed argument pairs', () => {
-    process.argv = ['node', 'runner.ts', '--url', '--out', '/tmp/test.jsonl'];
+    const testPath = join(tmpdir(), 'test.jsonl');
+    process.argv = ['node', 'runner.ts', '--url', '--out', testPath];
 
     // Spy on process.exit to verify it's called when args are malformed
     const exitSpy = vi.spyOn(process, 'exit');
@@ -186,12 +192,13 @@ describe('Session ID Generation', () => {
 
 describe('Session Configuration Creation', () => {
   test('should create session config with args', () => {
-    const args = { url: 'https://test.com', out: '/tmp/test.jsonl', config: '/path/to/config.json' };
+    const testPath = join(tmpdir(), 'test.jsonl');
+    const args = { url: 'https://test.com', out: testPath, config: '/path/to/config.json' };
 
     const config = createSessionConfig(args);
 
     expect(config.url).toBe('https://test.com');
-    expect(config.outputPath).toBe('/tmp/test.jsonl');
+    expect(config.outputPath).toBe(testPath);
     expect(config.configPath).toBe('/path/to/config.json');
     expect(config.startTime).toBeDefined();
     expect(typeof config.startTime).toBe('number');
@@ -199,12 +206,13 @@ describe('Session Configuration Creation', () => {
   });
 
   test('should create session config without config path', () => {
-    const args = { url: 'https://test.com', out: '/tmp/test.jsonl', config: undefined };
+    const testPath = join(tmpdir(), 'test.jsonl');
+    const args = { url: 'https://test.com', out: testPath, config: undefined };
 
     const config = createSessionConfig(args);
 
     expect(config.url).toBe('https://test.com');
-    expect(config.outputPath).toBe('/tmp/test.jsonl');
+    expect(config.outputPath).toBe(testPath);
     expect(config.configPath).toBeUndefined();
     expect(config.id).toMatch(/^session_\d+_[a-z0-9]+$/);
   });
@@ -615,7 +623,8 @@ describe('Cleanup Operations', () => {
 
 describe('Main Function', () => {
   test('should create valid configuration from args', () => {
-    const args = { url: 'https://example.com', out: '/tmp/test.out', config: './tests/fixtures/valid-config.json' };
+    const testPath = join(tmpdir(), 'test.out');
+    const args = { url: 'https://example.com', out: testPath, config: './tests/fixtures/valid-config.json' };
 
     // Test that the configuration loading and session creation works
     const config = loadInstrumentationConfig(args.config);
@@ -633,7 +642,7 @@ describe('CDPSessionManager Tests', () => {
   let tempOutputFile: string;
 
   beforeEach(() => {
-    tempOutputFile = `/tmp/cdp-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+    tempOutputFile = join(tmpdir(), `cdp-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
   });
 
   afterEach(() => {
@@ -726,7 +735,7 @@ describe('End-to-End Integration Tests', () => {
 
   // Create a temporary output file before each test
   beforeEach(() => {
-    tempOutputFile = `/tmp/test-output-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+    tempOutputFile = join(tmpdir(), `test-output-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
   });
 
   // Clean up temp file after each test

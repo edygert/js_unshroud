@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { tmpdir } from 'os';
 import { runMonitoring } from '../src/cli/runner.ts';
 import { readFileSync, unlinkSync, existsSync, writeFileSync, rmSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
 
 describe('runMonitoring Function', () => {
   let tempOutputFile: string;
@@ -15,7 +16,7 @@ describe('runMonitoring Function', () => {
     }
     isFirstTest = false;
 
-    tempOutputFile = `/tmp/runmon-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+    tempOutputFile = join(tmpdir(), `runmon-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
   });
 
   afterEach(() => {
@@ -152,7 +153,7 @@ describe('Main Function Entry Point', () => {
     }
     isFirstTest = false;
 
-    tempOutputFile = `/tmp/main-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`;
+    tempOutputFile = join(tmpdir(), `main-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jsonl`);
   });
 
   afterEach(() => {
@@ -302,10 +303,10 @@ describe('Page Snapshot Dual-Save', () => {
   });
 
   test('should capture both initial and final page snapshots with distinct stages', async () => {
-    const artifactsDir = `/tmp/artifacts-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const artifactsDir = join(tmpdir(), `artifacts-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
     // Create temp config file with artifact collection enabled
-    const configPath = `/tmp/snapshot-test-config-${Date.now()}.json`;
+    const configPath = join(tmpdir(), `snapshot-test-config-${Date.now()}.json`);
     const testConfig = {
       enableArtifactCollection: true,
       artifactDirectory: artifactsDir,
@@ -323,7 +324,7 @@ describe('Page Snapshot Dual-Save', () => {
     };
     writeFileSync(configPath, JSON.stringify(testConfig));
 
-    const tempOutputFile = `/tmp/test-output-snapshots-${Date.now()}.jsonl`;
+    const tempOutputFile = join(tmpdir(), `test-output-snapshots-${Date.now()}.jsonl`);
     const args = {
       url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
