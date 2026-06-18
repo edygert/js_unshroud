@@ -2,7 +2,7 @@
   "name": "js_unshroud",
   "module": "index.ts",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Headless JavaScript monitoring and analysis tool",
   "author": "Evan H. Dygert",
   "license": "MIT",
