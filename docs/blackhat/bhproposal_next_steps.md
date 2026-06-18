@@ -1,6 +1,6 @@
 Recommended Next Steps
 
-  1. Review the full proposal at /home/edygert333/ai/js_unshroud/BLACK_HAT_2026_PROPOSAL.md
+  1. Review the full proposal at BLACK_HAT_2026_PROPOSAL.md
   2. Customize the following sections:
     - Presenter credentials/bio (marked with placeholder)
     - Contact information (end of document)

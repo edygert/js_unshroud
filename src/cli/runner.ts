@@ -1,7 +1,12 @@
 #!/usr/bin/env bun
 
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
-import { readFileSync, existsSync } from 'fs';
+// playwright-core is loaded at runtime (see loadPlaywrightChromium) so the compiled
+// binary does not bake an absolute build-machine path into require.resolve(). Only
+// type information is imported statically here, which is erased at build time.
+import type { Browser, BrowserContext, BrowserType, Page } from 'playwright-core';
+import { readFileSync, existsSync, realpathSync } from 'fs';
+import { dirname, join } from 'path';
+import { pathToFileURL, fileURLToPath } from 'url';
 import { EventLogger } from '../orchestrator/EventLogger.ts';
 import { CDPSessionManager } from '../orchestrator/CDPSessionManager.ts';
 import { ArtifactCollector, type ArtifactConfig } from '../orchestrator/ArtifactCollector.ts';
@@ -39,6 +44,19 @@ interface Args {
   config?: string | Partial<InstrumentationConfig> | undefined;
 }
 
+const USAGE_LINES = [
+  'Usage:',
+  '  Run:       js_unshroud run --url <url> --out <output.jsonl> [--config <config.json>]',
+  '  Analyze:   js_unshroud analyze --input <events.jsonl> [--format text|json|stats] [--output <file>]',
+  '  Query:     js_unshroud query --input <events.jsonl> [FILTERS] [--format jsonl|count] [--output <file>]',
+  '  Correlate: js_unshroud correlate --input <events.jsonl> [--rules-file <file>] [--rules <names>] [OPTIONS]'
+];
+
+function printUsage(stream: 'stdout' | 'stderr' = 'stdout'): void {
+  const write = stream === 'stdout' ? console.log : console.error;
+  for (const line of USAGE_LINES) write(line);
+}
+
 function parseArgs(): Args {
   const args = process.argv.slice(2);
   let url: string | undefined, out: string | undefined, config: string | undefined;
@@ -66,11 +84,7 @@ function parseArgs(): Args {
   }
 
   if (!url || !out) {
-    console.error('Usage:');
-    console.error('  Run:       js_unshroud run --url <url> --out <output.jsonl> [--config <config.json>]');
-    console.error('  Analyze:   js_unshroud analyze --input <events.jsonl> [--format text|json|stats] [--output <file>]');
-    console.error('  Query:     js_unshroud query --input <events.jsonl> [FILTERS] [--format jsonl|count] [--output <file>]');
-    console.error('  Correlate: js_unshroud correlate --input <events.jsonl> [--rules-file <file>] [--rules <names>] [OPTIONS]');
+    printUsage('stderr');
     process.exit(1);
   }
 
@@ -225,6 +239,45 @@ function createSessionConfig(args: Args): SessionConfig {
   };
 }
 
+// Instrumentation scripts run in the browser context and are read from disk at runtime.
+// The directory is resolved relative to this module (dev / `bun run` / vitest) or relative
+// to the executable (compiled binary, where the scripts are shipped alongside it), never
+// relative to the current working directory. Resolved once and cached.
+let instrumentationDir: string | null = null;
+function resolveInstrumentationDir(): string {
+  if (instrumentationDir) return instrumentationDir;
+  const candidates: string[] = [];
+  // Dev / vitest / `bun run`: relative to this module (robust to cwd).
+  try {
+    candidates.push(join(dirname(fileURLToPath(import.meta.url)), '..', 'instrumentation'));
+  } catch {
+    // import.meta.url not resolvable; fall through to the candidates below.
+  }
+  // Compiled binary: shipped alongside the executable (see scripts/package-release.ts).
+  try {
+    candidates.push(join(dirname(realpathSync(process.execPath)), 'instrumentation'));
+  } catch {
+    // process.execPath not resolvable; fall through to the cwd fallback below.
+  }
+  // Last-resort fallback (matches tests/instrumentation.test.ts).
+  candidates.push(join(process.cwd(), 'src', 'instrumentation'));
+
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'bootstrap.js'))) {
+      instrumentationDir = dir;
+      return dir;
+    }
+  }
+  throw new Error(
+    'Could not locate instrumentation scripts. Ship the instrumentation/ directory next to ' +
+    'the js_unshroud binary.'
+  );
+}
+
+function readInstrumentationSource(name: string): string {
+  return readFileSync(join(resolveInstrumentationDir(), name), 'utf-8');
+}
+
 function loadInstrumentationScripts(config: InstrumentationConfig): {
   bootstrap: string;
   network: string | null;
@@ -248,52 +301,31 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   download: string | null;
   performanceMonitor: string;
 } {
-  const bootstrapScript = readFileSync('./src/instrumentation/bootstrap.js', 'utf-8');
-  const networkScript = readFileSync('./src/instrumentation/network-hooks.js', 'utf-8');
-  const storageScript = readFileSync('./src/instrumentation/storage-hooks.js', 'utf-8');
-  const timerScript = readFileSync('./src/instrumentation/timer-hooks.js', 'utf-8');
-  const domScript = readFileSync('./src/instrumentation/dom-hooks.js', 'utf-8');
-  const fingerprintingScript = readFileSync('./src/instrumentation/fingerprinting-hooks.js', 'utf-8');
-  const objectTrackingScript = readFileSync('./src/instrumentation/object-tracking.js', 'utf-8');
-  const headlessMitigationScript = readFileSync('./src/instrumentation/headless-mitigation.js', 'utf-8');
-  const serviceWorkerScript = readFileSync('./src/instrumentation/service-worker-hooks.js', 'utf-8');
-  const codeExecutionScript = readFileSync('./src/instrumentation/code-execution-hooks.js', 'utf-8');
-  const encodingScript = readFileSync('./src/instrumentation/encoding-hooks.js', 'utf-8');
-  const cryptojsScript = readFileSync('./src/instrumentation/cryptojs-hooks.js', 'utf-8');
-  const eventHandlerScript = readFileSync('./src/instrumentation/event-handler-hooks.js', 'utf-8');
-  const blobTrackingScript = readFileSync('./src/instrumentation/blob-hooks.js', 'utf-8');
-  const urlExecutionScript = readFileSync('./src/instrumentation/url-execution-hooks.js', 'utf-8');
-  const workerScript = readFileSync('./src/instrumentation/worker-hooks.js', 'utf-8');
-  const moduleScript = readFileSync('./src/instrumentation/module-hooks.js', 'utf-8');
-  const iframeScript = readFileSync('./src/instrumentation/iframe-hooks.js', 'utf-8');
-  const clipboardScript = readFileSync('./src/instrumentation/clipboard-hooks.js', 'utf-8');
-  const downloadScript = readFileSync('./src/instrumentation/download-hooks.js', 'utf-8');
-  const performanceMonitorScript = readFileSync('./src/instrumentation/performance-monitor.js', 'utf-8');
-
+  // Scripts are read from disk (resolved relative to the module or the executable).
   return {
-    bootstrap: bootstrapScript,
-    network: config.enableNetwork ? networkScript : null,
-    storage: config.enableStorage ? storageScript : null,
-    timer: config.enableTimer ? timerScript : null,
-    dom: config.enableDOM ? domScript : null,
-    fingerprinting: config.enableFingerprinting ? fingerprintingScript : null,
-    objectTracking: config.enableObjectTracking ? objectTrackingScript : null,
-    headlessMitigation: config.enableHeadlessMitigation ? headlessMitigationScript : null,
-    serviceWorker: config.enableServiceWorker ? serviceWorkerScript : null,
-    codeExecution: config.enableCodeExecution ? codeExecutionScript : null,
-    encoding: config.enableEncoding ? encodingScript : null,
-    cryptojs: config.enableCryptoJS ? cryptojsScript : null,
-    eventHandler: config.enableEventHandlers ? eventHandlerScript : null,
+    bootstrap: readInstrumentationSource('bootstrap.js'),
+    network: config.enableNetwork ? readInstrumentationSource('network-hooks.js') : null,
+    storage: config.enableStorage ? readInstrumentationSource('storage-hooks.js') : null,
+    timer: config.enableTimer ? readInstrumentationSource('timer-hooks.js') : null,
+    dom: config.enableDOM ? readInstrumentationSource('dom-hooks.js') : null,
+    fingerprinting: config.enableFingerprinting ? readInstrumentationSource('fingerprinting-hooks.js') : null,
+    objectTracking: config.enableObjectTracking ? readInstrumentationSource('object-tracking.js') : null,
+    headlessMitigation: config.enableHeadlessMitigation ? readInstrumentationSource('headless-mitigation.js') : null,
+    serviceWorker: config.enableServiceWorker ? readInstrumentationSource('service-worker-hooks.js') : null,
+    codeExecution: config.enableCodeExecution ? readInstrumentationSource('code-execution-hooks.js') : null,
+    encoding: config.enableEncoding ? readInstrumentationSource('encoding-hooks.js') : null,
+    cryptojs: config.enableCryptoJS ? readInstrumentationSource('cryptojs-hooks.js') : null,
+    eventHandler: config.enableEventHandlers ? readInstrumentationSource('event-handler-hooks.js') : null,
     // Blob tracking needed for worker CDP mitigation (to capture blob content)
-    blobTracking: (config.enableBlobTracking || config.enableHeadlessMitigation) ? blobTrackingScript : null,
-    urlExecution: config.enableURLExecution ? urlExecutionScript : null,
+    blobTracking: (config.enableBlobTracking || config.enableHeadlessMitigation) ? readInstrumentationSource('blob-hooks.js') : null,
+    urlExecution: config.enableURLExecution ? readInstrumentationSource('url-execution-hooks.js') : null,
     // Worker hooks needed for CDP mitigation in workers (even if worker logging disabled)
-    worker: (config.enableWorkers || config.enableHeadlessMitigation) ? workerScript : null,
-    module: config.enableModules ? moduleScript : null,
-    iframe: config.enableIframes ? iframeScript : null,
-    clipboard: config.enableClipboard ? clipboardScript : null,
-    download: config.enableDownloadDetection ? downloadScript : null,
-    performanceMonitor: performanceMonitorScript // Always loaded for performance controls
+    worker: (config.enableWorkers || config.enableHeadlessMitigation) ? readInstrumentationSource('worker-hooks.js') : null,
+    module: config.enableModules ? readInstrumentationSource('module-hooks.js') : null,
+    iframe: config.enableIframes ? readInstrumentationSource('iframe-hooks.js') : null,
+    clipboard: config.enableClipboard ? readInstrumentationSource('clipboard-hooks.js') : null,
+    download: config.enableDownloadDetection ? readInstrumentationSource('download-hooks.js') : null,
+    performanceMonitor: readInstrumentationSource('performance-monitor.js') // Always loaded for performance controls
   };
 }
 
@@ -1119,6 +1151,77 @@ async function simulateBehavior(page: Page, config: InstrumentationConfig, durat
   }
 }
 
+/**
+ * Resolve a playwright-core package directory (or a direct entry file) to an
+ * importable entry file path. Returns null if nothing usable is found.
+ */
+function resolvePlaywrightEntry(target: string): string | null {
+  // Direct reference to an entry file (e.g. .../playwright-core/index.mjs).
+  if (/\.(mjs|cjs|js)$/.test(target)) {
+    return existsSync(target) ? target : null;
+  }
+  // Package directory: prefer the ESM entry, then fall back to CJS.
+  for (const entry of ['index.mjs', 'index.js']) {
+    const full = join(target, entry);
+    if (existsSync(full)) return full;
+  }
+  return null;
+}
+
+/**
+ * Load playwright-core's `chromium` at runtime.
+ *
+ * The compiled binary intentionally does NOT embed playwright-core: it reads
+ * browser-registry data files from disk that Bun cannot bundle, and bundling it
+ * bakes the build machine's absolute path into the executable. Instead we resolve
+ * the package relative to the binary's own location so releases stay portable -
+ * ship `node_modules/playwright-core` next to the executable. Resolution order:
+ *   1. JS_UNSHROUD_PLAYWRIGHT_CORE env var (package dir or entry file)
+ *   2. <dir-of-binary>/node_modules/playwright-core   (vendored release layout)
+ *   3. bare "playwright-core" specifier                (dev: `bun run`)
+ */
+async function loadPlaywrightChromium(): Promise<BrowserType> {
+  const candidates: string[] = [];
+
+  const fromEnv = process.env['JS_UNSHROUD_PLAYWRIGHT_CORE'];
+  if (fromEnv) {
+    candidates.push(fromEnv);
+  }
+
+  try {
+    // realpathSync resolves a PATH symlink (e.g. /usr/local/bin/js_unshroud) back
+    // to the real install directory so the vendored package is found alongside it.
+    const binDir = dirname(realpathSync(process.execPath));
+    candidates.push(join(binDir, 'node_modules', 'playwright-core'));
+  } catch {
+    // process.execPath not resolvable; fall through to the bare specifier below.
+  }
+
+  for (const candidate of candidates) {
+    const entry = resolvePlaywrightEntry(candidate);
+    if (!entry) continue;
+    try {
+      const mod = (await import(pathToFileURL(entry).href)) as { chromium?: BrowserType };
+      if (mod.chromium) return mod.chromium;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  // Dev fallback: standard module resolution (works under `bun run`).
+  try {
+    const mod = (await import('playwright-core')) as { chromium?: BrowserType };
+    if (mod.chromium) return mod.chromium;
+  } catch {
+    // Fall through to the error below.
+  }
+
+  throw new Error(
+    'Could not locate playwright-core. Ship node_modules/playwright-core next to the ' +
+    'js_unshroud binary, or set JS_UNSHROUD_PLAYWRIGHT_CORE to its location.'
+  );
+}
+
 async function runMonitoring(args: Args): Promise<void> {
   const config = loadInstrumentationConfig(args.config);
   const logger = new Logger(config);
@@ -1177,8 +1280,10 @@ async function runMonitoring(args: Args): Promise<void> {
   const spoofedHeaders = useHeadlessMitigation && headlessConfig ? generateSpoofedHeaders(headlessConfig) : {};
   const brandMetadata = useHeadlessMitigation && headlessConfig ? generateBrandMetadata(headlessConfig) : undefined;
   
-  // Launch browser with headless mitigation settings
-  const browser = await chromium.launch({ 
+  // Launch browser with headless mitigation settings.
+  // playwright-core is resolved at runtime relative to the binary (see loadPlaywrightChromium).
+  const chromium = await loadPlaywrightChromium();
+  const browser = await chromium.launch({
     headless: false,
     args: useHeadlessMitigation 
       ? ['--disable-blink-features=AutomationControlled']
@@ -1357,6 +1462,12 @@ async function runMonitoring(args: Args): Promise<void> {
 
 async function main() {
   const subcommand = process.argv[2];
+
+  // Explicit help: print usage to stdout and exit 0 (no subcommand also shows help).
+  if (subcommand === undefined || subcommand === '--help' || subcommand === '-h') {
+    printUsage('stdout');
+    process.exit(0);
+  }
 
   if (subcommand === 'analyze') {
     const { runAnalyze } = await import('./analyze.ts');
