@@ -613,7 +613,7 @@ Based on remaining work from PART 1:
 
 #### P2b.1: Web Worker Instrumentation (2 days)
 
-**New File**: `/home/edygert333/ai/js_unshroud/src/instrumentation/worker-hooks.js`
+**New File**: `src/instrumentation/worker-hooks.js`
 
 **Instruments**:
 - `Worker` constructor
@@ -643,7 +643,7 @@ export interface WorkerEvent extends BaseEvent {
 
 #### P2b.2: Dynamic import() Detection (1 day)
 
-**New File**: `/home/edygert333/ai/js_unshroud/src/instrumentation/module-hooks.js`
+**New File**: `src/instrumentation/module-hooks.js`
 
 **Instruments**:
 - `<script type="module">` element detection via appendChild/insertBefore
@@ -666,7 +666,7 @@ export interface ModuleEvent extends BaseEvent {
 
 #### P2b.3: iframe Instrumentation (1-2 days)
 
-**New File**: `/home/edygert333/ai/js_unshroud/src/instrumentation/iframe-hooks.js`
+**New File**: `src/instrumentation/iframe-hooks.js`
 
 **Instruments**:
 - `iframe.srcdoc` setter - analyze HTML for scripts

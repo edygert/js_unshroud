@@ -64,6 +64,38 @@ bun run build:windows          # Windows x64
 bun run build:all              # All platforms
 ```
 
+All build scripts pass `--external playwright-core`. This is **required**: when playwright-core
+is bundled, Bun rewrites its internal `require.resolve()`/`__dirname` calls to the build
+machine's absolute path, which breaks the binary on every other machine (even `--help`).
+
+### Release (portable artifacts)
+```bash
+bun run release:linux          # build + package dist/js_unshroud-linux-x64.tar.gz
+bun run release:macos          # macOS x64
+bun run release:macos-arm      # macOS ARM64
+bun run release:windows        # Windows x64
+bun run release:all            # All platforms
+```
+
+`scripts/package-release.ts` assembles a tarball whose root dir contains the binary,
+`node_modules/playwright-core` (vendored), and `instrumentation/` (the hook scripts). A Bun
+`--compile` binary **cannot** be a single self-contained file here: playwright-core reads data
+files off disk at runtime, and the instrumentation scripts are read at runtime. Both are resolved
+relative to the executable's real path (see Runtime Resolution below). Chromium browsers are
+NOT packaged — supply them via `PLAYWRIGHT_BROWSERS_PATH`.
+
+### Runtime Resolution (runner.ts)
+- **playwright-core** — loaded via `loadPlaywrightChromium()` (dynamic `import()`), resolved in
+  order: `JS_UNSHROUD_PLAYWRIGHT_CORE` env var → `<dir-of-realpath(execPath)>/node_modules/playwright-core`
+  → bare specifier (dev / `bun run`). `realpathSync(process.execPath)` makes a `PATH` symlink
+  resolve back to the install dir. Only `import type` is imported statically (erased at build).
+- **instrumentation scripts** — read from disk via `resolveInstrumentationDir()` (cached): module
+  dir (`fileURLToPath(import.meta.url)/../instrumentation`, used by dev/tests/`bun run`) →
+  `<dir-of-realpath(execPath)>/instrumentation` (binary) → `process.cwd()/src/instrumentation`
+  (fallback matching `tests/instrumentation.test.ts`). Do NOT reintroduce Bun text imports
+  (`with { type: 'text' }`): vitest runs in a Node env and executes the `.js`, which references
+  `window` and throws.
+
 ### Testing
 ```bash
 bun test                       # Run all tests

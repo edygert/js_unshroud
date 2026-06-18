@@ -111,17 +111,50 @@ After completing these steps, you'll have a fully functional development environ
 **Note for Windows users:**
 - The shell scripts (`*.sh` files) require WSL, Git Bash, or similar Unix-like environment
 - All `bun` commands work natively in PowerShell or Command Prompt
-- The compiled Windows executable (`js_unshroud-windows-x64.exe`) runs without any dependencies
+- The compiled executable embeds the Bun runtime (no Bun/Node.js needed at runtime), but still
+  requires its `node_modules/playwright-core` and `instrumentation/` siblings plus a Chromium
+  browser — use `bun run release:windows` to produce a portable bundle (see
+  [Packaging and Distribution](#packaging-and-distribution))
 
 ## Building
 
-Build the application into a standalone executable:
+Build the compiled executable:
 
 ```bash
 bun run build
 ```
 
-This creates a compiled binary at `dist/js_unshroud` that can be run on any compatible system without requiring Bun or Node.js to be installed.
+This creates a binary at `dist/js_unshroud`. The binary embeds the Bun runtime (no Bun or
+Node.js needed at runtime), but it is **not** a single self-contained file: it requires
+`playwright-core` and the `instrumentation/` scripts to be present on disk next to it (see
+[Packaging and Distribution](#packaging-and-distribution)). Building alone is enough for local
+use from the project root; to produce a portable artifact for another machine, use the release
+scripts below.
+
+### Portable release builds
+
+```bash
+bun run release:linux        # dist/js_unshroud-linux-x64.tar.gz
+bun run release:macos        # dist/js_unshroud-macos-x64.tar.gz
+bun run release:macos-arm    # dist/js_unshroud-macos-arm64.tar.gz
+bun run release:windows      # dist/js_unshroud-windows-x64.tar.gz
+bun run release:all          # all of the above
+```
+
+Each `release:*` script builds the binary with `playwright-core` marked external (so no
+build-machine path is baked into the executable) and packages a tarball whose layout is:
+
+```
+js_unshroud-<target>/
+├── js_unshroud-<target>          # the binary
+├── node_modules/playwright-core/ # vendored Playwright (resolved relative to the binary)
+└── instrumentation/              # browser-context hook scripts
+```
+
+Extract the tarball anywhere and run the binary from inside it (or symlink it onto `PATH` — the
+binary resolves its dependencies via the real path of the executable, so symlinks work). Browser
+binaries are supplied separately via `PLAYWRIGHT_BROWSERS_PATH`; see
+[Packaging and Distribution](#packaging-and-distribution).
 
 ## Development
 
@@ -1399,60 +1432,79 @@ bun run check
 
 ## Packaging and Distribution
 
-The build process creates a standalone executable that can be distributed:
+A js_unshroud release has two runtime dependencies that live **on disk**, not inside the binary:
 
-1. Build the application: `bun run build`
-2. The executable `dist/js_unshroud` is ready to distribute
-3. Install Playwright browser dependencies:
+1. **`playwright-core` and the `instrumentation/` scripts** — shipped *alongside* the binary by
+   the `release:*` scripts. playwright-core cannot be embedded in a Bun `--compile` binary
+   because it reads its own data files (browser registry, etc.) from disk at runtime; the binary
+   therefore resolves it relative to the executable's real path.
+2. **The Chromium browser binary** — supplied via the `PLAYWRIGHT_BROWSERS_PATH` environment
+   variable (not packaged, due to size and licensing).
 
-   Since js_unshroud uses Playwright to control a headless Chrome browser for instrumentation, the executable needs access to browser binaries. Users must install Playwright's Chromium browser (the executable is not packaged with its own browser binaries due to size and licensing considerations).
+### Producing a release
 
-   **Installation Options:**
+```bash
+bun run release:linux   # → dist/js_unshroud-linux-x64.tar.gz
+```
 
-   - **Default (recommended)**: Install Chromium only
-     ```bash
-     npx playwright install chromium
-     ```
+The tarball is self-contained except for the browser. To use it on a target machine:
 
-   - **All browsers**: Install Chromium, Firefox, and WebKit
-     ```bash
-     npx playwright install
-     ```
+```bash
+tar -xzf js_unshroud-linux-x64.tar.gz
+cd js_unshroud-linux-x64
+PLAYWRIGHT_BROWSERS_PATH=/path/to/ms-playwright \
+  ./js_unshroud-linux-x64 run --url https://example.com --out events.jsonl
+```
 
-   - **System browser** (if you have Chromium/Chromium installed):
-     ```bash
-     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx playwright install-deps
-     ```
-     This installs system dependencies but uses your system-installed browser instead of downloading a specific Playwright version.
+You can verify the binary is portable without a capture by running `./js_unshroud-linux-x64 --help`
+(prints usage and exits 0).
 
-   - **CI/CD environments**: For automated deployments, you can pre-install browsers in your container or CI image using the above commands.
+### Installing the Chromium browser
 
-   Without the browser, the executable will fail to run with an error indicating the browser is not found.
+Since js_unshroud uses Playwright to drive Chromium for instrumentation, the browser binary must
+be available at runtime. Install it with the standard Playwright tooling, then point
+`PLAYWRIGHT_BROWSERS_PATH` at the install location:
+
+- **Default (recommended)**: Chromium only — `npx playwright install chromium`
+- **All browsers**: `npx playwright install`
+- **CI/containers**: pre-install in the image with the commands above
+
+By default Playwright installs to `~/.cache/ms-playwright` (Linux). Set
+`PLAYWRIGHT_BROWSERS_PATH` to that directory (or wherever you installed it) when running the
+binary. Without a reachable browser, `run` fails with an error indicating the browser was not
+found (the other subcommands — `analyze`, `query`, `correlate` — do not need a browser).
+
+### Advanced: overriding the playwright-core location
+
+The binary resolves `playwright-core` in this order: the `JS_UNSHROUD_PLAYWRIGHT_CORE`
+environment variable (a path to the package directory or its entry file), then
+`<dir-of-binary>/node_modules/playwright-core`, then standard module resolution (dev mode). Set
+`JS_UNSHROUD_PLAYWRIGHT_CORE` only if you keep playwright-core somewhere other than next to the
+binary.
 
 ## Deployment
 
-Since this is a CLI tool that produces a standalone binary, deployment options include:
-
-### Option 1: Direct Distribution
-- Build the executable on your target platform
-- Distribute the `dist/js_unshroud` binary
-- Ensure Playwright browsers are available (`npx playwright install chromium`)
+### Option 1: Direct distribution (recommended)
+- Build a portable release with `bun run release:<target>`.
+- Distribute the `dist/js_unshroud-<target>.tar.gz` (binary + `node_modules/playwright-core` +
+  `instrumentation/`).
+- Ensure a Chromium browser is available and pass `PLAYWRIGHT_BROWSERS_PATH` at runtime.
+- For a system install (e.g. REMnux/`/opt`): extract the tarball to `/opt/js_unshroud` and
+  symlink the binary into `PATH` (`ln -s /opt/js_unshroud/js_unshroud-linux-x64 /usr/local/bin/js_unshroud`).
 
 ### Option 2: Containerized
-Create a `Dockerfile` for containerized deployment:
+Create a `Dockerfile` that copies the whole extracted release directory and installs a browser:
 
 ```dockerfile
-FROM node:18-alpine
-RUN apk add --no-cache libc6-compat
+FROM node:18-slim
 WORKDIR /app
-COPY dist/js_unshroud ./
-RUN chmod +x js_unshroud
-RUN npx playwright install-deps chromium
-CMD ["./js_unshroud"]
+# Copy the extracted release dir (binary + node_modules/playwright-core + instrumentation/)
+COPY js_unshroud-linux-x64/ ./
+RUN chmod +x js_unshroud-linux-x64 \
+ && npx playwright install --with-deps chromium
+ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+ENTRYPOINT ["./js_unshroud-linux-x64"]
 ```
-
-### Option 3: NPM Package
-Publish as an NPM package where the `bin` field in package.json points to the executable.
 
 ## Output Format
 

@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { QueryEngine, type QueryFilter } from '../src/analysis/QueryEngine.ts';
 import { TimelineFormatter, type TimeRange } from '../src/analysis/TimelineFormatter.ts';
 import { CorrelationEngine, type CorrelationRule } from '../src/analysis/CorrelationEngine.ts';
-import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { resolve, join } from 'path';
 import type {
   MonitoringEvent,
@@ -30,7 +30,6 @@ import type {
   ModuleEvent,
   IframeEvent
 } from '../src/schema/types.ts';
-import { writeFileSync, unlinkSync } from 'fs';
 
 describe('Analysis Engine Tests', () => {
   // Phase 2: QueryEngine Testing (Focus: Stream processing, filtering)
