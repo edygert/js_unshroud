@@ -421,6 +421,30 @@ describe('Query Command Tests', () => {
       expect(event.storageType).toBe('localStorage');
     });
 
+    // Regression (audit H6): --operation / --storage-type must actually narrow results.
+    // Uses a dedicated mixed-storage file so the filters can't pass vacuously.
+    test('should filter storage events by operation and storageType end-to-end', async () => {
+      const mixed: StorageEvent[] = [
+        { id: 'm1', timestamp: 1, sessionId: 'q', type: 'storage', storageType: 'localStorage', operation: 'set', key: 'a' },
+        { id: 'm2', timestamp: 2, sessionId: 'q', type: 'storage', storageType: 'localStorage', operation: 'get', key: 'a' },
+        { id: 'm3', timestamp: 3, sessionId: 'q', type: 'storage', storageType: 'sessionStorage', operation: 'set', key: 'b' }
+      ];
+      writeFileSync(tempFilePath, mixed.map(e => JSON.stringify(e)).join('\n'));
+
+      const setOnly = await queryEvents({ input: tempFilePath, eventType: 'storage', operation: 'set' as const });
+      const setLines = setOnly.split('\n');
+      expect(setLines).toHaveLength(2);
+      expect(setLines.map(l => JSON.parse(l).operation).every(op => op === 'set')).toBe(true);
+
+      const sessionGet = await queryEvents({ input: tempFilePath, eventType: 'storage', storageType: 'sessionStorage' as const, operation: 'set' as const });
+      const sessionLines = sessionGet.split('\n');
+      expect(sessionLines).toHaveLength(1);
+      expect(JSON.parse(sessionLines[0]!).id).toBe('m3');
+
+      const noClear = await queryEvents({ input: tempFilePath, eventType: 'storage', operation: 'clear' as const, format: 'count' as const });
+      expect(noClear).toBe('0');
+    });
+
     test('should query events by correlation ID', async () => {
       const args = { input: tempFilePath, correlationId: 'corr-1' };
       const output = await queryEvents(args);

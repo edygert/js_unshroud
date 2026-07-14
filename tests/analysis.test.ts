@@ -257,6 +257,45 @@ describe('Analysis Engine Tests', () => {
       expect(storageEvent.operation).toBe('set');
     });
 
+    // Regression (audit H6): storageType/operation filters were declared but never applied
+    // in matchesFilter, so they silently returned every storage event. These use a mixed
+    // data set so the filters must actually discriminate.
+    describe('storage filters on mixed data (H6)', () => {
+      const mixedStorageEvents: StorageEvent[] = [
+        { id: 's1', timestamp: 1, sessionId: 'sx', type: 'storage', storageType: 'localStorage', operation: 'set', key: 'a' },
+        { id: 's2', timestamp: 2, sessionId: 'sx', type: 'storage', storageType: 'localStorage', operation: 'get', key: 'a' },
+        { id: 's3', timestamp: 3, sessionId: 'sx', type: 'storage', storageType: 'sessionStorage', operation: 'set', key: 'b' },
+        { id: 's4', timestamp: 4, sessionId: 'sx', type: 'storage', storageType: 'sessionStorage', operation: 'remove', key: 'b' }
+      ];
+
+      beforeEach(() => {
+        writeFileSync(tempFilePath, mixedStorageEvents.map(e => JSON.stringify(e)).join('\n'));
+      });
+
+      test('filters by operation across storage types', async () => {
+        const results = await queryEngine.queryEvents(tempFilePath, { eventType: 'storage', operation: 'set' });
+        expect(results).toHaveLength(2);
+        expect(results.every(e => (e as StorageEvent).operation === 'set')).toBe(true);
+      });
+
+      test('filters by storageType', async () => {
+        const results = await queryEngine.queryEvents(tempFilePath, { eventType: 'storage', storageType: 'sessionStorage' });
+        expect(results).toHaveLength(2);
+        expect(results.every(e => (e as StorageEvent).storageType === 'sessionStorage')).toBe(true);
+      });
+
+      test('filters by storageType AND operation together', async () => {
+        const results = await queryEngine.queryEvents(tempFilePath, { eventType: 'storage', storageType: 'localStorage', operation: 'get' });
+        expect(results).toHaveLength(1);
+        expect(results[0]?.id).toBe('s2');
+      });
+
+      test('returns nothing for an operation that is absent', async () => {
+        const results = await queryEngine.queryEvents(tempFilePath, { eventType: 'storage', operation: 'clear' });
+        expect(results).toHaveLength(0);
+      });
+    });
+
     test('should handle malformed JSON lines gracefully', async () => {
       // Create a file with malformed JSON
       const badContent = events.map(event => JSON.stringify(event)).join('\n') + '\n{"incomplete": json}\n' + events.slice(0, 2).map(event => JSON.stringify(event)).join('\n');

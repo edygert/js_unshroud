@@ -496,15 +496,28 @@
           return originalPostMessage.call(this, message, transfer);
         };
 
-        // Wrap port.onmessage setter
-        let onmessageHandler = null;
+        // Wrap port.onmessage setter - MUST call the native setter to connect to the
+        // browser's event system. Previously the handler was only stored in a closure
+        // variable and never attached, so SharedWorker messages were silently dropped
+        // (and the port never auto-started). Mirrors the Worker onmessage path above.
+        const nativePortOnmessageDescriptor = Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(port),
+          'onmessage'
+        ) || Object.getOwnPropertyDescriptor(port, 'onmessage');
+
+        const nativePortOnmessageSetter = nativePortOnmessageDescriptor?.set;
+        const nativePortOnmessageGetter = nativePortOnmessageDescriptor?.get;
+
         Object.defineProperty(port, 'onmessage', {
           get: function() {
-            return onmessageHandler;
+            if (nativePortOnmessageGetter) {
+              return nativePortOnmessageGetter.call(this);
+            }
+            return null;
           },
           set: function(handler) {
             if (handler && typeof handler === 'function') {
-              onmessageHandler = function(event) {
+              const wrappedHandler = function(event) {
                 try {
                   // Log message FROM shared worker
                   logWorkerEvent(
@@ -522,8 +535,16 @@
 
                 return handler.call(this, event);
               };
+
+              // Setting onmessage via the native setter also implicitly starts the port.
+              if (nativePortOnmessageSetter) {
+                nativePortOnmessageSetter.call(this, wrappedHandler);
+              }
             } else {
-              onmessageHandler = handler;
+              // Setting to null/undefined
+              if (nativePortOnmessageSetter) {
+                nativePortOnmessageSetter.call(this, handler);
+              }
             }
           },
           enumerable: true,

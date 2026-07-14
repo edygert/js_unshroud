@@ -118,6 +118,10 @@
           if (this.readyState === 4) { // DONE
             const endTime = Date.now();
 
+            // responseText throws (InvalidStateError) for binary responseType
+            // (arraybuffer/blob/json). Only read it for text-like responses.
+            const canReadText = this.responseType === '' || this.responseType === 'text';
+
             logEvent({
               type: 'network',
               method: xhr._js_unshroud_method,
@@ -125,7 +129,7 @@
               status: this.status,
               statusText: this.statusText,
               responseHeaders: this.getAllResponseHeaders(),
-              responsePayload: this.responseText,
+              responsePayload: canReadText ? this.responseText : undefined,
               duration: endTime - startTime,
               timestamp: endTime,
               xhr: true
@@ -140,6 +144,10 @@
       this.onload = function() {
         const endTime = Date.now();
 
+        // responseText throws (InvalidStateError) for binary responseType
+        // (arraybuffer/blob/json). Only read it for text-like responses.
+        const canReadText = this.responseType === '' || this.responseType === 'text';
+
         logEvent({
           type: 'network',
           method: xhr._js_unshroud_method,
@@ -147,7 +155,7 @@
           status: this.status,
           statusText: this.statusText,
           responseHeaders: this.getAllResponseHeaders(),
-          responsePayload: this.responseText,
+          responsePayload: canReadText ? this.responseText : undefined,
           duration: endTime - startTime,
           timestamp: endTime,
           xhr: true

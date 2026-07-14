@@ -53,6 +53,7 @@ const codeExecutionHooksScript = readFileSync(join(process.cwd(), 'src/instrumen
 const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/encoding-hooks.js'), 'utf-8');
 const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/cryptojs-hooks.js'), 'utf-8');
 const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/clipboard-hooks.js'), 'utf-8');
+const workerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/worker-hooks.js'), 'utf-8');
 
   beforeAll(async () => {
     browser = await chromium.launch({ headless: true });
@@ -104,6 +105,56 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
 
       const consoleEvents = events.filter(e => e.type === 'console' && e.message === 'test message');
       expect(consoleEvents.length).toBeGreaterThan(0);
+      await page.close();
+    });
+
+    // Regression (audit H2): console.log(circularObject) must NOT throw into the page.
+    // Previously JSON.stringify of the args threw and aborted the page's console call.
+    test('should not throw when logging circular/unserializable arguments', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.goto('about:blank');
+      await page.waitForTimeout(200); // let console interception activate
+
+      const result = await page.evaluate(() => {
+        const circular: any = { tag: 'circ' };
+        circular.self = circular;
+        let threw = false;
+        let originalRan = false;
+        // Detect that the original console method still runs by chaining onto it
+        const prev = console.log;
+        console.log = function (...args: unknown[]) {
+          originalRan = true;
+          return (prev as any).apply(console, args);
+        };
+        try {
+          console.log('marker', circular);
+        } catch {
+          threw = true;
+        }
+        return { threw, originalRan };
+      });
+
+      expect(result.threw).toBe(false);
+      expect(result.originalRan).toBe(true);
+
+      await page.waitForTimeout(50);
+      const circEvent = events.find(e => e.type === 'console' && typeof e.message === 'string' && e.message.includes('marker'));
+      expect(circEvent).toBeDefined();
+      // The circular arg was sanitized rather than crashing serialization
+      expect(circEvent.args).toContain('<unserializable>');
       await page.close();
     });
   });
@@ -179,6 +230,48 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       await page.close();
     });
 
+    // Regression (audit H3): reading responseText on a binary responseType throws
+    // InvalidStateError. The instrumentation previously did this inside the page's own
+    // load handler, breaking binary XHR flows. It must load cleanly and omit the payload.
+    test('should not break XHR with binary responseType', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(networkHooksScript);
+      await page.goto('about:blank');
+
+      const result = await page.evaluate(() => new Promise<{ loaded: boolean; isBuffer: boolean }>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'data:application/octet-stream;base64,AAECAwQF');
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = () => resolve({ loaded: true, isBuffer: xhr.response instanceof ArrayBuffer });
+        xhr.onerror = () => resolve({ loaded: false, isBuffer: false });
+        xhr.send();
+      }));
+
+      // The page's own onload ran to completion (instrumentation did not throw)
+      expect(result.loaded).toBe(true);
+      expect(result.isBuffer).toBe(true);
+
+      await page.waitForTimeout(50);
+      const responseEvents = events.filter(e => e.type === 'network' && e.xhr === true && e.status !== undefined);
+      expect(responseEvents.length).toBeGreaterThan(0);
+      // responseText was not read for the binary response, so no payload is present
+      expect(responseEvents[0].responsePayload).toBeUndefined();
+      await page.close();
+    });
+
     // Note: Stack traces were removed from all events in previous updates
     // This test is no longer applicable
   });
@@ -213,7 +306,7 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       expect(storageEvents[0]).toMatchObject({
         type: 'storage',
         storageType: 'localStorage',
-        operation: 'setItem',
+        operation: 'set',
         key: 'testKey',
         value: 'testValue'
       });
@@ -249,7 +342,7 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       expect(storageEvents[0]).toMatchObject({
         type: 'storage',
         storageType: 'sessionStorage',
-        operation: 'setItem',
+        operation: 'set',
         key: 'sessionKey',
         value: 'sessionValue'
       });
@@ -394,6 +487,41 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       });
       await page.close();
     });
+
+    // Regression (audit H1): the performance monitor wraps setTimeout/setInterval and is
+    // ALWAYS injected (timer-hooks is off by default). It must forward trailing args to
+    // the callback. Only bootstrap + performance-monitor are injected here to mirror the
+    // default configuration where the bug manifested.
+    test('should preserve trailing setTimeout arguments (perf-monitor wrapper)', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(performanceMonitorScript);
+      await page.goto('about:blank');
+
+      const result = await page.evaluate(() => new Promise<unknown[]>((resolve) => {
+        setTimeout((a: unknown, b: unknown) => resolve([a, b]), 0, 'foo', 'bar');
+      }));
+
+      expect(result).toEqual(['foo', 'bar']);
+      await page.close();
+    });
+
+    test('should preserve trailing setInterval arguments (perf-monitor wrapper)', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(performanceMonitorScript);
+      await page.goto('about:blank');
+
+      const result = await page.evaluate(() => new Promise<unknown[]>((resolve) => {
+        const id = setInterval((a: unknown, b: unknown) => {
+          clearInterval(id);
+          resolve([a, b]);
+        }, 5, 'baz', 'qux');
+      }));
+
+      expect(result).toEqual(['baz', 'qux']);
+      await page.close();
+    });
   });
 
   describe('DOM Hooks Script', () => {
@@ -497,6 +625,86 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
         operation: 'innerHTML'
       });
       expect(innerHtmlEvents[0].valueLength).toBeGreaterThan(0);
+      await page.close();
+    });
+
+    // Regression (audit H4): an EventListener object ({ handleEvent }) is legal. The old
+    // wrapper called listener.apply(), which objects lack, so dispatch threw and the
+    // handler never ran. It must be delivered like a normal listener.
+    test('should support EventListener object handlers without throwing', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(domHooksScript);
+      await page.goto('about:blank');
+
+      const result = await page.evaluate(() => {
+        let handled = false;
+        let threw = false;
+        const obj = { handleEvent() { handled = true; } };
+        try {
+          document.addEventListener('js_unshroud_obj_test', obj);
+          document.dispatchEvent(new Event('js_unshroud_obj_test'));
+        } catch {
+          threw = true;
+        }
+        return { handled, threw };
+      });
+
+      expect(result).toEqual({ handled: true, threw: false });
+      await page.close();
+    });
+
+    // Regression (audit H4): addEventListener(type, null) is a legal no-op. The old code
+    // called listener.toString() and threw on null.
+    test('should not throw when a null listener is registered', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(domHooksScript);
+      await page.goto('about:blank');
+
+      const threw = await page.evaluate(() => {
+        try {
+          // Intentionally invalid per TS types; addEventListener(type, null) is a legal
+          // runtime no-op that must not throw through our wrapper.
+          document.addEventListener('js_unshroud_null_test', null as unknown as EventListener);
+          return false;
+        } catch {
+          return true;
+        }
+      });
+
+      expect(threw).toBe(false);
+      await page.close();
+    });
+
+    // Regression (audit H4): removal was keyed by the first 50 chars of the listener's
+    // source, so two distinct closures with identical source collided and the wrong
+    // wrapper was removed. Identity keying must remove exactly the requested listener.
+    test('should remove the correct listener when sources collide', async () => {
+      page = await browser.newPage();
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(domHooksScript);
+      await page.goto('about:blank');
+
+      const hits = await page.evaluate(() => {
+        const seen: string[] = [];
+        // Both listeners have byte-identical source; the discriminator is captured via
+        // closure, so the old string key collides for l1 and l2.
+        function makeListener(tag: string) {
+          return function collidingListenerWithAStableSourceString() {
+            seen.push(tag);
+          };
+        }
+        const l1 = makeListener('one');
+        const l2 = makeListener('two');
+        document.addEventListener('js_unshroud_collide', l1);
+        document.addEventListener('js_unshroud_collide', l2);
+        document.removeEventListener('js_unshroud_collide', l1); // remove ONLY l1
+        document.dispatchEvent(new Event('js_unshroud_collide'));
+        return seen;
+      });
+
+      expect(hits).toEqual(['two']);
       await page.close();
     });
   });
@@ -4878,6 +5086,55 @@ const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentati
       expect(outputText).toBe('analysis bypassed');
 
       await cdpSession.detach();
+      await page.close();
+    });
+  });
+
+  describe('Worker Hooks Script', () => {
+    // Regression (audit H5): the SharedWorker port.onmessage setter previously stored the
+    // handler only in a closure and never called the native MessagePort setter, so
+    // messages were never delivered (and the port never started). We stub SharedWorker so
+    // its `port` is a real MessagePort (from MessageChannel); posting from the other end
+    // must reach the handler AND produce a worker_message event.
+    test('should deliver SharedWorker port.onmessage via the native port', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      // Bootstrap first (provides __js_unshroud_debug used by worker-hooks).
+      await page.addInitScript(bootstrapScript);
+      // Stub SharedWorker + config + log bridge BEFORE worker-hooks captures them.
+      await page.addInitScript(() => {
+        const channel = new MessageChannel();
+        (window as any).__testChannel = channel;
+        (window as any).SharedWorker = function () {
+          return { port: channel.port1 };
+        };
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableWorkers: true };
+      });
+      await page.addInitScript(workerHooksScript);
+      await page.goto('about:blank');
+
+      const received = await page.evaluate(() => new Promise<unknown>((resolve) => {
+        const sw = new SharedWorker('stub-url');
+        sw.port.onmessage = (e: MessageEvent) => resolve(e.data);
+        const other = (window as any).__testChannel.port2 as MessagePort;
+        other.postMessage('hello-from-worker');
+        setTimeout(() => resolve('__timeout__'), 500);
+      }));
+
+      expect(received).toBe('hello-from-worker');
+
+      await page.waitForTimeout(50);
+      const workerMessages = events.filter(e => e.type === 'worker' && e.eventType === 'worker_message');
+      expect(workerMessages.length).toBeGreaterThan(0);
+      expect(workerMessages[0].direction).toBe('from_worker');
       await page.close();
     });
   });
