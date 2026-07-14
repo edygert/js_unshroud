@@ -204,7 +204,8 @@
         window.__js_unshroud_log(JSON.stringify(performanceWarning));
       }
     }
-    return originalSetTimeout.call(this, callback, delay);
+    // Forward ALL arguments (callback, delay, ...args) so trailing timer args are preserved
+    return originalSetTimeout.apply(this, arguments);
   };
 
   window.setInterval = function(callback, delay) {
@@ -223,7 +224,8 @@
         window.__js_unshroud_log(JSON.stringify(performanceWarning));
       }
     }
-    return originalSetInterval.call(this, callback, delay);
+    // Forward ALL arguments (callback, delay, ...args) so trailing timer args are preserved
+    return originalSetInterval.apply(this, arguments);
   };
 
   // === EXPORT PERFORMANCE API ===

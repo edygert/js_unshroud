@@ -56,17 +56,40 @@
     window.__js_unshroud_console_methods.forEach(function(method) {
       const original = console[method];
       console[method] = function(...args) {
-        // Log to instrumentation system
-        window.__js_unshroud_log(JSON.stringify({
-          id: generateEventId(),
-          sessionId: getSessionId(),
-          timestamp: Date.now(),
-          type: 'console',
-          level: method,
-          message: Array.prototype.join.call(args, ' '),
-          args: args,
-          url: window.location.href
-        }));
+        // Log to instrumentation system.
+        // CRITICAL: this must NEVER throw into the page. console.log(circularObj),
+        // console.log(window), etc. would otherwise make JSON.stringify throw and
+        // abort the page's own console call. Sanitize defensively and swallow errors.
+        try {
+          let message;
+          try {
+            message = Array.prototype.join.call(args, ' ');
+          } catch {
+            message = '<unstringifiable console arguments>';
+          }
+
+          const safeArgs = Array.prototype.map.call(args, function(arg) {
+            try {
+              JSON.stringify(arg);
+              return arg;
+            } catch {
+              return '<unserializable>';
+            }
+          });
+
+          window.__js_unshroud_log(JSON.stringify({
+            id: generateEventId(),
+            sessionId: getSessionId(),
+            timestamp: Date.now(),
+            type: 'console',
+            level: method,
+            message: message,
+            args: safeArgs,
+            url: window.location.href
+          }));
+        } catch {
+          // Never let instrumentation break the page's console output
+        }
 
         // Call original method to preserve functionality
         return original.apply(console, args);

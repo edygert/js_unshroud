@@ -62,7 +62,7 @@
       logEvent({
         type: 'storage',
         storageType: storageType,
-        operation: 'setItem',
+        operation: 'set',
         key: key,
         value: value,
         oldValue: oldValue,

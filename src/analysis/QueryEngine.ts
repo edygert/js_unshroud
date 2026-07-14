@@ -75,6 +75,17 @@ export class QueryEngine {
       }
     }
 
+    // Storage-specific filters
+    if (event.type === 'storage') {
+      const storageEvent = event;
+      if (filter.storageType && storageEvent.storageType !== filter.storageType) {
+        return false;
+      }
+      if (filter.operation && storageEvent.operation !== filter.operation) {
+        return false;
+      }
+    }
+
     // Timestamp range filter
     if (filter.timestamp) {
       if (filter.timestamp.from && event.timestamp < filter.timestamp.from) {

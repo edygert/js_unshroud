@@ -257,20 +257,27 @@
     const originalAddEventListener = originals.addEventListener;
 
     window.EventTarget.prototype.addEventListener = function(type, listener, options) {
-      const listenerStr = getListenerString(listener);
       const targetSelector = getElementSelector(this);
 
-      // Check if we should log addEventListener (always true per filtering logic)
+      // Check if we should log addEventListener (always true per filtering logic).
+      // getListenerString safely handles non-function/null listeners.
       if (shouldLogDomEvent(type, 'addEventListener')) {
         logEvent({
           type: 'dom',
           eventType: type,
           targetSelector: targetSelector,
           operation: 'addEventListener',
-          listener: listenerStr,
+          listener: getListenerString(listener),
           options: options,
           timestamp: Date.now()
         });
+      }
+
+      // Only wrap function listeners. Object listeners ({ handleEvent }), null and
+      // undefined are legal and must be passed through untouched - an object has no
+      // .apply() (would throw on dispatch) and null.toString() would throw here.
+      if (typeof listener !== 'function') {
+        return originalAddEventListener.call(this, type, listener, options);
       }
 
       // Create wrapped listener that logs when event fires
@@ -295,12 +302,18 @@
         return listener.apply(this, arguments);
       };
 
-      // Store reference for removal tracking
+      // Store reference for removal tracking, keyed by listener IDENTITY (not source text)
+      // so distinct listeners never collide. Nested map: type -> (listener -> wrapped),
+      // because the same function may be registered for multiple event types.
       if (!this.__js_unshroud_listeners) {
         this.__js_unshroud_listeners = new Map();
       }
-      const key = type + '_' + listener.toString().substring(0, 50);
-      this.__js_unshroud_listeners.set(key, { original: listener, wrapped: wrappedListener });
+      let typeMap = this.__js_unshroud_listeners.get(type);
+      if (!typeMap) {
+        typeMap = new Map();
+        this.__js_unshroud_listeners.set(type, typeMap);
+      }
+      typeMap.set(listener, wrappedListener);
 
       return originalAddEventListener.call(this, type, wrappedListener, options);
     };
@@ -324,13 +337,14 @@
         });
       }
 
-      // Try to find and remove from our tracking
-      if (this.__js_unshroud_listeners) {
-        const key = type + '_' + listener.toString().substring(0, 50);
-        const stored = this.__js_unshroud_listeners.get(key);
-        if (stored) {
-          this.__js_unshroud_listeners.delete(key);
-          return originalRemoveEventListener.call(this, type, stored.wrapped, options);
+      // Look up the wrapped listener by identity so we remove the exact wrapper we added.
+      // Non-function listeners were never wrapped, so they fall through to the native call.
+      if (typeof listener === 'function' && this.__js_unshroud_listeners) {
+        const typeMap = this.__js_unshroud_listeners.get(type);
+        if (typeMap && typeMap.has(listener)) {
+          const wrapped = typeMap.get(listener);
+          typeMap.delete(listener);
+          return originalRemoveEventListener.call(this, type, wrapped, options);
         }
       }
 
