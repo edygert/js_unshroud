@@ -18,7 +18,8 @@ export class TimelineFormatter {
   private readonly groupedEvents: Map<number, MonitoringEvent[]> = new Map();
 
   constructor(events: MonitoringEvent[]) {
-    this.events = events.sort((a, b) => a.timestamp - b.timestamp);
+    // Copy before sorting so we don't mutate the caller's array (L7).
+    this.events = [...events].sort((a, b) => a.timestamp - b.timestamp);
     this.groupEventsByTime();
   }
 

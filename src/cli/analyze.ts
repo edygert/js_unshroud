@@ -81,6 +81,13 @@ function formatStatistics(formatter: TimelineFormatter): string {
   const lines: string[] = [];
   lines.push('Event Statistics');
   lines.push('='.repeat(50));
+
+  // Empty input: avoid NaN% (divide-by-zero) and 1970 timestamps from new Date(0) (L5).
+  if (stats.totalEvents === 0) {
+    lines.push('No events found in input file');
+    return lines.join('\n');
+  }
+
   lines.push(`Total Events: ${stats.totalEvents}`);
   lines.push(`Time Span: ${new Date(stats.timeSpan.start).toISOString()} to ${new Date(stats.timeSpan.end).toISOString()}`);
   lines.push(`Duration: ${stats.timeSpan.end - stats.timeSpan.start}ms`);

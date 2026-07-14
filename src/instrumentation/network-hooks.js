@@ -117,7 +117,10 @@
       if (this.onreadystatechange) {
         const originalHandler = this.onreadystatechange;
         this.onreadystatechange = function() {
-          if (this.readyState === 4) { // DONE
+          // Guard against double-logging: onreadystatechange and onload both
+          // fire on completion, so log the response exactly once (L2).
+          if (this.readyState === 4 && !xhr._js_unshroud_response_logged) { // DONE
+            xhr._js_unshroud_response_logged = true;
             const endTime = Date.now();
 
             // responseText throws (InvalidStateError) for binary responseType
@@ -144,24 +147,29 @@
       // Hook load event for modern code
       const originalOnLoad = this.onload;
       this.onload = function() {
-        const endTime = Date.now();
+        // Guard against double-logging: onreadystatechange (above) may have
+        // already logged this response on readyState 4 (L2).
+        if (!xhr._js_unshroud_response_logged) {
+          xhr._js_unshroud_response_logged = true;
+          const endTime = Date.now();
 
-        // responseText throws (InvalidStateError) for binary responseType
-        // (arraybuffer/blob/json). Only read it for text-like responses.
-        const canReadText = this.responseType === '' || this.responseType === 'text';
+          // responseText throws (InvalidStateError) for binary responseType
+          // (arraybuffer/blob/json). Only read it for text-like responses.
+          const canReadText = this.responseType === '' || this.responseType === 'text';
 
-        logEvent({
-          type: 'network',
-          method: xhr._js_unshroud_method,
-          url: xhr._js_unshroud_url,
-          status: this.status,
-          statusText: this.statusText,
-          responseHeaders: this.getAllResponseHeaders(),
-          responsePayload: canReadText ? this.responseText : undefined,
-          duration: endTime - startTime,
-          timestamp: endTime,
-          xhr: true
-        });
+          logEvent({
+            type: 'network',
+            method: xhr._js_unshroud_method,
+            url: xhr._js_unshroud_url,
+            status: this.status,
+            statusText: this.statusText,
+            responseHeaders: this.getAllResponseHeaders(),
+            responsePayload: canReadText ? this.responseText : undefined,
+            duration: endTime - startTime,
+            timestamp: endTime,
+            xhr: true
+          });
+        }
 
         if (originalOnLoad) {
           return originalOnLoad.apply(this, arguments);
