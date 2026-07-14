@@ -345,6 +345,25 @@ describe('Statistics Formatting', () => {
     expect(output).toContain('Time Span:');
     expect(output).toContain('Duration: 5000ms');
   });
+
+  // Regression (audit L5): empty input previously produced NaN% (divide by zero)
+  // and 1970 timestamps (new Date(0)). It must emit a friendly summary instead.
+  test('should handle empty input in stats format without NaN or 1970', async () => {
+    const emptyFile = join(tmpdir(), `test-empty-stats-${Date.now()}.jsonl`);
+    writeFileSync(emptyFile, '');
+
+    const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const args = { input: emptyFile, format: 'stats' as const };
+    const output = await analyzeEvents(args);
+
+    expect(output).toContain('No events found');
+    expect(output).not.toContain('NaN');
+    expect(output).not.toContain('1970');
+
+    mockConsoleWarn.mockRestore();
+    unlinkSync(emptyFile);
+  });
 });
 
 describe('All Event Types Coverage', () => {

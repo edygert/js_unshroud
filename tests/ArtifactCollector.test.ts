@@ -1093,6 +1093,61 @@ describe('ArtifactCollector', () => {
       expect(result).toContain('.pdf');
     });
 
+    // Regression (audit L4): the browser-side download hook derives the extension
+    // from a page-controlled filename via split('.').pop(), which does not strip '/'.
+    // A crafted extension like "bin/evil" would place the artifact in a sub-directory
+    // of the artifact dir. saveArtifact must whitelist the extension.
+    test('should sanitize a path-separator in the extension to bin', async () => {
+      const sessionConfig = createTestSessionConfig();
+      const artifactConfig = createTestArtifactConfig();
+      const collector = new ArtifactCollector(sessionConfig, artifactConfig);
+      await collector.initialize();
+
+      const event = createEvent<CodeExecutionEvent>(sessionConfig.id, undefined, {
+        type: 'code_execution',
+        method: 'eval',
+        operation: 'execute',
+        code: 'x',
+        codeLength: 1
+      });
+
+      const result = await collector.saveArtifact(event, {
+        type: 'code_execution',
+        content: 'x',
+        extension: 'bin/evil' // attacker-controlled: contains a path separator
+      });
+
+      expect(result).not.toBeNull();
+      // Falls back to 'bin'; the injected sub-path component is gone.
+      expect(result).toContain(`${event.id}.bin`);
+      expect(result).not.toContain('evil');
+      expect(result).not.toContain('bin/evil');
+    });
+
+    test('should sanitize an empty or non-alphanumeric extension to bin', async () => {
+      const sessionConfig = createTestSessionConfig();
+      const artifactConfig = createTestArtifactConfig();
+      const collector = new ArtifactCollector(sessionConfig, artifactConfig);
+      await collector.initialize();
+
+      const event = createEvent<CodeExecutionEvent>(sessionConfig.id, undefined, {
+        type: 'code_execution',
+        method: 'eval',
+        operation: 'execute',
+        code: 'x',
+        codeLength: 1
+      });
+
+      const result = await collector.saveArtifact(event, {
+        type: 'code_execution',
+        content: 'x',
+        extension: '../secret'
+      });
+
+      expect(result).toContain(`${event.id}.bin`);
+      expect(result).not.toContain('secret');
+    });
+
     test('should handle filename with multiple dots', async () => {
       const sessionConfig = createTestSessionConfig();
       const artifactConfig = createTestArtifactConfig();

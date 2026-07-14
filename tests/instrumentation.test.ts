@@ -53,6 +53,7 @@ const encodingHooksScript = readFileSync(join(process.cwd(), 'src/instrumentatio
 const cryptojsHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/cryptojs-hooks.js'), 'utf-8');
 const clipboardHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/clipboard-hooks.js'), 'utf-8');
 const workerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/worker-hooks.js'), 'utf-8');
+const downloadHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/download-hooks.js'), 'utf-8');
 
   beforeAll(async () => {
     browser = await chromium.launch({ headless: true });
@@ -271,8 +272,127 @@ const workerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/
       await page.close();
     });
 
+    // Regression (audit L2): when a page sets BOTH onreadystatechange and onload,
+    // both wrappers previously logged the completed response, double-counting it.
+    // The response must be logged exactly once.
+    test('should log XHR response once when both onreadystatechange and onload are set', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(networkHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'data:text/plain,hello');
+        // Both handlers present — this is the double-log scenario.
+        xhr.onreadystatechange = () => {};
+        xhr.onload = () => resolve();
+        xhr.send();
+      }));
+
+      await page.waitForTimeout(50);
+
+      // Response events carry a status; the initial open() event does not.
+      const responseEvents = events.filter(e => e.type === 'network' && e.xhr === true && e.status !== undefined);
+      expect(responseEvents.length).toBe(1);
+      expect(responseEvents[0].responsePayload).toBe('hello');
+      await page.close();
+    });
+
     // Note: Stack traces were removed from all events in previous updates
     // This test is no longer applicable
+  });
+
+  describe('Download Hooks Script', () => {
+    // Regression (audit L3): querySelectorAll('a') ran once at init-script time,
+    // before the document was parsed, so statically-authored <a download> anchors
+    // were never instrumented — only createElement('a') anchors were. The DOM-ready
+    // rescan must instrument static anchors so clicking one is captured.
+    test('should instrument statically-authored anchors (present at DOM ready)', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableDownloadDetection: true };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(downloadHooksScript);
+
+      // Static anchor authored directly in the HTML (not via createElement).
+      // Use a real navigation so the document parses normally and DOMContentLoaded
+      // fires (page.setContent uses document.write and does not reliably do so).
+      const html = '<html><body><a id="dl" download="report.pdf" href="data:text/plain,x">dl</a></body></html>';
+      await page.goto('data:text/html,' + encodeURIComponent(html));
+
+      await page.evaluate(() => {
+        (document.getElementById('dl') as HTMLAnchorElement).click();
+      });
+
+      await page.waitForTimeout(50);
+
+      const clickEvents = events.filter(e => e.type === 'download' && e.eventType === 'download_click');
+      expect(clickEvents.length).toBe(1);
+      await page.close();
+    });
+
+    // Regression (audit L3): anchors inserted after load (e.g. via innerHTML) must
+    // also be instrumented via the MutationObserver.
+    test('should instrument anchors inserted after load', async () => {
+      page = await browser.newPage();
+
+      const events: any[] = [];
+      await page.exposeFunction('__test_log_event', (event: string) => {
+        events.push(JSON.parse(event));
+      });
+
+      await page.addInitScript(() => {
+        window.__js_unshroud_log = (data: string) => {
+          (window as any).__test_log_event(data);
+        };
+        window.__js_unshroud_config = { enableDownloadDetection: true };
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(downloadHooksScript);
+      await page.goto('about:blank');
+
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        const container = document.createElement('div');
+        container.innerHTML = '<a id="dl2" download="late.bin" href="data:text/plain,y">late</a>';
+        document.body.appendChild(container);
+        // Give the MutationObserver a microtask/tick to instrument the new anchor.
+        setTimeout(() => {
+          (document.getElementById('dl2') as HTMLAnchorElement).click();
+          resolve();
+        }, 10);
+      }));
+
+      await page.waitForTimeout(50);
+
+      const clickEvents = events.filter(e => e.type === 'download' && e.eventType === 'download_click');
+      expect(clickEvents.length).toBe(1);
+      await page.close();
+    });
   });
 
   describe('Storage Hooks Script', () => {

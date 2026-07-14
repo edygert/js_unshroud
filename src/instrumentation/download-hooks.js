@@ -54,6 +54,12 @@
 
   // Instrument anchor element with property setters
   function instrumentAnchorElement(anchor) {
+    // Idempotency guard: an anchor can be reached by createElement, the
+    // DOMContentLoaded rescan, and the MutationObserver (L3). Only wrap once.
+    if (window.__js_unshroud_download_map.has(anchor)) {
+      return;
+    }
+
     const downloadId = 'download_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
     // Store download info for this anchor
@@ -223,16 +229,56 @@
     return element;
   };
 
-  // 2. Instrument existing anchor elements on page
+  // 2. Instrument statically-authored anchor elements.
+  // This init script runs before the document is parsed, so a single
+  // querySelectorAll('a') here matches nothing. Rescan when the DOM is ready
+  // and observe later insertions so static <a download> elements are captured
+  // rather than only anchors built via createElement (L3).
+  function instrumentExistingAnchors(root) {
+    try {
+      const scope = root && root.querySelectorAll ? root : document;
+      const anchors = scope.querySelectorAll('a');
+      anchors.forEach(function(anchor) {
+        instrumentAnchorElement(anchor);
+      });
+    } catch (e) {
+      // DOM may not be ready yet, that's okay
+      if (window.__js_unshroud_debug) {
+        window.__js_unshroud_debug('[JS Unshroud] Could not instrument existing anchors:', e.message);
+      }
+    }
+  }
+
+  // Run now (covers the case where the document is already parsed) and again
+  // once the DOM finishes parsing.
+  instrumentExistingAnchors(document);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      instrumentExistingAnchors(document);
+    }, { once: true });
+  }
+
+  // Observe anchors inserted after load (e.g. via innerHTML).
   try {
-    const existingAnchors = document.querySelectorAll('a');
-    existingAnchors.forEach(function(anchor) {
-      instrumentAnchorElement(anchor);
-    });
+    if (typeof MutationObserver === 'function') {
+      const anchorObserver = new MutationObserver(function(mutations) {
+        for (const mutation of mutations) {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType !== 1) return; // ELEMENT_NODE
+            if (node.tagName === 'A') {
+              instrumentAnchorElement(node);
+            } else if (node.querySelectorAll) {
+              instrumentExistingAnchors(node);
+            }
+          });
+        }
+      });
+      const observeTarget = document.documentElement || document;
+      anchorObserver.observe(observeTarget, { childList: true, subtree: true });
+    }
   } catch (e) {
-    // DOM may not be ready yet, that's okay
     if (window.__js_unshroud_debug) {
-      window.__js_unshroud_debug('[JS Unshroud] Could not instrument existing anchors:', e.message);
+      window.__js_unshroud_debug('[JS Unshroud] Could not observe anchor insertions:', e.message);
     }
   }
 

@@ -342,6 +342,22 @@ describe('Analysis Engine Tests', () => {
       expect(timeline[3]?.summary).toBe('POST https://api.example.com/login (200)');
     });
 
+    // Regression (audit L7): the constructor sorted the passed array in place,
+    // mutating the caller's array. It must sort a copy and leave the input alone.
+    test('should not mutate the caller\'s events array', () => {
+      const unsorted: MonitoringEvent[] = [
+        { id: 'c', timestamp: 3000, sessionId: 's1', type: 'console', level: 'log', message: 'third' } as ConsoleEvent,
+        { id: 'a', timestamp: 1000, sessionId: 's1', type: 'console', level: 'log', message: 'first' } as ConsoleEvent,
+        { id: 'b', timestamp: 2000, sessionId: 's1', type: 'console', level: 'log', message: 'second' } as ConsoleEvent
+      ];
+      const originalOrder = unsorted.map(e => e.id);
+
+      new TimelineFormatter(unsorted);
+
+      // Caller's array order is preserved (not sorted in place).
+      expect(unsorted.map(e => e.id)).toEqual(originalOrder);
+    });
+
     test('should format as text correctly', () => {
       const text = timelineFormatter.formatAsText();
       expect(text).toContain('Timeline (4 entries)');

@@ -88,13 +88,18 @@ export class ArtifactCollector {
       // Generate artifact filename
       const artifactId = event.id;
 
+      // Sanitize the page-controlled extension so it can't inject a path
+      // separator (e.g. filename "x.bin/evil" -> extension "bin/evil") and
+      // steer the artifact into a sub-directory of the artifact dir (L4).
+      const extension = this.sanitizeExtension(artifactData.extension);
+
       // Include stage in filename for page snapshots
       let filename: string;
       if (artifactData.type === 'page_snapshot') {
         const snapshotEvent = event as PageSnapshotEvent;
-        filename = `${artifactId}_${snapshotEvent.snapshotStage}.${artifactData.extension}`;
+        filename = `${artifactId}_${snapshotEvent.snapshotStage}.${extension}`;
       } else {
-        filename = `${artifactId}.${artifactData.extension}`;
+        filename = `${artifactId}.${extension}`;
       }
 
       const subdirMap: Record<string, string> = {
@@ -180,6 +185,15 @@ export class ArtifactCollector {
     if (!filename) return null;
     const match = filename.match(/\.([^.]+)$/);
     return match ? (match[1] ?? null) : null;
+  }
+
+  /**
+   * Whitelist a file extension for use in an on-disk artifact filename.
+   * Only short alphanumeric extensions are allowed; anything else (path
+   * separators, dots, empty) falls back to 'bin' (L4).
+   */
+  private sanitizeExtension(extension: string): string {
+    return /^[A-Za-z0-9]{1,16}$/.test(extension) ? extension : 'bin';
   }
 
   /**
