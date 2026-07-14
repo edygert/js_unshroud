@@ -93,11 +93,6 @@ export class TimelineFormatter {
         return `Headless Mitigation: ${hmEvent.method}.${hmEvent.operation}`;
       }
 
-      case 'performance_stats': {
-        const psEvent = event;
-        return `Performance Stats: ${psEvent.operation} (uptime: ${psEvent.uptime}ms)`;
-      }
-
       case 'performance_warning': {
         const pwEvent = event;
         return `Performance Warning: ${pwEvent.method} - ${pwEvent.warning}`;

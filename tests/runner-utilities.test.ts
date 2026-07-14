@@ -88,10 +88,8 @@ describe('Runner Utility Functions', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: true,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15,
       debug: false
     };

@@ -277,10 +277,8 @@ describe('Main Function Entry Point', () => {
       url: `file://${resolve('tests/fixtures/test_monitoring.html')}`,
       out: tempOutputFile,
       config: {
-        dedupeWindowMs: 200,
         maxPayloadSize: 1024,
         maxStackDepth: 10,
-        enableDeduplication: true,
         monitoringTimeoutSeconds: 3
       }
     };

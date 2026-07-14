@@ -635,10 +635,8 @@ Configuration options:
 - `enableTimeDelayedBehavior`: Enable phased interaction over time to defeat time-bomb malware (default: `true` when `enableBehaviorSimulation` is true)
 
 **Performance Tuning:**
-- `dedupeWindowMs`: Time window for deduplication in milliseconds (default: `100`)
 - `maxPayloadSize`: Maximum size of event payloads in bytes (default: `2051`)
 - `maxStackDepth`: Maximum stack trace depth for captured events (default: `20`)
-- `enableDeduplication`: Enable/disable event deduplication (default: `true`)
 
 **Event Filtering (P4.1) - Reduce Noise for Malware Triage:**
 
@@ -709,10 +707,7 @@ Create a config file `my-config.json` and run:
 
 ## Performance Monitoring
 
-js_unshroud includes built-in performance monitoring and optimization features to manage high-volume event capture:
-
-### Deduplication
-Automatically deduplicate similar events within a time window (`dedupeWindowMs`). This prevents log spam from repeated operations like tight loops or high-frequency timer callbacks. Events are deduplicated based on a signature combining event type, method, and key properties (URL, payload snippet, etc.).
+js_unshroud includes built-in performance features to manage high-volume event capture:
 
 ### Payload Size Control
 Code execution and encoding events can generate very large payloads (obfuscated JavaScript can be megabytes). The `maxPayloadSize` setting limits payload sizes by truncating to the first 1024 bytes + "..." + last 1024 bytes, preserving both the beginning and end of the code for analysis.
@@ -721,8 +716,6 @@ Stack traces are limited to `maxStackDepth` frames to keep event data manageable
 
 ### UDP Logging
 For real-time monitoring and SIEM integration, events can be sent via UDP to a remote collector using the `outputMode` and `udpLogging` configuration options. UDP logging is fire-and-forget (no acknowledgment) and suitable for high-volume scenarios where some event loss is acceptable.
-
-Performance metrics are automatically logged every 30 seconds, including total events processed, acceptance rates, and deduplication statistics.
 
 ## Headless Browser Mitigation
 
@@ -1355,7 +1348,7 @@ The excluded files include:
 - `fingerprinting-hooks.js` - Canvas/WebGL fingerprinting detection
 - `object-tracking.js` - Proxy-based object monitoring
 - `headless-mitigation.js` - Browser evasion techniques (navigator overrides, BOM spoofing, fingerprinting mitigation)
-- `performance-monitor.js` - Event filtering and deduplication
+- `performance-monitor.js` - Wraps setTimeout/setInterval to flag very short timers (performance_warning events)
 - `service-worker-hooks.js` - Service Worker monitoring
 - `code-execution-hooks.js` - eval/Function/dynamic code execution
 - `encoding-hooks.js` - atob/btoa/fromCharCode/URI encoding
@@ -1384,7 +1377,7 @@ bun test tests/analysis.test.ts  # Analysis layer tests (QueryEngine, Correlatio
 The analysis layer (`src/analysis/`) maintains comprehensive test coverage:
 
 - **TimelineFormatter.ts**: 100% statement and line coverage
-  - Complete coverage of all 26 event types (network, storage, console, error, dom, timer, websocket, fingerprinting, headless_mitigation, performance_stats, performance_warning, service_worker, code_execution, encoding, cryptojs, script_injection, event_handler, blob, url_execution, worker, module, iframe, clipboard, debugger, download)
+  - Complete coverage of all 25 event types (network, storage, console, error, dom, timer, websocket, fingerprinting, headless_mitigation, performance_warning, service_worker, code_execution, encoding, cryptojs, script_injection, event_handler, blob, url_execution, worker, module, iframe, clipboard, debugger, download)
   - Branch coverage for event variants (blob operations, worker messaging, module injection types)
   - Edge case testing (empty filters, time boundaries, missing optional fields)
 
@@ -1701,21 +1694,17 @@ Note: Malicious JavaScript often uses `debugger;` statements to detect analysis 
 }
 ```
 
-**Performance Monitoring Events:**
+**Performance Warning Events:** (emitted when a page schedules a very short timer)
 ```json
 {
-  "id": "perf_1234567890_001",
+  "id": "3f2a1b4c-5d6e-4f70-8a91-b2c3d4e5f607",
   "timestamp": 1640995200700,
   "sessionId": "session_1640995200_abc123",
-  "type": "performance_stats",
-  "method": "periodic_report",
-  "operation": "performance_monitoring",
-  "uptime": 30000,
-  "totalEventsProcessed": 1250,
-  "eventsAccepted": 1200,
-  "eventsRejected": 50,
-  "eventsDeduplicated": 50,
-  "acceptanceRate": "96.00%"
+  "type": "performance_warning",
+  "method": "setTimeout",
+  "operation": "short_timeout_detected",
+  "delay": 5,
+  "warning": "Instrumentation may be impacting performance"
 }
 ```
 

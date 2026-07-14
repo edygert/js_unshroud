@@ -130,8 +130,9 @@ export class CorrelationEngine {
       const expectedType = rule.patterns.events[expectedTypeIndex];
 
       if (event.type === expectedType) {
-        if (currentChain.length === 0 ||
-            (rule.patterns.maxTimeGap && event.timestamp - lastTimestamp <= rule.patterns.maxTimeGap)) {
+        const withinGap = rule.patterns.maxTimeGap == null ||
+                          event.timestamp - lastTimestamp <= rule.patterns.maxTimeGap;
+        if (currentChain.length === 0 || withinGap) {
           currentChain.push(event);
           lastTimestamp = event.timestamp;
 
@@ -183,8 +184,9 @@ export class CorrelationEngine {
 
     for (const event of sortedEvents) {
       if (currentGroup.length === 0 || rule.patterns.events.includes(event.type)) {
-        if (currentGroup.length === 0 ||
-            (rule.patterns.maxTimeGap && event.timestamp - lastTimestamp <= rule.patterns.maxTimeGap)) {
+        const withinGap = rule.patterns.maxTimeGap == null ||
+                          event.timestamp - lastTimestamp <= rule.patterns.maxTimeGap;
+        if (currentGroup.length === 0 || withinGap) {
           currentGroup.push(event);
           lastTimestamp = event.timestamp;
         } else {

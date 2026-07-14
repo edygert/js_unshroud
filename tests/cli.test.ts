@@ -245,10 +245,8 @@ describe('Instrumentation Script Loading', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: true,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15
     };
 
@@ -288,10 +286,8 @@ describe('Instrumentation Script Loading', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: true,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15
     };
 
@@ -330,10 +326,8 @@ describe('Instrumentation Script Loading', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: true,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15
     };
 
@@ -373,10 +367,8 @@ describe('Instrumentation Injection', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: true,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15
     };
 
@@ -429,10 +421,8 @@ describe('Instrumentation Injection', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: true,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15
     };
 
@@ -483,10 +473,8 @@ describe('Instrumentation Injection', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: true,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15
     };
 
@@ -534,10 +522,8 @@ describe('Instrumentation Injection', () => {
       clipboardPatternDetection: true,
       enableDebuggerDetection: false,
       enableDownloadDetection: false,
-      dedupeWindowMs: 100,
       maxPayloadSize: 1024,
       maxStackDepth: 20,
-      enableDeduplication: true,
       monitoringTimeoutSeconds: 15
     };
 

@@ -2,7 +2,10 @@ import { describe, test, expect } from 'vitest';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { EventLogger } from '../src/orchestrator/EventLogger.ts';
-import { createEvent, validateEvent, serializeEvent } from '../src/schema/events.ts';
+import { createEvent, validateEvent, serializeEvent, generateEventId } from '../src/schema/events.ts';
+
+// v4 UUID: 8-4-4-4-12 hex, version nibble 4, variant nibble 8/9/a/b
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 import type { ConsoleEvent, NetworkEvent, StorageEvent, SessionConfig, MonitoringEvent } from '../src/schema/types.ts';
 
 describe('EventLogger', () => {
@@ -271,9 +274,20 @@ describe('Event creation utilities', () => {
     );
 
     expect(event1.id).not.toBe(event2.id);
+    // M5: IDs are v4 UUIDs (previously a collision-prone 32-bit MD5 prefix).
+    expect(event1.id).toMatch(UUID_V4);
+    expect(event2.id).toMatch(UUID_V4);
     expect(event1.sessionId).toBe('session-1');
     expect(event1.frameId).toBe('frame-1');
     expect(event2.type).toBe('console');
+  });
+
+  test('generateEventId returns a v4 UUID and is unique', () => {
+    const a = generateEventId();
+    const b = generateEventId();
+    expect(a).toMatch(UUID_V4);
+    expect(b).toMatch(UUID_V4);
+    expect(a).not.toBe(b);
   });
 
   test('should create different event types', () => {

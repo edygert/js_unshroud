@@ -19,8 +19,7 @@ declare global {
     };
     __js_unshroud_trackObject?: (obj: any, label: string, options?: any) => any;
     __js_unshroud?: {
-      filterEvent?: (event: any) => any;
-      getPerformanceStats?: () => any;
+      newEventId?: () => string;
       updateConfig?: (config: any) => void;
     };
     __js_unshroud_config?: any;
@@ -1153,108 +1152,10 @@ const workerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/
   });
 
   describe('Performance Monitor Script', () => {
-    test('should provide filterEvent API with sampling', async () => {
-      page = await browser.newPage();
-
-      const events: any[] = [];
-      await page.exposeFunction('__test_log_event', (event: string) => {
-        events.push(JSON.parse(event));
-      });
-
-      await page.addInitScript(() => {
-        window.__js_unshroud_log = (data: string) => {
-          (window as any).__test_log_event(data);
-        };
-      });
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(performanceMonitorScript);
-      await page.goto('about:blank');
-
-      const filteredEvents = await page.evaluate(() => {
-        const testEvents = [];
-        for (let i = 0; i < 10; i++) {
-          const event = { type: 'test', id: i, timestamp: Date.now() };
-          const filtered = window.__js_unshroud?.filterEvent?.(event);
-          if (filtered) {
-            testEvents.push(filtered);
-          }
-        }
-        return testEvents;
-      });
-
-      expect(filteredEvents.every(e => e.performanceNote === 'passed_filters')).toBe(true);
-
-      await page.close();
-    });
-
-    // Note: Rate limiting test removed - feature not actively used
-
-    test('should deduplicate events within time window', async () => {
-      page = await browser.newPage();
-
-      await page.addInitScript(() => {
-        window.__js_unshroud_session_id = 'test_session';
-      });
-
-      const events: any[] = [];
-      await page.exposeFunction('__test_log_event', (event: string) => {
-        events.push(JSON.parse(event));
-      });
-
-      await page.addInitScript(() => {
-        window.__js_unshroud_log = (data: string) => {
-          (window as any).__test_log_event(data);
-        };
-      });
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(performanceMonitorScript);
-      await page.goto('about:blank');
-
-      const results = await page.evaluate(() => {
-        // Send duplicate events
-        const duplicateEvent = { type: 'duplicate_test', payload: 'test_data' };
-        const result1 = window.__js_unshroud?.filterEvent?.(duplicateEvent);
-        const result2 = window.__js_unshroud?.filterEvent?.(duplicateEvent); // Should be deduplicated
-        return { result1: result1 !== null, result2: result2 !== null, stats: window.__js_unshroud?.getPerformanceStats?.() };
-      });
-
-      expect(results.result1).toBe(true);
-      expect(results.result2).toBe(false); // Second event should be deduplicated
-      expect(results.stats.eventsDeduplicated).toBeGreaterThan(0);
-
-      await page.close();
-    });
-
-    test('should limit payload sizes', async () => {
-      page = await browser.newPage();
-
-      await page.addInitScript(() => {
-      });
-
-      await page.addInitScript(() => {
-        window.__js_unshroud_log = () => {}; // Dummy logger
-      });
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(performanceMonitorScript);
-      await page.goto('about:blank');
-
-      const result = await page.evaluate(() => {
-        const largePayload = { type: 'test', payload: 'x'.repeat(2000) };
-        const filtered = window.__js_unshroud?.filterEvent?.(largePayload);
-        return {
-          payload: filtered?.payload,
-          hasTruncationMessage: filtered?.payload?.includes('truncated')
-        };
-      });
-
-      expect(result.payload.length).toBeLessThan(2000); // Should be truncated
-      expect(result.hasTruncationMessage).toBe(true); // Should have truncation note
-
-      await page.close();
-    });
+    // Note: the central filterEvent/dedup/payload-limit/getPerformanceStats pipeline was
+    // removed (audit M1) — it was exported but never wired into the live event path, so its
+    // config keys (enableDeduplication/dedupeWindowMs) were no-ops. The performance monitor
+    // now only wraps setTimeout/setInterval to emit performance_warning events.
 
     test('should monitor short setTimeouts', async () => {
       page = await browser.newPage();
@@ -1322,26 +1223,7 @@ const workerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/
       await page.close();
     });
 
-    test('should provide getPerformanceStats API', async () => {
-      page = await browser.newPage();
-
-      await page.addInitScript(bootstrapScript);
-      await page.addInitScript(performanceMonitorScript);
-      await page.goto('about:blank');
-
-      const stats = await page.evaluate(() => {
-        return window.__js_unshroud?.getPerformanceStats?.();
-      });
-
-      expect(stats).toBeDefined();
-      expect(stats.eventsAccepted).toBeDefined();
-      expect(stats.eventsRejected).toBeDefined();
-      expect(stats.startTime).toBeDefined();
-
-      await page.close();
-    });
-
-    // Note: Config update test removed - sampleRate was removed from config
+    // Note: the getPerformanceStats API was removed with the dedup/stats pipeline (audit M1).
   });
 
   describe('Service Worker Hooks Script', () => {
@@ -1755,8 +1637,90 @@ const workerHooksScript = readFileSync(join(process.cwd(), 'src/instrumentation/
       await page.close();
     });
 
-    // Note: AsyncFunction and GeneratorFunction are not reliably intercepted
-    // They share the same prototype chain as Function, making instrumentation tricky
+    // M3 regression: AsyncFunction/GeneratorFunction are non-global; malware reaches them
+    // via `(async(){}).constructor`. We install the wrapping proxy on that prototype slot,
+    // so `new (async(){}).constructor('code')` is captured. Pre-fix the wrappers were built
+    // then discarded, so these events never fired.
+    test('should intercept AsyncFunction constructor via prototype', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(async () => {
+        const AsyncFunction = (async function() {}).constructor as new (...args: string[]) => () => Promise<unknown>;
+        const fn = new AsyncFunction('return 1 + 1');
+        await fn();
+      });
+
+      await page.waitForTimeout(100);
+
+      const asyncEvents = events.filter(e => e.type === 'code_execution' && e.method === 'AsyncFunction');
+      expect(asyncEvents.length).toBeGreaterThan(0);
+      expect(asyncEvents[0].code).toContain('return 1 + 1');
+      // M5: browser-side event IDs are v4 UUIDs (unified with the TS side).
+      expect(asyncEvents[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+      await page.close();
+    });
+
+    test('should intercept GeneratorFunction constructor via prototype', async () => {
+      page = await browser.newPage();
+      const events: any[] = [];
+
+      await page.exposeFunction('__test_log_event', (eventJson: string) => {
+        events.push(JSON.parse(eventJson));
+      });
+
+      await page.addInitScript(bootstrapScript);
+      await page.addInitScript(`
+        window.__js_unshroud_config = {
+          enableCodeExecution: true,
+          maxPayloadSize: 2051
+        };
+        window.__js_unshroud_session_id = 'test-session';
+        window.__js_unshroud_log = function(data) {
+          window.__test_log_event(data);
+        };
+      `);
+      await page.addInitScript(performanceMonitorScript);
+      await page.addInitScript(codeExecutionHooksScript);
+
+      await page.goto('about:blank');
+
+      await page.evaluate(() => {
+        const GeneratorFunction = (function*() {}).constructor as new (...args: string[]) => () => Generator;
+        const fn = new GeneratorFunction('yield 42');
+        const it = fn();
+        it.next();
+      });
+
+      await page.waitForTimeout(100);
+
+      const genEvents = events.filter(e => e.type === 'code_execution' && e.method === 'GeneratorFunction');
+      expect(genEvents.length).toBeGreaterThan(0);
+      expect(genEvents[0].code).toContain('yield 42');
+
+      await page.close();
+    });
 
     test('should truncate large code with first/last pattern', async () => {
       page = await browser.newPage();

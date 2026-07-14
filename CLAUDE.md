@@ -32,7 +32,7 @@ The tool targets malicious JavaScript in web pages and requires headless browser
      - `service-worker-hooks.js`: Service Worker registration/lifecycle/messaging
      - `code-execution-hooks.js`: eval/Function/dynamic code execution (P0.2)
      - `encoding-hooks.js`: atob/btoa/fromCharCode/URI encoding (P0.3)
-     - `performance-monitor.js`: Event deduplication and payload size limiting
+     - `performance-monitor.js`: Wraps setTimeout/setInterval to emit performance_warning events on very short timers
 
 3. **Schema & Analysis** (`src/schema/`, `src/analysis/`)
    - `types.ts`: TypeScript event type definitions (NetworkEvent, StorageEvent, etc.)
@@ -268,10 +268,8 @@ Key configuration options:
 - `monitoringTimeoutSeconds`: How long to monitor the page in seconds (default: `15`)
 - `outputMode`: Output destination - `'file'`, `'udp'`, or `'both'` (default: `'file'`)
 - `udpLogging`: UDP logging configuration (host, port, enabled)
-- `dedupeWindowMs`: Deduplication window in milliseconds (default: `100`)
 - `maxPayloadSize`: Payload size limit in bytes (default: `2051`)
 - `maxStackDepth`: Stack trace depth limit (default: `20`)
-- `enableDeduplication`: Enable/disable deduplication (default: `true`)
 - `eventFiltering` (P4.1): Event filtering configuration to reduce noise during malware triage
   - `eventFiltering.dom.enableLoadEvents`: Log load events (default: `false`)
   - `eventFiltering.dom.enableMouseEvents`: Log mouse events (default: `false`)
@@ -461,10 +459,10 @@ Critical: Instrumentation MUST be injected BEFORE page navigation. Order matters
 ## Output Format
 
 Events are written to JSONL (JSON Lines) format. Each event has:
-- `id`: Unique event ID (evt_timestamp_random)
+- `id`: Unique event ID (v4 UUID; unified across browser-injected hooks and CDP/orchestrator events)
 - `sessionId`: Session identifier
 - `timestamp`: Unix timestamp (milliseconds)
-- `type`: Event type (network, storage, console, error, websocket, timer, dom, fingerprinting, headless_mitigation, service_worker, code_execution, encoding, performance_stats, performance_warning)
+- `type`: Event type (network, storage, console, error, websocket, timer, dom, fingerprinting, headless_mitigation, service_worker, code_execution, encoding, performance_warning)
 - Type-specific fields (see `src/schema/types.ts`)
 
 **UDP Logging (P0.1b)**: Events can optionally be sent via UDP to remote collectors for real-time analysis or SIEM integration. Configure via `outputMode: 'udp'` or `'both'` and `udpLogging` settings.
@@ -510,7 +508,7 @@ js_unshroud --url https://malicious-site.com --out full-behavior.jsonl --config 
 3. **Logging bridge**: Instrumentation hooks depend on `page.exposeFunction()` being called BEFORE scripts are injected. Without this bridge, events are silently lost.
 4. **Testing instrumentation**: Can't use normal unit tests. Must use Playwright integration tests.
 5. **Event correlation**: Use `correlationId` to link related events (e.g., request → response)
-6. **Performance**: High event volume can cause memory pressure. Use deduplication via performance-monitor.js. Rate limiting was removed in P0.5.
+6. **Performance**: High event volume can cause memory pressure. Per-hook payload truncation (`maxPayloadSize`) bounds individual event size. Central deduplication and rate limiting were removed (audit M1 / P0.5) — the config keys no longer exist.
 
 ## Debugging
 

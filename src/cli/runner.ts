@@ -117,10 +117,8 @@ function loadInstrumentationConfig(configPath?: string | Partial<Instrumentation
     clipboardPatternDetection: true,  // Enable malicious pattern detection (PowerShell, MSHTA, Base64)
     enableDebuggerDetection: true, // Detects debugger statements via CDP - common anti-analysis technique
     enableDownloadDetection: true, // Detects file downloads via blob/data URLs and anchor elements
-    dedupeWindowMs: 100,           // Short window to reduce noise from tight loops
     maxPayloadSize: 2051,         // Captures first 1024 + "..." + last 1024 chars for code/encoding output
     maxStackDepth: 20,
-    enableDeduplication: true,
     // Monitoring configuration
     monitoringTimeoutSeconds: 15, // Default 15 seconds - increase for slow-loading malware samples
     // Behavioral simulation (P3.2) - Defeats interaction-gated malware
@@ -484,10 +482,8 @@ async function injectInstrumentation(
     content: `
       Object.defineProperty(window, '__js_unshroud_config', {
         value: ${JSON.stringify({
-          dedupeWindowMs: config.dedupeWindowMs,
           maxPayloadSize: config.maxPayloadSize,
           maxStackDepth: config.maxStackDepth,
-          enableDeduplication: config.enableDeduplication,
           enableServiceWorker: config.enableServiceWorker,
           enableCodeExecution: config.enableCodeExecution,
           enableEncoding: config.enableEncoding,
