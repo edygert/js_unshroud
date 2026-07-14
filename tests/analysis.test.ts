@@ -16,7 +16,6 @@ import type {
   WebSocketEvent,
   FingerprintingEvent,
   HeadlessMitigationEvent,
-  PerformanceStatsEvent,
   PerformanceWarningEvent,
   ServiceWorkerEvent,
   CodeExecutionEvent,
@@ -599,29 +598,6 @@ describe('Analysis Engine Tests', () => {
       const formatter = new TimelineFormatter([hmEvent]);
       const timeline = formatter.formatTimeline();
       expect(timeline[0]?.summary).toBe('Headless Mitigation: navigator.webdriver');
-    });
-
-    test('should format performance_stats event summary', () => {
-      const psEvent: PerformanceStatsEvent = {
-        id: 'ps-test',
-        timestamp: 1640995201100,
-        sessionId: 'session-1',
-        type: 'performance_stats',
-        method: 'performance_monitor',
-        operation: 'performance_monitoring',
-        uptime: 5000,
-        totalEventsProcessed: 100,
-        eventsAccepted: 95,
-        eventsRejected: 5,
-        eventsRateLimited: 0,
-        eventsDeduplicated: 10,
-        acceptanceRate: '95.00%',
-        maxEventsPerSecond: 50
-      };
-      const formatter = new TimelineFormatter([psEvent]);
-      const timeline = formatter.formatTimeline();
-      expect(timeline[0]?.summary).toContain('Performance Stats: performance_monitoring');
-      expect(timeline[0]?.summary).toContain('uptime: 5000ms');
     });
 
     test('should format performance_warning event summary', () => {
@@ -1888,6 +1864,92 @@ describe('Analysis Engine Tests', () => {
       // Should find correlation based on sessionId as fallback
       expect(correlations).toHaveLength(1);
       expect(correlations[0]?.correlationId).toBe('session-1');
+    });
+
+    // M2 regression: a rule omitting maxTimeGap must still form multi-event chains.
+    // Pre-fix, the `maxTimeGap && ...` conjunct made every extension falsy, so the
+    // chain reset to length 1 on each event and no sequence/group ever completed.
+    test('should form multi-event sequences when maxTimeGap is omitted', async () => {
+      const rule: CorrelationRule = {
+        name: 'storage-then-network-no-gap',
+        description: 'storage followed by network (no time limit)',
+        patterns: {
+          type: 'sequence',
+          events: ['storage', 'network']
+          // maxTimeGap intentionally omitted
+        }
+      };
+
+      const correlationData = [
+        {
+          id: 'storage-1',
+          timestamp: 1640995200000,
+          sessionId: 'session-1',
+          type: 'storage',
+          storageType: 'localStorage',
+          operation: 'set',
+          key: 'data'
+        } as StorageEvent,
+        // A gap far larger than any default maxTimeGap — must still correlate.
+        {
+          id: 'network-1',
+          timestamp: 1640995260000, // 60 seconds later
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/data'
+        } as NetworkEvent
+      ];
+
+      writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
+
+      correlationEngine = new CorrelationEngine(new QueryEngine(), [rule]);
+      const correlations = await correlationEngine.findCorrelations(tempFilePath, 'storage-then-network-no-gap');
+
+      expect(correlations).toHaveLength(1);
+      expect(correlations[0]?.events.map(e => e.id)).toEqual(['storage-1', 'network-1']);
+    });
+
+    test('should form groups when maxTimeGap is omitted', async () => {
+      const rule: CorrelationRule = {
+        name: 'network-group-no-gap',
+        description: 'group of network events (no time limit)',
+        patterns: {
+          type: 'group',
+          events: ['network'],
+          correlationField: 'correlationId'
+          // maxTimeGap intentionally omitted
+        }
+      };
+
+      const correlationData = [
+        {
+          id: 'network-1',
+          timestamp: 1640995200000,
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'POST',
+          url: 'https://api.example.com/a',
+          correlationId: 'req-1'
+        } as NetworkEvent,
+        {
+          id: 'network-2',
+          timestamp: 1640995290000, // 90 seconds later
+          sessionId: 'session-1',
+          type: 'network',
+          method: 'GET',
+          url: 'https://api.example.com/b',
+          correlationId: 'req-1'
+        } as NetworkEvent
+      ];
+
+      writeFileSync(tempFilePath, correlationData.map(event => JSON.stringify(event)).join('\n'));
+
+      correlationEngine = new CorrelationEngine(new QueryEngine(), [rule]);
+      const correlations = await correlationEngine.findCorrelations(tempFilePath, 'network-group-no-gap');
+
+      expect(correlations).toHaveLength(1);
+      expect(correlations[0]?.events).toHaveLength(2);
     });
   });
 });

@@ -13,7 +13,9 @@
 
   // Generate a simple event ID
   const generateEventId = function() {
-    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return (window.__js_unshroud && window.__js_unshroud.newEventId)
+      ? window.__js_unshroud.newEventId()
+      : 'evt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
   };
 
   // Get session ID from window
@@ -264,8 +266,11 @@
     hookCryptoJS(window.CryptoJS);
   }
 
-  // Option 2: Monitor for CryptoJS assignment
-  let cryptoJSValue;
+  // Option 2: Monitor for CryptoJS assignment.
+  // Seed from the existing value first — otherwise redefining the property with a getter
+  // that returns an uninitialized `cryptoJSValue` blanks a pre-existing window.CryptoJS
+  // to `undefined`, breaking the page's own access.
+  let cryptoJSValue = window.CryptoJS;
   try {
     Object.defineProperty(window, 'CryptoJS', {
       get: function() {
@@ -275,6 +280,7 @@
         cryptoJSValue = value;
         hookCryptoJS(value);
       },
+      enumerable: true,
       configurable: true
     });
   } catch (e) {

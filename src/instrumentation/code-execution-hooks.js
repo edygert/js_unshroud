@@ -20,7 +20,9 @@
 
   // Generate a simple event ID
   const generateEventId = function() {
-    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return (window.__js_unshroud && window.__js_unshroud.newEventId)
+      ? window.__js_unshroud.newEventId()
+      : 'evt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
   };
 
   // Get session ID from window
@@ -167,17 +169,20 @@
   // Override Function constructor
   window.Function = createFunctionWrapper(originalFunction, 'Function');
 
-  // Override AsyncFunction if available
+  // Override AsyncFunction if available.
+  // AsyncFunction/GeneratorFunction are not globals — malware reaches them via
+  // `(async(){}).constructor`, which resolves to `AsyncFunction.prototype.constructor`.
+  // So we install the wrapping proxy on that prototype slot; `new (async(){}).constructor('code')`
+  // then hits the proxy's construct trap and is logged before delegating to the native
+  // constructor. (The proxy has no `get` trap, so name/length/prototype/toString forward
+  // to the native constructor, keeping it native-looking.)
   if (originalAsyncFunction && originalAsyncFunction !== window.Function) {
     try {
-      // AsyncFunction is not directly accessible, need to get it via constructor
-      const AsyncFunctionConstructor = originalAsyncFunction;
-      const wrappedAsyncFunction = createFunctionWrapper(AsyncFunctionConstructor, 'AsyncFunction');
-
-      // Replace the constructor in the prototype chain
-      Object.defineProperty(wrappedAsyncFunction, 'constructor', {
+      const wrappedAsyncFunction = createFunctionWrapper(originalAsyncFunction, 'AsyncFunction');
+      Object.defineProperty(originalAsyncFunction.prototype, 'constructor', {
         value: wrappedAsyncFunction,
         writable: true,
+        enumerable: false, // mirror the native constructor descriptor
         configurable: true
       });
     } catch (e) {
@@ -188,15 +193,14 @@
     }
   }
 
-  // Override GeneratorFunction if available
+  // Override GeneratorFunction if available (same prototype-constructor approach)
   if (originalGeneratorFunction && originalGeneratorFunction !== window.Function) {
     try {
-      const GeneratorFunctionConstructor = originalGeneratorFunction;
-      const wrappedGeneratorFunction = createFunctionWrapper(GeneratorFunctionConstructor, 'GeneratorFunction');
-
-      Object.defineProperty(wrappedGeneratorFunction, 'constructor', {
+      const wrappedGeneratorFunction = createFunctionWrapper(originalGeneratorFunction, 'GeneratorFunction');
+      Object.defineProperty(originalGeneratorFunction.prototype, 'constructor', {
         value: wrappedGeneratorFunction,
         writable: true,
+        enumerable: false,
         configurable: true
       });
     } catch (e) {

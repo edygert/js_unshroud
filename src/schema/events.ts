@@ -1,5 +1,5 @@
 import type { MonitoringEvent } from './types.ts';
-import { createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 // Type-safe event types derived from MonitoringEvent union
 const EVENT_TYPES = [
@@ -12,7 +12,6 @@ const EVENT_TYPES = [
   'dom',
   'fingerprinting',
   'headless_mitigation',
-  'performance_stats',
   'performance_warning',
   'service_worker',
   'code_execution',
@@ -35,10 +34,11 @@ function isValidEventType(type: string): type is MonitoringEvent['type'] {
   return EVENT_TYPES.includes(type as MonitoringEvent['type']);
 }
 
-export function generateEventId(sessionId: string, timestamp: number, type: string): string {
-  const hash = createHash('md5');
-  hash.update(`${sessionId}${timestamp}${type}${Math.random()}`);
-  return hash.digest('hex').substring(0, 8);
+// Event IDs are v4 UUIDs (122 bits of randomness) — wide enough to be collision-free at
+// the documented 10k–100k+ events/session scale where they double as artifact filenames.
+// The previous 32-bit MD5 prefix collided by the birthday bound well within that range.
+export function generateEventId(): string {
+  return randomUUID();
 }
 
 export function createEvent<T extends MonitoringEvent>(
@@ -47,7 +47,7 @@ export function createEvent<T extends MonitoringEvent>(
   event: Omit<T, 'id' | 'timestamp' | 'sessionId' | 'frameId'>
 ): T {
   return {
-    id: generateEventId(sessionId, Date.now(), event.type),
+    id: generateEventId(),
     timestamp: Date.now(),
     sessionId,
     frameId,

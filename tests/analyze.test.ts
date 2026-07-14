@@ -18,7 +18,6 @@ import type {
   WebSocketEvent,
   FingerprintingEvent,
   HeadlessMitigationEvent,
-  PerformanceStatsEvent,
   PerformanceWarningEvent,
   ServiceWorkerEvent,
   CodeExecutionEvent,
@@ -372,7 +371,6 @@ describe('All Event Types Coverage', () => {
       { id: '7', timestamp: 7000, sessionId: 's1', type: 'dom', eventType: 'click', eventPhase: 'target', bubbles: true, cancelable: true, defaultPrevented: false, composed: false } as DomEvent,
       { id: '8', timestamp: 8000, sessionId: 's1', type: 'fingerprinting', method: 'canvas', operation: 'toDataURL' } as FingerprintingEvent,
       { id: '9', timestamp: 9000, sessionId: 's1', type: 'headless_mitigation', method: 'navigator', operation: 'webdriver_check' } as HeadlessMitigationEvent,
-      { id: '10', timestamp: 10000, sessionId: 's1', type: 'performance_stats', method: 'monitor', operation: 'performance_monitoring', uptime: 10000, totalEventsProcessed: 100, eventsAccepted: 90, eventsRejected: 5, eventsRateLimited: 3, eventsDeduplicated: 2, acceptanceRate: '90%', maxEventsPerSecond: 50 } as PerformanceStatsEvent,
       { id: '11', timestamp: 11000, sessionId: 's1', type: 'performance_warning', method: 'setTimeout', operation: 'short_timeout_detected', delay: 1, warning: 'Short timeout detected' } as PerformanceWarningEvent,
       { id: '12', timestamp: 12000, sessionId: 's1', type: 'service_worker', eventType: 'register', scriptUrl: '/sw.js' } as ServiceWorkerEvent,
       { id: '13', timestamp: 13000, sessionId: 's1', type: 'code_execution', method: 'eval', operation: 'execute', code: 'console.log("test")', codeLength: 20 } as CodeExecutionEvent,
@@ -402,7 +400,6 @@ describe('All Event Types Coverage', () => {
     expect(output).toContain('DOM:');
     expect(output).toContain('Fingerprinting:');
     expect(output).toContain('Headless Mitigation:');
-    expect(output).toContain('Performance Stats:');
     expect(output).toContain('Performance Warning:');
     expect(output).toContain('Service Worker:');
     expect(output).toContain('Code Execution:');

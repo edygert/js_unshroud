@@ -109,20 +109,6 @@ export interface HeadlessMitigationEvent extends BaseEvent {
   stackTrace?: string;
 }
 
-export interface PerformanceStatsEvent extends BaseEvent {
-  type: 'performance_stats';
-  method: string;
-  operation: 'performance_monitoring';
-  uptime: number;
-  totalEventsProcessed: number;
-  eventsAccepted: number;
-  eventsRejected: number;
-  eventsRateLimited: number;
-  eventsDeduplicated: number;
-  acceptanceRate: string;
-  maxEventsPerSecond: number;
-}
-
 export interface PerformanceWarningEvent extends BaseEvent {
   type: 'performance_warning';
   method: 'setTimeout' | 'setInterval';
@@ -328,7 +314,6 @@ export type MonitoringEvent =
   | DomEvent
   | FingerprintingEvent
   | HeadlessMitigationEvent
-  | PerformanceStatsEvent
   | PerformanceWarningEvent
   | ServiceWorkerEvent
   | CodeExecutionEvent
@@ -481,10 +466,8 @@ export interface InstrumentationConfig {
   clipboardPatternDetection: boolean;  // Enable malicious pattern detection (PowerShell, MSHTA, Base64) in clipboard data
   enableDebuggerDetection: boolean;  // Detects debugger statements via CDP (anti-analysis technique detection)
   enableDownloadDetection: boolean;  // Detects file downloads via blob/data URLs and anchor elements (default: true)
-  dedupeWindowMs: number;       // Deduplication window in milliseconds
   maxPayloadSize: number;       // Maximum payload size in bytes
   maxStackDepth: number;        // Maximum stack trace depth
-  enableDeduplication: boolean; // Reduce noise from tight loops
 
   // Monitoring configuration
   monitoringTimeoutSeconds: number;  // How long to monitor the page in seconds (default: 15)

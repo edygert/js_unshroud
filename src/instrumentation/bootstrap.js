@@ -29,9 +29,30 @@
     configurable: false
   });
 
-  // Generate a simple event ID
+  // Canonical event-ID generator (single source of truth for all hooks).
+  // Emits a v4 UUID. Uses crypto.getRandomValues (available even in insecure http://
+  // contexts, unlike crypto.randomUUID) with a Math.random fallback. Kept identical in
+  // spirit to the TS side (crypto.randomUUID in src/schema/events.ts) so both event
+  // sources share one format.
+  window.__js_unshroud = window.__js_unshroud || {};
+  window.__js_unshroud.newEventId = function() {
+    const rnd = (window.crypto && window.crypto.getRandomValues)
+      ? window.crypto.getRandomValues(new Uint8Array(16))
+      : Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+    rnd[6] = (rnd[6] & 0x0f) | 0x40;
+    rnd[8] = (rnd[8] & 0x3f) | 0x80;
+    const hex = [];
+    for (let i = 0; i < 16; i++) {
+      hex.push((rnd[i] + 0x100).toString(16).slice(1));
+    }
+    return hex[0] + hex[1] + hex[2] + hex[3] + '-' + hex[4] + hex[5] + '-' +
+      hex[6] + hex[7] + '-' + hex[8] + hex[9] + '-' +
+      hex[10] + hex[11] + hex[12] + hex[13] + hex[14] + hex[15];
+  };
+
+  // Generate a simple event ID (delegates to the canonical generator above)
   const generateEventId = function() {
-    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return window.__js_unshroud.newEventId();
   };
 
   // Get session ID from window or generate a temporary one

@@ -14,7 +14,9 @@
 
   // Generate a simple event ID
   const generateEventId = function() {
-    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return (window.__js_unshroud && window.__js_unshroud.newEventId)
+      ? window.__js_unshroud.newEventId()
+      : 'evt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
   };
 
   // Get session ID from window or generate a temporary one

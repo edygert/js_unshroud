@@ -270,8 +270,6 @@ export function formatEventSummary(event: MonitoringEvent): string {
       return `DOM ${(event).eventType}${(event).target ? ` on ${(event).target}` : ''}`;
     case 'headless_mitigation':
       return `${(event).method} ${(event).operation}`;
-    case 'performance_stats':
-      return `Performance: ${(event).totalEventsProcessed} events (${(event).eventsAccepted} accepted)`;
     case 'performance_warning':
       return `${(event).method}(${(event).delay}ms): ${(event).warning}`;
     case 'service_worker':

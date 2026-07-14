@@ -4,7 +4,9 @@
 
   // Generate a simple event ID
   const generateEventId = function() {
-    return 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return (window.__js_unshroud && window.__js_unshroud.newEventId)
+      ? window.__js_unshroud.newEventId()
+      : 'evt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 11);
   };
 
   // Get session ID from window or generate a temporary one
@@ -106,82 +108,80 @@
 
   // === CORE HEADLESS DETECTION MITIGATIONS ===
 
-  // 0. Fix broken image dimensions - Real Chrome reports 0x0, not 16x16
+  // 0. Fix broken image dimensions - Real Chrome reports 0x0 for images that failed to
+  // load. Only special-case genuinely broken images; normal images must keep native
+  // semantics. Notably `img.width`/`img.height` return the *layout* width (CSS-influenced),
+  // NOT the content attribute or intrinsic size — so we delegate to the native getters and
+  // only coerce the broken-image case. We also read via the captured native descriptors
+  // (never `this.naturalWidth`, which would re-enter our own accessor) and do not log on
+  // every read (spam + detection risk).
   try {
-    // Override naturalWidth and naturalHeight for broken images
     // eslint-disable-next-line no-undef
-    const originalImageDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalWidth');
-    // eslint-disable-next-line no-undef
-    const originalHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalHeight');
+    const imgProto = HTMLImageElement.prototype;
+    const natWidthDesc = Object.getOwnPropertyDescriptor(imgProto, 'naturalWidth');
+    const natHeightDesc = Object.getOwnPropertyDescriptor(imgProto, 'naturalHeight');
+    const widthDesc = Object.getOwnPropertyDescriptor(imgProto, 'width');
+    const heightDesc = Object.getOwnPropertyDescriptor(imgProto, 'height');
 
-    // eslint-disable-next-line no-undef
-    Object.defineProperty(HTMLImageElement.prototype, 'naturalWidth', {
-      get: function() {
-        // If image failed to load, return 0 (real Chrome behavior)
-        if (this.complete && !this.naturalWidth) {
-          logEvent({
-            type: 'headless_mitigation',
-            method: 'HTMLImageElement.naturalWidth',
-            operation: 'broken_image_dimension_fix',
-            originalValue: originalImageDescriptor ? originalImageDescriptor.get.call(this) : 16,
-            newValue: 0,
-            timestamp: Date.now()
-          });
-          return 0;
-        }
-        return originalImageDescriptor ? originalImageDescriptor.get.call(this) : 0;
-      },
-      configurable: true
-    });
+    const nativeNaturalWidth = function(el) {
+      return natWidthDesc && natWidthDesc.get ? natWidthDesc.get.call(el) : 0;
+    };
+    const nativeNaturalHeight = function(el) {
+      return natHeightDesc && natHeightDesc.get ? natHeightDesc.get.call(el) : 0;
+    };
 
-    // eslint-disable-next-line no-undef
-    Object.defineProperty(HTMLImageElement.prototype, 'naturalHeight', {
-      get: function() {
-        // If image failed to load, return 0 (real Chrome behavior)
-        if (this.complete && !this.naturalHeight) {
-          logEvent({
-            type: 'headless_mitigation',
-            method: 'HTMLImageElement.naturalHeight',
-            operation: 'broken_image_dimension_fix',
-            originalValue: originalHeightDescriptor ? originalHeightDescriptor.get.call(this) : 16,
-            newValue: 0,
-            timestamp: Date.now()
-          });
-          return 0;
-        }
-        return originalHeightDescriptor ? originalHeightDescriptor.get.call(this) : 0;
-      },
-      configurable: true
-    });
+    if (natWidthDesc && natWidthDesc.get) {
+      Object.defineProperty(imgProto, 'naturalWidth', {
+        get: function() {
+          const value = nativeNaturalWidth(this);
+          // A failed load reports a nonzero placeholder in some headless builds; real
+          // Chrome reports 0. Coerce only that case, pass everything else through.
+          return (this.complete && !value) ? 0 : value;
+        },
+        configurable: true,
+        enumerable: natWidthDesc.enumerable
+      });
+    }
 
-    // Also override width/height properties for broken images
-    // eslint-disable-next-line no-undef
-    Object.defineProperty(HTMLImageElement.prototype, 'width', {
-      get: function() {
-        if (this.complete && this.naturalWidth === 0) {
-          return 0;
-        }
-        return this.getAttribute('width') || this.naturalWidth || 0;
-      },
-      set: function(value) {
-        this.setAttribute('width', value);
-      },
-      configurable: true
-    });
+    if (natHeightDesc && natHeightDesc.get) {
+      Object.defineProperty(imgProto, 'naturalHeight', {
+        get: function() {
+          const value = nativeNaturalHeight(this);
+          return (this.complete && !value) ? 0 : value;
+        },
+        configurable: true,
+        enumerable: natHeightDesc.enumerable
+      });
+    }
 
-    // eslint-disable-next-line no-undef
-    Object.defineProperty(HTMLImageElement.prototype, 'height', {
-      get: function() {
-        if (this.complete && this.naturalHeight === 0) {
-          return 0;
-        }
-        return this.getAttribute('height') || this.naturalHeight || 0;
-      },
-      set: function(value) {
-        this.setAttribute('height', value);
-      },
-      configurable: true
-    });
+    if (widthDesc && widthDesc.get) {
+      Object.defineProperty(imgProto, 'width', {
+        get: function() {
+          // Broken image → 0 (match real Chrome); otherwise the native layout width.
+          if (this.complete && nativeNaturalWidth(this) === 0) {
+            return 0;
+          }
+          return widthDesc.get.call(this);
+        },
+        set: widthDesc.set ? function(value) { widthDesc.set.call(this, value); } : undefined,
+        configurable: true,
+        enumerable: widthDesc.enumerable
+      });
+    }
+
+    if (heightDesc && heightDesc.get) {
+      Object.defineProperty(imgProto, 'height', {
+        get: function() {
+          if (this.complete && nativeNaturalHeight(this) === 0) {
+            return 0;
+          }
+          return heightDesc.get.call(this);
+        },
+        set: heightDesc.set ? function(value) { heightDesc.set.call(this, value); } : undefined,
+        configurable: true,
+        enumerable: heightDesc.enumerable
+      });
+    }
   } catch (e) {
     window.__js_unshroud_debug('[JS Unshroud] Could not fix broken image dimensions:', e.message);
   }
