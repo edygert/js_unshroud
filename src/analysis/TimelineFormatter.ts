@@ -26,18 +26,24 @@ export class TimelineFormatter {
   private groupEventsByTime(): void {
     const timeTolerance = 50; // Group events within 50ms as simultaneous
 
-    for (const event of this.events) {
-      let bucketFound = false;
-      for (const [bucketTime, bucketEvents] of this.groupedEvents) {
-        if (Math.abs(event.timestamp - bucketTime) <= timeTolerance) {
-          bucketEvents.push(event);
-          bucketFound = true;
-          break;
-        }
-      }
+    // Single pass (Q2): events are pre-sorted ascending, and bucket keys are
+    // created in ascending order, so an event can only ever join the most
+    // recent bucket (older keys are always further than the current one). This
+    // is equivalent to the previous all-buckets scan but O(n) instead of O(n²).
+    let currentBucketTime: number | null = null;
+    let currentBucketEvents: MonitoringEvent[] | null = null;
 
-      if (!bucketFound) {
-        this.groupedEvents.set(event.timestamp, [event]);
+    for (const event of this.events) {
+      if (
+        currentBucketTime !== null &&
+        currentBucketEvents !== null &&
+        event.timestamp - currentBucketTime <= timeTolerance
+      ) {
+        currentBucketEvents.push(event);
+      } else {
+        currentBucketEvents = [event];
+        currentBucketTime = event.timestamp;
+        this.groupedEvents.set(currentBucketTime, currentBucketEvents);
       }
     }
   }
@@ -237,16 +243,13 @@ export class TimelineFormatter {
   formatTimeline(range?: TimeRange, maxEntries?: number): TimelineEntry[] {
     const entries: TimelineEntry[] = [];
 
-    let filteredEvents = this.events;
-    if (range?.start || range?.end) {
-      filteredEvents = this.events.filter(e =>
-        (!range.start || e.timestamp >= range.start) &&
-        (!range.end || e.timestamp <= range.end)
-      );
-    }
-
     for (const [timestamp, eventsAtTime] of this.groupedEvents) {
-      const matchesFilter = filteredEvents.some(e => e.timestamp === timestamp);
+      // Each bucket key is the timestamp of its first event, so a direct range
+      // test on the key is equivalent to the previous per-bucket scan of the
+      // filtered event set — but O(1) per bucket instead of O(n) (Q2).
+      const matchesFilter =
+        (!range?.start || timestamp >= range.start) &&
+        (!range?.end || timestamp <= range.end);
       if (matchesFilter && eventsAtTime.length > 0) {
         entries.push({
           timestamp,

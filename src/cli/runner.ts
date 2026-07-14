@@ -276,7 +276,8 @@ function readInstrumentationSource(name: string): string {
   return readFileSync(join(resolveInstrumentationDir(), name), 'utf-8');
 }
 
-function loadInstrumentationScripts(config: InstrumentationConfig): {
+/** The set of instrumentation hook sources loaded for a session (Q5). */
+interface InstrumentationScripts {
   bootstrap: string;
   network: string | null;
   storage: string | null;
@@ -298,7 +299,9 @@ function loadInstrumentationScripts(config: InstrumentationConfig): {
   clipboard: string | null;
   download: string | null;
   performanceMonitor: string;
-} {
+}
+
+function loadInstrumentationScripts(config: InstrumentationConfig): InstrumentationScripts {
   // Scripts are read from disk (resolved relative to the module or the executable).
   return {
     bootstrap: readInstrumentationSource('bootstrap.js'),
@@ -336,29 +339,7 @@ async function injectInstrumentation(
   logger: Logger,
   cdpManager: CDPSessionManager,
   headlessConfig?: HeadlessMitigationConfig
-): Promise<{
-  bootstrap: string;
-  network: string | null;
-  storage: string | null;
-  timer: string | null;
-  dom: string | null;
-  fingerprinting: string | null;
-  objectTracking: string | null;
-  headlessMitigation: string | null;
-  serviceWorker: string | null;
-  codeExecution: string | null;
-  encoding: string | null;
-  cryptojs: string | null;
-  eventHandler: string | null;
-  blobTracking: string | null;
-  urlExecution: string | null;
-  worker: string | null;
-  module: string | null;
-  iframe: string | null;
-  clipboard: string | null;
-  download: string | null;
-  performanceMonitor: string;
-}> {
+): Promise<InstrumentationScripts> {
   const scripts = loadInstrumentationScripts(config);
 
   // CRITICAL: Set up browser-to-Node.js logging bridge using CDP Runtime.addBinding

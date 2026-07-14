@@ -4,7 +4,8 @@ import { existsSync, writeFileSync } from 'fs';
 
 interface AnalyzeArgs {
   input: string;
-  format?: 'text' | 'json' | 'stats';
+  // Captured verbatim at parse time; validateArgs rejects out-of-set values (Q7).
+  format?: string;
   output?: string;
 }
 
@@ -15,7 +16,7 @@ interface AnalyzeArgs {
 function parseAnalyzeArgs(): AnalyzeArgs {
   const args = process.argv.slice(3); // Skip 'node', 'runner.ts', 'analyze'
   let input: string | undefined;
-  let format: 'text' | 'json' | 'stats' | undefined;
+  let format: string | undefined;
   let output: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -27,7 +28,8 @@ function parseAnalyzeArgs(): AnalyzeArgs {
       }
     } else if (args[i] === '--format') {
       const nextArg = args[i + 1];
-      if (nextArg && (nextArg === 'text' || nextArg === 'json' || nextArg === 'stats')) {
+      if (nextArg) {
+        // Capture verbatim; validateArgs enforces the allowed set (Q7).
         format = nextArg;
         i++;
       }
