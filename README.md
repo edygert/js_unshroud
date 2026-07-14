@@ -1092,7 +1092,7 @@ Each download event includes:
 
 ```json
 {
-  "id": "evt_1234567890_012",
+  "id": "47f1f177-4906-4dbc-8bdb-509be66cffa2",
   "timestamp": 1640995201100,
   "sessionId": "session_1640995200_abc123",
   "type": "download",
@@ -1105,7 +1105,7 @@ Each download event includes:
   "blobType": "application/octet-stream",
   "blobSize": 524288,
   "blobContent": "MZ\u0090\u0000\u0003...",
-  "artifactPath": "artifacts/session_xyz/downloads/evt_1234567890_012.exe"
+  "artifactPath": "artifacts/session_xyz/downloads/47f1f177-4906-4dbc-8bdb-509be66cffa2.exe"
 }
 ```
 
@@ -1130,29 +1130,29 @@ Event logs (JSONL) truncate large payloads to keep file sizes manageable. For ex
 artifacts/
   session_{timestamp}_{random}/
     page_snapshot/      # Initial page HTML snapshot
-      evt_000_aaa.html
-      evt_000_aaa.meta.json
+      9f39c3ec-1111-4515-bffc-6e4b03f678c8.html
+      9f39c3ec-1111-4515-bffc-6e4b03f678c8.meta.json
     downloads/          # Downloaded files (blobs, data URLs)
-      evt_123_abc.exe
-      evt_123_abc.meta.json
+      26ff25de-f55e-4c79-838b-c26499f7cbf2.exe
+      26ff25de-f55e-4c79-838b-c26499f7cbf2.meta.json
     code_execution/     # Full eval/Function code
-      evt_456_def.js
-      evt_456_def.meta.json
+      15d32404-1a33-465f-b6df-ad761810b327.js
+      15d32404-1a33-465f-b6df-ad761810b327.meta.json
     encoding/           # Full decoded/encoded output
-      evt_789_ghi.txt
-      evt_789_ghi.meta.json
+      35285454-3e10-45df-a0f0-cd9b67773533.txt
+      35285454-3e10-45df-a0f0-cd9b67773533.meta.json
     cryptojs/           # Full decrypted plaintext
-      evt_012_jkl.txt
-      evt_012_jkl.meta.json
+      2c57681b-3c75-40bf-9f9d-7cadc51c03ef.txt
+      2c57681b-3c75-40bf-9f9d-7cadc51c03ef.meta.json
     clipboard/          # Clipboard payloads
-      evt_345_mno.txt
-      evt_345_mno.meta.json
+      3a413a57-1786-454f-b5dd-821f90059b76.txt
+      3a413a57-1786-454f-b5dd-821f90059b76.meta.json
     workers/            # Web Worker scripts
-      evt_678_pqr.js
-      evt_678_pqr.meta.json
+      e871c71d-7917-47b9-b57c-5f46e35b8fc2.js
+      e871c71d-7917-47b9-b57c-5f46e35b8fc2.meta.json
     iframes/            # iframe srcdoc HTML
-      evt_901_stu.html
-      evt_901_stu.meta.json
+      2e40b55b-cf07-4365-b565-03e715952259.html
+      2e40b55b-cf07-4365-b565-03e715952259.meta.json
 ```
 
 **Naming Convention:** `{eventId}.{extension}`
@@ -1513,7 +1513,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **Network Events:**
 ```json
 {
-  "id": "evt_1234567890_001",
+  "id": "2d53de2c-1203-4096-8dcb-4c71e920d6f2",
   "timestamp": 1640995200000,
   "sessionId": "session_1640995200_abc123",
   "type": "network",
@@ -1530,7 +1530,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **Storage Events:**
 ```json
 {
-  "id": "evt_1234567890_002",
+  "id": "dfe97fab-fd6b-4b9f-9dfe-120c728010d2",
   "timestamp": 1640995200100,
   "sessionId": "session_1640995200_abc123",
   "type": "storage",
@@ -1545,7 +1545,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **Console Events:**
 ```json
 {
-  "id": "evt_1234567890_003",
+  "id": "1cf5e464-06fc-443f-8c6f-ab41976b9b6d",
   "timestamp": 1640995200200,
   "sessionId": "session_1640995200_abc123",
   "type": "console",
@@ -1558,7 +1558,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **Error Events:**
 ```json
 {
-  "id": "evt_1234567890_004",
+  "id": "edb90f23-0889-4285-89ae-22b85ec647ea",
   "timestamp": 1640995200300,
   "sessionId": "session_1640995200_abc123",
   "type": "error",
@@ -1573,7 +1573,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **WebSocket Events:**
 ```json
 {
-  "id": "evt_1234567890_005",
+  "id": "ad8a2567-bad3-41fa-b283-c7008396e434",
   "timestamp": 1640995200400,
   "sessionId": "session_1640995200_abc123",
   "type": "websocket",
@@ -1586,7 +1586,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **Code Execution Events:**
 ```json
 {
-  "id": "evt_1234567890_006",
+  "id": "0032347c-d3e6-427c-b295-229d219c8b20",
   "timestamp": 1640995200500,
   "sessionId": "session_1640995200_abc123",
   "type": "code_execution",
@@ -1601,7 +1601,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **Encoding Events (Deobfuscation):**
 ```json
 {
-  "id": "evt_1234567890_007",
+  "id": "8fc34484-712f-4db3-bf48-a836fea839c0",
   "timestamp": 1640995200600,
   "sessionId": "session_1640995200_abc123",
   "type": "encoding",
@@ -1616,7 +1616,7 @@ The tool outputs events in JSONL format (one JSON object per line). Each event i
 **CryptoJS Events (Encryption/Decryption):**
 ```json
 {
-  "id": "evt_1234567890_008",
+  "id": "43cd7706-b4ec-42d3-9dbf-c9b66105a54d",
   "timestamp": 1640995200700,
   "sessionId": "session_1640995200_abc123",
   "type": "cryptojs",
@@ -1635,7 +1635,7 @@ Note: For `decrypt` operations, `output` contains the decrypted plaintext. For `
 **Debugger Events (Anti-Analysis Detection):**
 ```json
 {
-  "id": "evt_1234567890_009",
+  "id": "bb57eb15-e2d2-432c-ab87-e3bbeab56895",
   "timestamp": 1640995200750,
   "sessionId": "session_1640995200_abc123",
   "type": "debugger",
@@ -1652,7 +1652,7 @@ Note: Malicious JavaScript often uses `debugger;` statements to detect analysis 
 **Web Worker Events:**
 ```json
 {
-  "id": "evt_1234567890_009",
+  "id": "3537f5ec-1e3e-45b2-be6b-e1747a286dff",
   "timestamp": 1640995200800,
   "sessionId": "session_1640995200_abc123",
   "type": "worker",
@@ -1667,7 +1667,7 @@ Note: Malicious JavaScript often uses `debugger;` statements to detect analysis 
 **ES Module Events:**
 ```json
 {
-  "id": "evt_1234567890_010",
+  "id": "d3499ece-af8d-4b29-94d7-30722455baf5",
   "timestamp": 1640995200900,
   "sessionId": "session_1640995200_abc123",
   "type": "module",
@@ -1681,7 +1681,7 @@ Note: Malicious JavaScript often uses `debugger;` statements to detect analysis 
 **iframe Events:**
 ```json
 {
-  "id": "evt_1234567890_011",
+  "id": "555d0af7-af82-44ea-88d5-340fc30a87ad",
   "timestamp": 1640995201000,
   "sessionId": "session_1640995200_abc123",
   "type": "iframe",
@@ -1711,7 +1711,7 @@ Note: Malicious JavaScript often uses `debugger;` statements to detect analysis 
 **Headless Mitigation Events:**
 ```json
 {
-  "id": "evt_1234567890_006",
+  "id": "3ac5b43a-db19-4b54-94a8-2ff9a2230feb",
   "timestamp": 1640995200600,
   "sessionId": "session_1640995200_abc123",
   "type": "headless_mitigation",

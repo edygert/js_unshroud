@@ -4,7 +4,7 @@
 
   // === CONFIGURATION ===
   let config = {
-    maxPayloadSize: 1024,       // Max bytes for payload logging
+    maxPayloadSize: 2051,       // Max bytes for payload logging (matches runner.ts default, Q6)
     maxStackDepth: 20           // Max stack frames to capture
   };
 

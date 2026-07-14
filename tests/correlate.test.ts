@@ -133,13 +133,14 @@ describe('Correlate Command Tests', () => {
       mockError.mockRestore();
     });
 
-    test('should handle invalid format values gracefully', () => {
+    test('should capture invalid format verbatim for validateArgs to reject (Q7)', () => {
       process.argv = ['node', 'runner.ts', 'correlate', '--input', 'test.jsonl', '--format', 'invalid'];
 
       const args = parseCorrelateArgs();
 
-      // Invalid format should be silently ignored (not set)
-      expect(args.format).toBeUndefined();
+      // Q7: parse captures the raw value; validateArgs (below) rejects it,
+      // rather than silently downgrading to the default format.
+      expect(args.format).toBe('invalid');
       expect(args.input).toBe('test.jsonl');
     });
   });
@@ -176,6 +177,28 @@ describe('Correlate Command Tests', () => {
 
       expect(() => validateArgs(argsText)).not.toThrow();
       expect(() => validateArgs(argsJson)).not.toThrow();
+    });
+
+    test('should exit with error for invalid format (Q7)', () => {
+      writeFileSync(tempFilePath, '', 'utf-8');
+      writeFileSync(tempRulesPath, '{"rules":[]}', 'utf-8');
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+      const mockError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const args = {
+        input: tempFilePath,
+        rulesFile: tempRulesPath,
+        format: 'invalid'
+      };
+
+      validateArgs(args);
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining('Invalid format'));
+
+      mockExit.mockRestore();
+      mockError.mockRestore();
     });
   });
 
@@ -563,6 +586,21 @@ describe('Correlate Command Tests', () => {
 
       const result = formatEventSummary(event);
       expect(result).toBe('canvas.toDataURL()');
+    });
+
+    test('should fall back to "<type> event" for an unknown event type (Q8)', () => {
+      // Simulates a hand-edited or forward-version JSONL carrying a type not in
+      // the current union. Before Q8 the switch had no default and returned
+      // undefined ("... undefined" in output); now it mirrors TimelineFormatter.
+      const event = {
+        id: 'evt_unknown',
+        sessionId: 'sess_456',
+        timestamp: Date.now(),
+        type: 'quantum_teleport'
+      } as unknown as MonitoringEvent;
+
+      const result = formatEventSummary(event);
+      expect(result).toBe('quantum_teleport event');
     });
   });
 

@@ -14,7 +14,8 @@ interface QueryArgs {
   operation?: 'set' | 'get' | 'remove' | 'clear';
   correlationId?: string;
   // Output params
-  format?: 'jsonl' | 'count';
+  // Captured verbatim at parse time; validateArgs rejects out-of-set values (Q7).
+  format?: string;
   output?: string;
 }
 
@@ -41,7 +42,7 @@ export function parseQueryArgs(): QueryArgs {
   let storageType: 'localStorage' | 'sessionStorage' | undefined;
   let operation: 'set' | 'get' | 'remove' | 'clear' | undefined;
   let correlationId: string | undefined;
-  let format: 'jsonl' | 'count' | undefined;
+  let format: string | undefined;
   let output: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -83,9 +84,8 @@ export function parseQueryArgs(): QueryArgs {
       correlationId = nextArg;
       i++;
     } else if (arg === '--format' && nextArg) {
-      if (nextArg === 'jsonl' || nextArg === 'count') {
-        format = nextArg;
-      }
+      // Capture verbatim; validateArgs enforces the allowed set (Q7).
+      format = nextArg;
       i++;
     } else if (arg === '--output' && nextArg) {
       output = nextArg;

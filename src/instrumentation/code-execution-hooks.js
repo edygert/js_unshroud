@@ -16,7 +16,8 @@
 
   // Get config values
   const config = window.__js_unshroud_config || {};
-  const maxPayloadSize = config.maxPayloadSize || 1024;
+  // Fallback matches the real config default in runner.ts and the other hooks (Q6).
+  const maxPayloadSize = config.maxPayloadSize || 2051;
 
   // Generate a simple event ID
   const generateEventId = function() {
@@ -114,13 +115,9 @@
     return originalEval.call(this, code);
   };
 
-  // Override global eval
+  // Override global eval. (window.globalThis === window in page context, so a
+  // second assignment through globalThis would be redundant — Q9.)
   window.eval = wrappedEval;
-
-  // Also override via indirect eval references
-  if (window.globalThis) {
-    window.globalThis.eval = wrappedEval;
-  }
 
   // ============================================================================
   // FUNCTION CONSTRUCTOR INSTRUMENTATION

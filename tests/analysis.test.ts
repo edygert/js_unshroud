@@ -400,6 +400,33 @@ describe('Analysis Engine Tests', () => {
       expect(text).toContain('No events found');
     });
 
+    // Regression (audit Q2): the O(n²) all-buckets scan was replaced with a
+    // single pass. Grouping must still be measured against each bucket's KEY
+    // (its first event), not a sliding window, and buckets must stay ordered.
+    test('should bucket relative to the first event of the bucket (Q2)', () => {
+      const spread: MonitoringEvent[] = [
+        { id: 'a', timestamp: 1000, sessionId: 's1', type: 'console', level: 'log', message: 'a' } as ConsoleEvent,
+        { id: 'b', timestamp: 1040, sessionId: 's1', type: 'console', level: 'log', message: 'b' } as ConsoleEvent, // 40ms from key → same bucket
+        { id: 'c', timestamp: 1060, sessionId: 's1', type: 'console', level: 'log', message: 'c' } as ConsoleEvent, // 60ms from key(1000) → new bucket, even though 20ms from b
+        { id: 'd', timestamp: 5000, sessionId: 's1', type: 'console', level: 'log', message: 'd' } as ConsoleEvent  // far away → own bucket
+      ];
+      const formatter = new TimelineFormatter(spread);
+      const timeline = formatter.formatTimeline();
+
+      expect(timeline).toHaveLength(3);
+      expect(timeline[0]?.timestamp).toBe(1000);
+      expect(timeline[0]?.events.map(e => e.id)).toEqual(['a', 'b']);
+      expect(timeline[1]?.timestamp).toBe(1060);
+      expect(timeline[1]?.events.map(e => e.id)).toEqual(['c']);
+      expect(timeline[2]?.timestamp).toBe(5000);
+
+      // Range filter uses the bucket key directly; a range covering only the
+      // middle bucket returns exactly that bucket.
+      const mid = formatter.formatTimeline({ start: 1055, end: 1065 });
+      expect(mid).toHaveLength(1);
+      expect(mid[0]?.timestamp).toBe(1060);
+    });
+
     test('should filter by time range', () => {
       const range: TimeRange = {
         start: 1640995200100,

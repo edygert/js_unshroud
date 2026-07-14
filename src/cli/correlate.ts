@@ -9,7 +9,8 @@ interface CorrelateArgs {
   input: string;
   rulesFile?: string;
   rules?: string;
-  format?: 'text' | 'json';
+  // Captured verbatim at parse time; validateArgs rejects out-of-set values (Q7).
+  format?: string;
   output?: string;
 }
 
@@ -33,7 +34,7 @@ export function parseCorrelateArgs(): CorrelateArgs {
   let input: string | undefined;
   let rulesFile: string | undefined;
   let rules: string | undefined;
-  let format: 'text' | 'json' | undefined;
+  let format: string | undefined;
   let output: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -50,9 +51,8 @@ export function parseCorrelateArgs(): CorrelateArgs {
       rules = nextArg;
       i++;
     } else if (arg === '--format' && nextArg) {
-      if (nextArg === 'text' || nextArg === 'json') {
-        format = nextArg;
-      }
+      // Capture verbatim; validateArgs enforces the allowed set (Q7).
+      format = nextArg;
       i++;
     } else if (arg === '--output' && nextArg) {
       output = nextArg;
@@ -304,6 +304,10 @@ export function formatEventSummary(event: MonitoringEvent): string {
     }
     case 'download':
       return `Download ${(event).eventType}: ${(event).filename ?? (event).url ?? (event).href ?? '(no filename)'}`;
+    default:
+      // Defensive fallback for unknown/forward-version event types read from a
+      // hand-edited or newer JSONL, mirroring TimelineFormatter (Q8).
+      return `${(event as MonitoringEvent).type} event`;
   }
 }
 

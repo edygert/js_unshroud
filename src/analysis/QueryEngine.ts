@@ -62,9 +62,8 @@ export class QueryEngine {
       if (filter.status && networkEvent.status !== filter.status) {
         return false;
       }
-      if (filter.correlationId && networkEvent.correlationId !== filter.correlationId) {
-        return false;
-      }
+      // correlationId is handled by the general check below (Q9); network events
+      // carry it on the base event too, so a network-specific check is redundant.
     }
 
     // Console-specific filters
